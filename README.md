@@ -76,9 +76,9 @@ npm run build
 
 ```
 TrafficControlPlan/
-├── traffic-control-planner.jsx   # Main React component (all features)
 └── my-app/                       # Vite + React app host
     ├── src/
+    │   ├── traffic-control-planner.jsx   # Main component (all features)
     │   ├── App.jsx               # Mounts TrafficControlPlanner
     │   └── main.jsx
     └── package.json
@@ -89,5 +89,5 @@ TrafficControlPlan/
 ## Stack
 - [React 19](https://react.dev/) — UI and state management
 - [Vite 7](https://vite.dev/) — dev server and bundler
-- HTML5 Canvas 2D API — all rendering
+- [react-konva](https://konvajs.org/docs/react/) — declarative canvas rendering
 - [OpenStreetMap](https://www.openstreetmap.org/) tile server — map background

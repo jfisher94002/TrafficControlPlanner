@@ -1049,6 +1049,10 @@ export default function TrafficControlPlanner() {
   const [curvePoints, setCurvePoints] = useState([]);
   const [snapIndicator, setSnapIndicator] = useState(null);
   const [signSubTab, setSignSubTab] = useState("library");
+  const [customSigns, setCustomSigns] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("tcp_custom_signs") || "[]"); }
+    catch { return []; }
+  });
 
   const lastClickTimeRef = useRef(0);
   const lastClickPosRef = useRef(null);
@@ -1108,6 +1112,11 @@ export default function TrafficControlPlanner() {
   useEffect(() => {
     setPolyPoints([]); setCurvePoints([]);
   }, [roadDrawMode]);
+
+  // Sync custom signs to localStorage
+  useEffect(() => {
+    localStorage.setItem("tcp_custom_signs", JSON.stringify(customSigns));
+  }, [customSigns]);
 
   // Passive wheel listener to prevent page scroll
   useEffect(() => {
@@ -1604,6 +1613,28 @@ export default function TrafficControlPlanner() {
                         </button>
                       ))}
                     </div>
+                    {customSigns.length > 0 && (
+                      <>
+                        {sectionTitle("My Custom Signs")}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+                          {customSigns.map((sign) => (
+                            <div key={sign.id} style={{ position: "relative" }}>
+                              <button onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                                style={{ width: "100%", padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                                <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none" }}>
+                                  {sign.label.slice(0, 4)}
+                                </div>
+                                <span style={{ fontSize: 8, color: COLORS.textMuted, textAlign: "center" }}>{sign.label}</span>
+                              </button>
+                              <button onClick={() => setCustomSigns((prev) => prev.filter((s) => s.id !== sign.id))}
+                                style={{ position: "absolute", top: 2, right: 2, background: "rgba(239,68,68,0.15)", border: "none", color: COLORS.danger, borderRadius: 3, width: 14, height: 14, fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                     <div style={{ marginTop: 12, padding: 8, background: "rgba(245,158,11,0.05)", borderRadius: 6, border: `1px solid rgba(245,158,11,0.1)` }}>
                       <div style={{ fontSize: 9, color: COLORS.accent }}>Select a sign then click on the canvas to place it.</div>
                     </div>
@@ -1613,9 +1644,9 @@ export default function TrafficControlPlanner() {
                 {signSubTab === "editor" && (
                   <SignEditorPanel
                     onUseSign={(signData) => {
+                      setCustomSigns((prev) => [...prev, signData]);
                       setSelectedSign(signData);
                       switchTool("sign");
-                      setSignSubTab("library");
                     }}
                   />
                 )}

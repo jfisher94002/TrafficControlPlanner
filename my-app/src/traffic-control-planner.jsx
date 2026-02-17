@@ -752,7 +752,7 @@ function ToolButton({ tool, active, onClick }) {
 
 // ─── SIGN EDITOR PANEL ───────────────────────────────────────────────────────
 
-function SignEditorPanel({ onUseSign }) {
+function SignEditorPanel({ onUseSign, onSaveToLibrary }) {
   const [shape, setShape] = useState("diamond");
   const [text, setText] = useState("CUSTOM");
   const [bgColor, setBgColor] = useState("#f97316");
@@ -834,17 +834,30 @@ function SignEditorPanel({ onUseSign }) {
           style={{ borderRadius: 6, border: `1px solid ${COLORS.panelBorder}` }} />
       </div>
 
-      <button
-        onClick={() => onUseSign({ ...signData, id: "custom_" + uid() })}
-        style={{
-          padding: "8px 0", background: COLORS.accentDim,
-          border: `1px solid ${COLORS.accent}`, borderRadius: 6,
-          color: COLORS.accent, cursor: "pointer", fontSize: 11,
-          fontFamily: "inherit", fontWeight: 600, letterSpacing: 0.5,
-        }}
-      >
-        ✓ Place This Sign
-      </button>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={() => onUseSign({ ...signData, id: "custom_" + uid() })}
+          style={{
+            flex: 1, padding: "8px 0", background: COLORS.accentDim,
+            border: `1px solid ${COLORS.accent}`, borderRadius: 6,
+            color: COLORS.accent, cursor: "pointer", fontSize: 11,
+            fontFamily: "inherit", fontWeight: 600, letterSpacing: 0.5,
+          }}
+        >
+          ✓ Place
+        </button>
+        <button
+          onClick={() => onSaveToLibrary({ ...signData, id: "custom_" + uid() })}
+          style={{
+            flex: 1, padding: "8px 0", background: "transparent",
+            border: `1px solid ${COLORS.panelBorder}`, borderRadius: 6,
+            color: COLORS.textMuted, cursor: "pointer", fontSize: 11,
+            fontFamily: "inherit", fontWeight: 600, letterSpacing: 0.5,
+          }}
+        >
+          + Save
+        </button>
+      </div>
     </div>
   );
 }
@@ -1644,9 +1657,11 @@ export default function TrafficControlPlanner() {
                 {signSubTab === "editor" && (
                   <SignEditorPanel
                     onUseSign={(signData) => {
-                      setCustomSigns((prev) => [...prev, signData]);
                       setSelectedSign(signData);
                       switchTool("sign");
+                    }}
+                    onSaveToLibrary={(signData) => {
+                      setCustomSigns((prev) => [...prev, signData]);
                     }}
                   />
                 )}

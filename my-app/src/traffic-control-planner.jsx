@@ -864,11 +864,23 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }) {
 
 // ─── PROPERTY PANEL ──────────────────────────────────────────────────────────
 
-function PropertyPanel({ selected, objects, onUpdate, onDelete }) {
+function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpdateMeta }) {
   if (!selected) {
     return (
-      <div style={{ padding: 16, color: COLORS.textDim, fontSize: 12, textAlign: "center" }}>
-        Select an object to edit its properties
+      <div style={{ padding: 12 }}>
+        {sectionTitle("Plan Info")}
+        {[["Project #", "projectNumber"], ["Client", "client"], ["Location", "location"]].map(([label, key]) => (
+          <label key={key} style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 8, fontSize: 11, color: COLORS.textMuted }}>
+            {label}
+            <input value={planMeta[key]} onChange={(e) => onUpdateMeta({ ...planMeta, [key]: e.target.value })}
+              style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "5px 8px", borderRadius: 4, fontSize: 11, fontFamily: "inherit", outline: "none" }} />
+          </label>
+        ))}
+        <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: COLORS.textMuted }}>
+          Notes
+          <textarea value={planMeta.notes} onChange={(e) => onUpdateMeta({ ...planMeta, notes: e.target.value })}
+            rows={3} style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "5px 8px", borderRadius: 4, fontSize: 11, fontFamily: "inherit", resize: "vertical", outline: "none" }} />
+        </label>
       </div>
     );
   }
@@ -1047,6 +1059,10 @@ export default function TrafficControlPlanner() {
   const [history, setHistory] = useState([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [planTitle, setPlanTitle] = useState("Untitled Traffic Control Plan");
+  const [planId, setPlanId] = useState(uid);
+  const [planCreatedAt, setPlanCreatedAt] = useState(() => new Date().toISOString());
+  const [planMeta, setPlanMeta] = useState({ projectNumber: "", client: "", location: "", notes: "" });
+  const fileInputRef = useRef(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -1447,6 +1463,64 @@ export default function TrafficControlPlanner() {
     if (confirm("Clear all objects?")) { setObjects([]); pushHistory([]); setSelected(null); }
   };
 
+  const newPlan = () => {
+    if (objects.length > 0 && !confirm("Start a new plan? Unsaved changes will be lost.")) return;
+    setObjects([]); pushHistory([]); setSelected(null);
+    setPlanTitle("Untitled Traffic Control Plan");
+    setPlanId(uid());
+    setPlanCreatedAt(new Date().toISOString());
+    setPlanMeta({ projectNumber: "", client: "", location: "", notes: "" });
+    setMapCenter(null);
+    setOffset({ x: 0, y: 0 });
+    setZoom(1);
+  };
+
+  const savePlan = () => {
+    const plan = {
+      id: planId,
+      name: planTitle,
+      createdAt: planCreatedAt,
+      updatedAt: new Date().toISOString(),
+      userId: null,
+      mapCenter: mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lon, zoom: mapCenter.zoom } : null,
+      canvasOffset: offset,
+      canvasZoom: zoom,
+      canvasState: { objects },
+      metadata: planMeta,
+    };
+    const blob = new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${planTitle.replace(/[^a-z0-9]/gi, "_")}.tcp.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const loadPlan = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const plan = JSON.parse(evt.target.result);
+        setPlanTitle(plan.name || "Untitled Traffic Control Plan");
+        setPlanId(plan.id || uid());
+        setPlanCreatedAt(plan.createdAt || new Date().toISOString());
+        setPlanMeta(plan.metadata || { projectNumber: "", client: "", location: "", notes: "" });
+        if (plan.mapCenter) setMapCenter({ lat: plan.mapCenter.lat, lon: plan.mapCenter.lng, zoom: plan.mapCenter.zoom });
+        if (plan.canvasOffset) setOffset(plan.canvasOffset);
+        if (plan.canvasZoom) setZoom(plan.canvasZoom);
+        const loaded = plan.canvasState?.objects || [];
+        setObjects(loaded); pushHistory(loaded); setSelected(null);
+      } catch {
+        alert("Failed to load plan. Make sure it's a valid .tcp.json file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   const zoomIn = () => setZoom((z) => Math.min(MAX_ZOOM, z * 1.2));
   const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, z / 1.2));
   const zoomFit = () => { setZoom(1); setOffset({ x: 0, y: 0 }); };
@@ -1497,8 +1571,13 @@ export default function TrafficControlPlanner() {
           <input
             value={planTitle}
             onChange={(e) => setPlanTitle(e.target.value)}
-            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, width: 280, padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
+            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, width: 220, padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
           />
+          <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
+          <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
+          <button onClick={() => fileInputRef.current.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
+          <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
+          <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 
         <div style={{ position: "relative", flex: "0 1 420px" }}>
@@ -1832,7 +1911,7 @@ export default function TrafficControlPlanner() {
               Properties
               <button onClick={() => setRightPanel(false)} style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14 }}>×</button>
             </div>
-            <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} />
+            <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
 
             <div style={{ marginTop: "auto", borderTop: `1px solid ${COLORS.panelBorder}`, padding: 12 }}>
               {sectionTitle("Layers")}

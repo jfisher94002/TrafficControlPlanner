@@ -23,3 +23,6 @@ my-app/dist/
 # Editor
 .vscode/
 .idea/
+
+# Saved plan files
+*.tcp.json

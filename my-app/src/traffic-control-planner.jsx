@@ -1661,7 +1661,17 @@ export default function TrafficControlPlanner() {
                       switchTool("sign");
                     }}
                     onSaveToLibrary={(signData) => {
-                      setCustomSigns((prev) => [...prev, signData]);
+                      const existing = customSigns.find((s) =>
+                        s.label === signData.label && s.shape === signData.shape &&
+                        s.color === signData.color && s.textColor === signData.textColor
+                      );
+                      if (existing) {
+                        if (confirm(`"${signData.label}" is already in your library. Overwrite it?`)) {
+                          setCustomSigns((prev) => prev.map((s) => s.id === existing.id ? { ...signData, id: existing.id } : s));
+                        }
+                      } else {
+                        setCustomSigns((prev) => [...prev, signData]);
+                      }
                     }}
                   />
                 )}

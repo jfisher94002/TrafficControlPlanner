@@ -357,7 +357,8 @@ function RoadSegment({ obj, isSelected }) {
 }
 
 function PolylineRoad({ obj, isSelected }) {
-  const { points, width, lanes, roadType } = obj;
+  const { points, width, lanes, roadType, smooth } = obj;
+  const tension = smooth ? 0.5 : 0;
   if (!points || points.length < 2) return null;
 
   const pts = [];
@@ -399,9 +400,9 @@ function PolylineRoad({ obj, isSelected }) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={tension} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -666,12 +667,13 @@ function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicat
     );
   }
 
-  // Polyline in-progress
-  if (tool === "road" && roadDrawMode === "poly" && polyPoints.length > 0) {
+  // Polyline / smooth in-progress
+  if (tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length > 0) {
     const flat = [...polyPoints.flatMap((p) => [p.x, p.y]), previewTarget.x, previewTarget.y];
+    const previewTension = roadDrawMode === "smooth" ? 0.5 : 0;
     elements.push(
       <Line key="poly-preview" points={flat}
-        stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} listening={false} />
+        stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={previewTension} listening={false} />
     );
     polyPoints.forEach((p, idx) => {
       elements.push(
@@ -1194,8 +1196,8 @@ export default function TrafficControlPlanner() {
       }
 
       if (key === "ENTER") {
-        if (tool === "road" && roadDrawMode === "poly" && polyPoints.length >= 2) {
-          const newRoad = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
+        if (tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length >= 2) {
+          const newRoad = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
         }
@@ -1326,7 +1328,7 @@ export default function TrafficControlPlanner() {
         return;
       }
 
-      if (roadDrawMode === "poly") {
+      if (roadDrawMode === "poly" || roadDrawMode === "smooth") {
         const now = Date.now();
         const last = lastClickPosRef.current;
         const isDouble = (now - lastClickTimeRef.current < 350) && last && dist(x, y, last.x, last.y) < 15 / zoom;
@@ -1334,7 +1336,7 @@ export default function TrafficControlPlanner() {
         lastClickPosRef.current = { x, y };
 
         if (isDouble && polyPoints.length >= 2) {
-          const newRoad = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
+          const newRoad = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
         } else {
@@ -1550,7 +1552,7 @@ export default function TrafficControlPlanner() {
 
   const isSearchError = searchStatus.startsWith("Address lookup failed") || searchStatus.startsWith("No matches") || searchStatus.startsWith("Selected result");
 
-  const polyInProgress = tool === "road" && roadDrawMode === "poly" && polyPoints.length > 0;
+  const polyInProgress = tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length > 0;
   const curveInProgress = tool === "road" && roadDrawMode === "curve" && curvePoints.length > 0;
 
   // suppress mapRenderTick lint warning — used to trigger re-render when tiles load
@@ -1779,6 +1781,7 @@ export default function TrafficControlPlanner() {
                   {[
                     { id: "straight", label: "Straight", icon: "━" },
                     { id: "poly",     label: "Polyline", icon: "⌇" },
+                    { id: "smooth",   label: "Smooth",   icon: "∿" },
                     { id: "curve",    label: "Curve",    icon: "⌒" },
                   ].map((mode) => (
                     <button key={mode.id}
@@ -1812,6 +1815,7 @@ export default function TrafficControlPlanner() {
                   <div style={{ fontSize: 9, color: COLORS.accent }}>
                     {roadDrawMode === "straight" && "Click and drag to draw a straight road."}
                     {roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
+                    {roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
                     {roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
                   </div>
                 </div>

@@ -1,0 +1,20 @@
+version: 1
+
+rules:
+  # React / JSX
+  - id: no-unused-state
+    enabled: true
+  - id: react-hooks-exhaustive-deps
+    enabled: true
+
+ignore:
+  # Don't flag generated or vendored files
+  paths:
+    - my-app/dist/**
+    - my-app/node_modules/**
+
+github:
+  # Post a summary comment on every PR
+  post_summary: true
+  # Request changes (not just comments) when issues are found
+  request_changes_on_issues: false

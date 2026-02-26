@@ -27,3 +27,8 @@ my-app/dist/
 # Saved plan files
 *.tcp.json
 *.tcp*.json
+
+# Documents & generated files
+*.docx
+*.pdf
+tcp_app_architecture_handoff.md

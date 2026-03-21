@@ -16,16 +16,24 @@ TrafficControlPlanner/           # repo root
 │   ├── copilot-instructions.md  # this file
 │   └── workflows/
 │       └── code-review.yml      # CI: build + lint on push/PR to main or dev
-├── my-app/                      # Vite + React application (all active code lives here)
+├── my-app/                      # Vite + React + TypeScript application (all active code lives here)
 │   ├── src/
-│   │   ├── traffic-control-planner.jsx  # Main component (~1,956 lines) — ALL features
-│   │   ├── App.jsx                      # Thin wrapper that mounts TrafficControlPlanner
-│   │   ├── main.jsx                     # React entry point
+│   │   ├── traffic-control-planner.tsx  # Main component (~2,300 lines) — ALL features
+│   │   ├── types.ts                     # Shared TypeScript types (CanvasObject union, PlanMeta, etc.)
+│   │   ├── utils.ts                     # Pure helper functions (uid, dist, geocodeAddress, etc.)
+│   │   ├── App.tsx                      # Thin wrapper that mounts TrafficControlPlanner
+│   │   ├── main.tsx                     # React entry point
 │   │   ├── App.css
 │   │   └── index.css
+│   ├── src/test/
+│   │   ├── planner.test.tsx             # UI integration tests (Vitest + React Testing Library)
+│   │   ├── utils.test.ts                # Unit tests for utils.ts
+│   │   └── setup.ts                     # Vitest global setup (mocks react-konva, localStorage)
 │   ├── public/
 │   ├── eslint.config.js         # ESLint flat-config (eslint 9)
-│   ├── vite.config.js           # Vite config with react-konva alias fixes
+│   ├── vite.config.ts           # Vite config with react-konva alias fixes
+│   ├── vitest.config.ts         # Vitest configuration
+│   ├── tsconfig.json            # TypeScript config
 │   ├── index.html
 │   └── package.json
 ├── amplify.yml                  # AWS Amplify build config (frontend hosting)
@@ -43,9 +51,11 @@ TrafficControlPlanner/           # repo root
 | Layer | Technology | Version |
 |-------|-----------|---------|
 | Frontend framework | React | 19 |
+| Language | TypeScript | 5 |
 | Bundler / dev server | Vite | 7 |
 | Canvas rendering | react-konva + konva | 19 / 10 |
 | Map tiles | OpenStreetMap (no API key needed) | — |
+| Testing | Vitest + React Testing Library | — |
 | Linter | ESLint | 9 (flat config) |
 | CI | GitHub Actions | — |
 | Hosting | AWS Amplify (auto-deploy from GitHub) | — |
@@ -70,8 +80,17 @@ npm run dev
 # Production build (output: my-app/dist/)
 npm run build
 
+# Type-check only (no emit)
+npm run typecheck
+
 # Lint
 npm run lint
+
+# Run tests (single pass)
+npm test
+
+# Run tests in watch mode
+npm run test:watch
 
 # Preview production build locally
 npm run preview
@@ -81,15 +100,21 @@ npm run preview
 
 ## Key Files
 
-### `my-app/src/traffic-control-planner.jsx`
-The entire application in one large React component (~1,956 lines). It contains:
+### `my-app/src/traffic-control-planner.tsx`
+The entire application in one large React component (~2,300 lines). It contains:
 - **Constants & data** at the top: `COLORS`, `SIGN_SHAPES`, `SIGN_CATEGORIES`, `DEVICES`, `ROAD_TYPES`, `TOOLS`
-- **Helper functions**: `uid()`, `dist()`, `angleBetween()`, `snapToEndpoint()`, `sampleBezier()`, `distToSegment()`, `distToPolyline()`
+- **Sub-components**: `NorthArrow`, `ManifestPanel`, `PropertyPanel`, `SignEditorPanel`, tool-bar shapes
 - **The main `TrafficControlPlanner` component** with all canvas interaction, tool state, and rendering
 
-### `my-app/vite.config.js`
+### `my-app/src/types.ts`
+All shared TypeScript interfaces and type aliases: `CanvasObject` (discriminated union), `PlanMeta`, `MapCenter`, `RoadType`, `SignData`, `DeviceData`, `ToolDef`, and more.
+
+### `my-app/src/utils.ts`
+Pure helper functions extracted from the main component: `uid()`, `dist()`, `angleBetween()`, `geoRoadWidthPx()`, `snapToEndpoint()`, `sampleBezier()`, `distToPolyline()`, `geocodeAddress()`, `calcTaperLength()`, `cloneObject()`, and type-guard helpers.
+
+### `my-app/vite.config.ts`
 Contains React module aliases required to prevent duplicate React instances with react-konva. Do not remove these aliases:
-```js
+```ts
 resolve: {
   alias: {
     react: path.resolve(__dirname, 'node_modules/react'),
@@ -112,13 +137,15 @@ Object types stored in state:
 | Type | Description |
 |------|-------------|
 | `road` | Straight road segment (`x1, y1, x2, y2`, `roadType`) |
-| `polyline_road` | Multi-point road (`points[]`, `roadType`) |
+| `polyline_road` | Multi-point road (`points[]`, `roadType`, `smooth`) |
 | `curve_road` | Quadratic Bézier road (`points[3]`, `roadType`) |
 | `sign` | Sign placed on canvas (`x, y, rotation, scale, signData`) |
-| `device` | Traffic control device (`x, y, rotation, scale, deviceData`) |
-| `zone` | Work zone rectangle (`x, y, width, height, rotation`) |
-| `arrow` | Directional arrow (`x1, y1, x2, y2`) |
-| `text` | Text label (`x, y, text, fontSize`) |
+| `device` | Traffic control device (`x, y, rotation, deviceData`) |
+| `zone` | Work zone rectangle (`x, y, w, h`) |
+| `arrow` | Directional arrow (`x1, y1, x2, y2, color`) |
+| `text` | Text label (`x, y, text, fontSize, bold, color`) |
+| `measure` | Distance measurement line (`x1, y1, x2, y2`) |
+| `taper` | Lane-closure taper (`x, y, rotation, laneWidth, speed, taperLength, numLanes`) |
 
 ---
 
@@ -132,9 +159,10 @@ Object types stored in state:
 | Sign | S | Place signs |
 | Device | D | Place traffic control devices |
 | Zone | Z | Draw work zone rectangles |
-| Arrow | A | Draw directional arrows |
 | Text | T | Add text labels |
 | Measure | M | Measure distances |
+| Arrow | A | Draw directional arrows |
+| Taper | P | Draw lane-closure tapers (MUTCD-compliant length) |
 | Erase | X | Delete objects |
 
 Global shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo, `Escape` cancel current operation.
@@ -174,12 +202,14 @@ Auto-deploys from GitHub on push:
 
 ## Development Roadmap
 
-### Phase 1 — Core Save/Load + Auth (next priority)
-- Plan naming UI
-- Canvas serialization to JSON (see schema in `TCP_App_Architecture_Handoff.md`)
-- Save/load via AWS S3
-- User auth via AWS Cognito (Amplify)
-- Plan list / dashboard
+### Phase 1 — Core Save/Load + Auth ✅ (local save/load complete)
+- ✅ Plan naming UI
+- ✅ Canvas serialization to JSON (`.tcp.json` format)
+- ✅ Local save/load (browser download / file open)
+- ✅ Autosave to `localStorage`
+- ☐ Cloud save/load via AWS S3
+- ☐ User auth via AWS Cognito (Amplify)
+- ☐ Plan list / dashboard
 
 ### Phase 2 — Export + Polish
 - PDF export (server-side via ReportLab on AWS Lambda)
@@ -214,10 +244,10 @@ Auto-deploys from GitHub on push:
 
 ## Known Issues / Workarounds
 
-- **react-konva peer dependency:** react-konva requires exact React version alignment. The `vite.config.js` aliases (`react`, `react/jsx-runtime`, `react-dom`) resolve duplicate React instance errors that would otherwise cause runtime failures. Do not remove or simplify these aliases.
-- **No test suite:** There are currently no unit or integration tests. Do not add a testing framework unless explicitly requested. Validate changes manually with `npm run dev`.
-- **Single large component:** `traffic-control-planner.jsx` intentionally contains all features in one file. Do not split it into sub-components without careful consideration of the shared state model.
+- **react-konva peer dependency:** react-konva requires exact React version alignment. The `vite.config.ts` aliases (`react`, `react/jsx-runtime`, `react-dom`) resolve duplicate React instance errors that would otherwise cause runtime failures. Do not remove or simplify these aliases.
+- **Single large component:** `traffic-control-planner.tsx` intentionally contains all features in one file. Do not split it into sub-components without careful consideration of the shared state model.
 - **`no-unused-vars` pattern:** The ESLint config suppresses warnings for uppercase-named variables (`varsIgnorePattern: '^[A-Z_]'`). When adding new data constants, follow the `SCREAMING_SNAKE_CASE` convention to avoid lint errors.
+- **`void mapRenderTick`:** The `void` expression at the end of the render function is an intentional lint suppression to consume the `mapRenderTick` state variable (used only as a render trigger).
 # GitHub Copilot Code Review Instructions
 
 ## Project Overview
@@ -227,14 +257,18 @@ Plans are saved/loaded as `.tcp.json` files. The app is deployed via AWS Amplify
 
 ## Stack
 - **React 19** with hooks (no Redux, no class components)
+- **TypeScript 5** — all source files are `.tsx` / `.ts`
 - **react-konva / Konva** for all canvas rendering — do not suggest switching back to raw Canvas 2D
 - **Vite** build tool
+- **Vitest + React Testing Library** — tests live in `my-app/src/test/`
 - **No backend yet** — auth and cloud storage are planned (Phase 3), not present
 
 ## Architecture
-All application code lives in a single file: `my-app/src/traffic-control-planner.jsx`.
+All application code lives in a single file: `my-app/src/traffic-control-planner.tsx`.
 This is intentional for the current prototype phase. Do not suggest splitting into many files
 unless the file exceeds ~3,000 lines.
+
+Shared types live in `my-app/src/types.ts` and pure helpers in `my-app/src/utils.ts`.
 
 ### Key patterns to understand before flagging issues:
 - **3-layer Konva Stage**: Layer 1 = map tiles (screen-space), Layer 2 = world objects
@@ -257,38 +291,48 @@ unless the file exceeds ~3,000 lines.
 - State mutations (objects array must be treated as immutable)
 - Accessibility regressions on panel UI controls
 - Broken plan save/load JSON schema compatibility
+- TypeScript type errors or unsafe `as` casts that bypass runtime safety
 
 ### Don't flag these:
 - The single-file architecture — intentional for prototype stage
 - Inline styles — used throughout intentionally for this project
-- Missing TypeScript — not planned for this phase
 - Bundle size warning from Vite — known, acceptable for now
-- `localStorage` usage for custom signs — intentional, documented behavior
+- `localStorage` usage for autosave and custom signs — intentional, documented behavior
 - The `void mapRenderTick` line — intentional lint suppression
 
 ## Data Model
-Canvas objects are plain JS objects stored in the `objects` array:
-```js
+Canvas objects are TypeScript-typed values stored in the `objects: CanvasObject[]` array
+(see `my-app/src/types.ts` for the full discriminated union):
+```ts
 // Road (straight)
 { id, type: "road", x1, y1, x2, y2, width, realWidth, lanes, roadType }
 
 // Polyline / smooth road
-{ id, type: "polyline_road", points: [{x,y}...], width, realWidth, lanes, roadType, smooth? }
+{ id, type: "polyline_road", points: [{x,y}...], width, realWidth, lanes, roadType, smooth }
 
 // Bezier curve road
 { id, type: "curve_road", points: [{x,y}, controlPt, {x,y}], width, realWidth, lanes, roadType }
 
 // Sign
-{ id, type: "sign", x, y, signData: { label, shape, color, textColor }, rotation?, scale? }
+{ id, type: "sign", x, y, signData: { label, shape, color, textColor }, rotation, scale }
 
 // Device (cone, barrel, etc.)
-{ id, type: "device", x, y, deviceId, rotation? }
+{ id, type: "device", x, y, deviceData: { id, label, icon, color }, rotation }
 
 // Work zone
 { id, type: "zone", x, y, w, h }
 
-// Annotation
-{ id, type: "arrow"|"measure"|"text", ... }
+// Directional arrow
+{ id, type: "arrow", x1, y1, x2, y2, color }
+
+// Text label
+{ id, type: "text", x, y, text, fontSize, bold, color }
+
+// Distance measurement
+{ id, type: "measure", x1, y1, x2, y2 }
+
+// Lane-closure taper
+{ id, type: "taper", x, y, rotation, laneWidth, speed, taperLength, manualLength, numLanes }
 ```
 
 ## Plan File Format (.tcp.json)
@@ -298,10 +342,14 @@ Canvas objects are plain JS objects stored in the `objects` array:
   "name": "<plan title>",
   "createdAt": "<ISO date>",
   "updatedAt": "<ISO date>",
-  "mapCenter": { "lat": 0, "lng": 0 },
+  "userId": null,
+  "mapCenter": { "lat": 0, "lng": 0, "zoom": 16 },
   "canvasOffset": { "x": 0, "y": 0 },
   "canvasZoom": 1,
   "canvasState": { "objects": [] },
   "metadata": { "projectNumber": "", "client": "", "location": "", "notes": "" }
 }
 ```
+
+> **Note:** `mapCenter.lng` is used in the file format; the internal `MapCenter` type uses `lon`.
+> The `loadPlan` / `savePlan` functions map between the two.

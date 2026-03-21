@@ -1,6 +1,6 @@
 # Traffic Control Planner
 
-A browser-based traffic control plan (TCP) diagramming tool built with React and HTML5 Canvas. Draw roads over a live map background, place signs and traffic control devices, and export your plan.
+A browser-based traffic control plan (TCP) diagramming tool built with React and TypeScript. Draw roads over a live map background, place MUTCD signs and traffic control devices, and export your plan.
 
 ---
 
@@ -13,6 +13,7 @@ A browser-based traffic control plan (TCP) diagramming tool built with React and
 ### Road Drawing
 - **Straight roads** — click and drag to place a road segment
 - **Polyline roads** — click to add points, double-click or press Enter to finish, Esc to cancel
+- **Smooth roads** — polyline with Catmull-Rom spline smoothing
 - **Curved roads** — 3-click quadratic Bézier (start → control point → end)
 - **Snap to endpoints** — new roads snap to the endpoints of existing roads for clean connections
 - Road types: 2-Lane, 4-Lane, 6-Lane Divided, Highway
@@ -34,17 +35,27 @@ A browser-based traffic control plan (TCP) diagramming tool built with React and
 | Sign | S | Place signs |
 | Device | D | Place traffic control devices |
 | Zone | Z | Draw work zone rectangles |
-| Arrow | A | Draw directional arrows |
 | Text | T | Add text labels |
 | Measure | M | Measure distances |
-| Erase | E | Delete objects |
+| Arrow | A | Draw directional arrows |
+| Taper | P | Draw lane-closure tapers (MUTCD-compliant length) |
+| Erase | X | Delete objects |
+
+### Plan Management
+- **Save** — download the current plan as a `.tcp.json` file
+- **Load** — open a previously saved `.tcp.json` file
+- **New** — start a fresh plan (with unsaved-change confirmation)
+- **Autosave** — plan state is automatically saved to `localStorage` between sessions
+- **Plan metadata** — record project number, client, location, and notes in the Properties panel
 
 ### Other
 - Undo/Redo (Ctrl+Z / Ctrl+Shift+Z)
-- Mini-map overview
-- Property panel for editing selected objects (rotation, scale, colors)
-- Export to PNG
+- North Arrow compass overlay (togglable)
+- Manifest panel — live count of all objects on the canvas broken down by type
+- Property panel for editing selected objects (rotation, scale, colors, taper parameters)
+- Export to PNG (2× resolution)
 - Zoom in/out with scroll wheel or toolbar buttons
+- Address/intersection search powered by OpenStreetMap Nominatim
 
 ---
 
@@ -70,17 +81,32 @@ cd my-app
 npm run build
 ```
 
+### Run Tests
+
+```bash
+cd my-app
+npm test
+```
+
 ---
 
 ## Project Structure
 
 ```
-TrafficControlPlan/
-└── my-app/                       # Vite + React app host
+TrafficControlPlanner/
+└── my-app/                       # Vite + React + TypeScript app
     ├── src/
-    │   ├── traffic-control-planner.jsx   # Main component (all features)
-    │   ├── App.jsx               # Mounts TrafficControlPlanner
-    │   └── main.jsx
+    │   ├── traffic-control-planner.tsx  # Main component (all features)
+    │   ├── types.ts                     # Shared TypeScript types
+    │   ├── utils.ts                     # Pure helper functions
+    │   ├── App.tsx                      # Mounts TrafficControlPlanner
+    │   ├── main.tsx                     # React entry point
+    │   └── test/
+    │       ├── planner.test.tsx         # UI integration tests
+    │       ├── utils.test.ts            # Unit tests for utils
+    │       └── setup.ts                 # Vitest/Testing Library setup
+    ├── vite.config.ts
+    ├── vitest.config.ts
     └── package.json
 ```
 
@@ -88,6 +114,8 @@ TrafficControlPlan/
 
 ## Stack
 - [React 19](https://react.dev/) — UI and state management
+- [TypeScript 5](https://www.typescriptlang.org/) — static typing
 - [Vite 7](https://vite.dev/) — dev server and bundler
 - [react-konva](https://konvajs.org/docs/react/) — declarative canvas rendering
 - [OpenStreetMap](https://www.openstreetmap.org/) tile server — map background
+- [Vitest](https://vitest.dev/) + [React Testing Library](https://testing-library.com/) — unit and integration tests

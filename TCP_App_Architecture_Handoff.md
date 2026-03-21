@@ -8,13 +8,26 @@ Building a web-based traffic control plan designer that competes with Invarion R
 
 ## Current Prototype Status
 
-- **Framework:** Vite + React
-- **Map layer:** OpenMap API (aerial/street imagery)
-- **Drawing layer:** Raw HTML Canvas
+- **Framework:** Vite + React + TypeScript
+- **Map layer:** OpenStreetMap tile API (no API key required)
+- **Drawing layer:** react-konva (Konva.js) — 3-layer Stage (map tiles / world objects / drawing overlays)
 - **Working features:**
-  - Drag-and-drop objects on map
-  - Road/lane drawing tools
-  - MUTCD sign library
+  - Drag-and-drop objects on map (select, move, rotate, scale, delete)
+  - Road drawing: straight, polyline, smooth (Catmull-Rom), and Bézier curve
+  - MUTCD sign library + custom sign editor
+  - Traffic control devices (cones, barrels, barriers, flaggers, etc.)
+  - Work zone rectangles
+  - Lane-closure taper tool (MUTCD-compliant auto-calculated length)
+  - Text labels, directional arrows, distance measurements
+  - North Arrow compass overlay
+  - Manifest panel (live object count by type)
+  - Undo / redo (Ctrl+Z / Ctrl+Shift+Z)
+  - Address / intersection search (OpenStreetMap Nominatim)
+  - **Save plan** — downloads `.tcp.json` file locally
+  - **Load plan** — opens `.tcp.json` from disk
+  - **Autosave** — plan state persisted to `localStorage` between sessions
+  - Export to PNG (2× resolution)
+  - Plan metadata: project number, client name, location, notes
 
 ---
 
@@ -22,17 +35,17 @@ Building a web-based traffic control plan designer that competes with Invarion R
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| Frontend | React + TypeScript (Vite) | Already in place |
-| Drawing engine | Raw HTML Canvas | Currently working; consider migrating to Fabric.js/Konva.js later for undo/redo, grouping, multi-select |
-| Map layer | OpenMap API | Already in place |
-| Backend API | FastAPI + Mangum on AWS Lambda | Python backend |
-| Database | Aurora Serverless PostgreSQL + PostGIS | Geospatial plan data |
-| Auth | AWS Cognito (via Amplify) | User pools, JWT |
-| File storage | AWS S3 (via Amplify) | Plan JSON, exported PDFs, sign SVGs |
-| PDF export | ReportLab on Lambda | Server-side PDF generation |
-| Payments | Stripe (webhook → Lambda) | Subscription management |
-| Infrastructure | AWS Amplify (frontend, auth, storage) + AWS SAM (Python Lambda API) | Hybrid approach |
-| CI/CD | Amplify auto-deploy from GitHub | |
+| Frontend | React + TypeScript (Vite) | Implemented — main component in `traffic-control-planner.tsx` |
+| Drawing engine | react-konva / Konva.js | Implemented — 3-layer Stage with pan/zoom transforms |
+| Map layer | OpenStreetMap Nominatim + tile API | Implemented — address search + tile rendering |
+| Backend API | FastAPI + Mangum on AWS Lambda | Planned — Python backend |
+| Database | Aurora Serverless PostgreSQL + PostGIS | Planned — geospatial plan data |
+| Auth | AWS Cognito (via Amplify) | Planned — user pools, JWT |
+| File storage | AWS S3 (via Amplify) | Planned — plan JSON, exported PDFs, sign SVGs |
+| PDF export | ReportLab on Lambda | Planned — server-side PDF generation |
+| Payments | Stripe (webhook → Lambda) | Planned — subscription management |
+| Infrastructure | AWS Amplify (frontend, auth, storage) + AWS SAM (Python Lambda API) | Planned — hybrid approach |
+| CI/CD | Amplify auto-deploy from GitHub | Implemented |
 
 ### Infrastructure Note
 
@@ -48,32 +61,44 @@ Amplify handles frontend hosting, Cognito auth, and S3 storage. The FastAPI back
   "name": "Main St & 5th Ave - Lane Closure",
   "createdAt": "2026-02-16T10:30:00Z",
   "updatedAt": "2026-02-16T14:22:00Z",
-  "userId": "cognito-user-id",
-  "mapCenter": { "lat": 37.7749, "lng": -122.4194 },
-  "mapZoom": 17,
+  "userId": null,
+  "mapCenter": { "lat": 37.7749, "lng": -122.4194, "zoom": 16 },
+  "canvasOffset": { "x": 0, "y": 0 },
+  "canvasZoom": 1,
   "canvasState": {
     "objects": [
       {
+        "id": "abc123",
         "type": "sign",
-        "mutcdCode": "W20-1",
-        "label": "Road Work Ahead",
         "x": 450,
         "y": 320,
         "rotation": 0,
-        "scale": 1.0
+        "scale": 1.0,
+        "signData": { "id": "roadwork", "label": "⚠ ROAD WORK", "shape": "diamond", "color": "#f97316", "textColor": "#111" }
       },
       {
+        "id": "def456",
         "type": "road",
-        "points": [[100, 200], [300, 200], [500, 250]],
-        "laneCount": 2,
-        "width": 24
+        "x1": 100, "y1": 200, "x2": 500, "y2": 250,
+        "lanes": 2, "width": 80, "realWidth": 22, "roadType": "2lane"
+      },
+      {
+        "id": "ghi789",
+        "type": "taper",
+        "x": 300, "y": 400,
+        "rotation": 45,
+        "laneWidth": 12,
+        "speed": 45,
+        "taperLength": 495,
+        "manualLength": false,
+        "numLanes": 1
       }
     ]
   },
   "metadata": {
-    "projectNumber": "",
-    "client": "",
-    "location": "",
+    "projectNumber": "2026-001",
+    "client": "City of Springfield",
+    "location": "Main St & 5th Ave",
     "notes": ""
   }
 }
@@ -84,11 +109,13 @@ Amplify handles frontend hosting, Cognito auth, and S3 storage. The FastAPI back
 ## Development Roadmap (Priority Order)
 
 ### Phase 1 — Core Save/Load + Auth
-1. **Plan naming** — UI for naming/renaming plans
-2. **Canvas serialization** — Serialize full canvas state to JSON
-3. **Save/load plans** — S3 storage for plan JSON files
-4. **User auth** — Cognito via Amplify (sign up, login, plan ownership)
-5. **Plan list/dashboard** — Browse, open, delete saved plans
+1. ✅ **Plan naming** — UI for naming/renaming plans
+2. ✅ **Canvas serialization** — Serialize full canvas state to JSON (`.tcp.json`)
+3. ✅ **Local save/load plans** — Browser download and file-open for plan JSON
+4. ✅ **Autosave** — Plan state persisted to `localStorage` between sessions
+5. ☐ **Cloud save/load plans** — S3 storage for plan JSON files
+6. ☐ **User auth** — Cognito via Amplify (sign up, login, plan ownership)
+7. ☐ **Plan list/dashboard** — Browse, open, delete saved plans
 
 ### Phase 2 — Export + Polish
 6. **PDF export** — Canvas → high-quality PDF with title block, legend, scale

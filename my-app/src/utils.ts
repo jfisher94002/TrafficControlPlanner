@@ -4,6 +4,21 @@ import type {
   StraightRoadObject, ArrowObject, MeasureObject,
 } from './types'
 
+// ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
+
+/**
+ * Returns a deep copy of `obj` with a fresh id and each coordinate offset by
+ * (dx, dy).  Works for all CanvasObject variants.
+ */
+export function cloneObject(obj: CanvasObject, dx = 20, dy = 20): CanvasObject {
+  const newId = uid()
+  if (isPointObject(obj)) return { ...obj, id: newId, x: obj.x + dx, y: obj.y + dy }
+  if (isLineObject(obj))  return { ...obj, id: newId, x1: obj.x1 + dx, y1: obj.y1 + dy, x2: obj.x2 + dx, y2: obj.y2 + dy }
+  if (obj.type === 'polyline_road') return { ...obj, id: newId, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
+  if (obj.type === 'curve_road')    return { ...obj, id: newId, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point] }
+  return { ...(obj as Record<string, unknown>), id: newId } as CanvasObject
+}
+
 // ─── TYPE GUARDS ──────────────────────────────────────────────────────────────
 
 /** Objects with a single x/y position (sign, device, zone, text, taper). */

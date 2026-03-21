@@ -11,7 +11,7 @@ import type {
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, calcTaperLength } from './utils';
+import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, calcTaperLength, cloneObject } from './utils';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -1253,6 +1253,7 @@ export default function TrafficControlPlanner() {
   const [planCreatedAt, setPlanCreatedAt] = useState<string>(() => initialAutosave?.createdAt ?? new Date().toISOString());
   const [planMeta, setPlanMeta] = useState<PlanMeta>(() => initialAutosave?.metadata ?? { projectNumber: "", client: "", location: "", notes: "" });
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const [clipboard, setClipboard] = useState<CanvasObject | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
@@ -1409,6 +1410,31 @@ export default function TrafficControlPlanner() {
       if (e.metaKey || e.ctrlKey) {
         if (key === "Z" && e.shiftKey) { e.preventDefault(); redo(); return; }
         if (key === "Z") { e.preventDefault(); undo(); return; }
+        if (key === "Y") { e.preventDefault(); redo(); return; }
+        if (key === "C" && selected) {
+          e.preventDefault();
+          const obj = objects.find((o) => o.id === selected);
+          if (obj) setClipboard(obj);
+          return;
+        }
+        if (key === "V" && clipboard) {
+          e.preventDefault();
+          const clone = cloneObject(clipboard);
+          const newObjs = [...objects, clone];
+          setObjects(newObjs); pushHistory(newObjs); setSelected(clone.id);
+          setClipboard(clone); // shift clipboard so repeated Ctrl+V continues to offset
+          return;
+        }
+        if (key === "D" && selected) {
+          e.preventDefault();
+          const obj = objects.find((o) => o.id === selected);
+          if (obj) {
+            const clone = cloneObject(obj);
+            const newObjs = [...objects, clone];
+            setObjects(newObjs); pushHistory(newObjs); setSelected(clone.id);
+          }
+          return;
+        }
       }
 
       if (key === "ESCAPE") {
@@ -1437,7 +1463,7 @@ export default function TrafficControlPlanner() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [selected, objects, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, switchTool]);
+  }, [selected, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, switchTool]);
 
   // toWorld: uses Konva Stage pointer position
   const toWorld = useCallback((): Point => {

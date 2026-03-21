@@ -1725,7 +1725,11 @@ export default function TrafficControlPlanner() {
     a.click();
   };
 
-  const safePlanTitle = planTitle.replace(/[^a-z0-9]/gi, "_") || "plan";
+  const safePlanTitle =
+    planTitle
+      .replace(/[^a-z0-9]/gi, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "") || "plan";
 
   const savePlan = () => {
     const plan = {

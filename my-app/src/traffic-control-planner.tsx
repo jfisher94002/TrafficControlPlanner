@@ -1718,6 +1718,15 @@ export default function TrafficControlPlanner() {
     setZoom(1);
   };
 
+  const triggerDownload = (href: string, filename: string) => {
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    a.click();
+  };
+
+  const safePlanTitle = planTitle.replace(/[^a-z0-9]/gi, "_") || "plan";
+
   const savePlan = () => {
     const plan = {
       id: planId,
@@ -1733,10 +1742,7 @@ export default function TrafficControlPlanner() {
     };
     const blob = new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${planTitle.replace(/[^a-z0-9]/gi, "_")}.tcp.json`;
-    a.click();
+    triggerDownload(url, `${safePlanTitle}.tcp.json`);
     URL.revokeObjectURL(url);
   };
 
@@ -1744,10 +1750,7 @@ export default function TrafficControlPlanner() {
     const stage = stageRef.current;
     if (!stage) return;
     const dataURL = stage.toDataURL({ pixelRatio: 2 });
-    const a = document.createElement("a");
-    a.href = dataURL;
-    a.download = `${planTitle.replace(/[^a-z0-9]/gi, "_")}.png`;
-    a.click();
+    triggerDownload(dataURL, `${safePlanTitle}.png`);
   };
 
   const loadPlan = (e: React.ChangeEvent<HTMLInputElement>) => {

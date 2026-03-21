@@ -288,4 +288,24 @@ describe('cloneObject', () => {
     cloneObject(sign)
     expect((sign as typeof sign).x).toBe(10)
   })
+
+  it('offsets all three control points for a curve_road', () => {
+    const curve: CanvasObject = {
+      id: 'c', type: 'curve_road',
+      points: [{ x: 0, y: 0 }, { x: 50, y: -50 }, { x: 100, y: 0 }],
+      width: 80, realWidth: 22, lanes: 2, roadType: '2lane',
+    }
+    const clone = cloneObject(curve) as typeof curve
+    expect(clone.id).not.toBe('c')
+    expect(clone.points[0]).toEqual({ x: 20, y: 20 })
+    expect(clone.points[1]).toEqual({ x: 70, y: -30 })
+    expect(clone.points[2]).toEqual({ x: 120, y: 20 })
+  })
+
+  it('deep-clones nested structures so signData is not shared', () => {
+    const sign: CanvasObject = { id: 'a', type: 'sign', x: 0, y: 0, signData: { id: 'stop', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+    const clone = cloneObject(sign) as typeof sign
+    clone.signData.label = 'MUTATED'
+    expect((sign as typeof sign).signData.label).toBe('STOP')
+  })
 })

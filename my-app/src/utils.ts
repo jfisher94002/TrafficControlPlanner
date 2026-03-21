@@ -7,16 +7,22 @@ import type {
 // ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
 
 /**
- * Returns a deep copy of `obj` with a fresh id and each coordinate offset by
- * (dx, dy).  Works for all CanvasObject variants.
+ * Returns a clone of `obj` with a fresh id and each coordinate offset by
+ * (dx, dy).  All nested structures (signData, deviceData, points arrays, etc.)
+ * are deep-copied via JSON round-trip so the clone shares no object references
+ * with the original.
  */
 export function cloneObject(obj: CanvasObject, dx = 20, dy = 20): CanvasObject {
+  // JSON round-trip gives a true deep clone of all nested structures.
+  const clone = JSON.parse(JSON.stringify(obj)) as CanvasObject
   const newId = uid()
-  if (isPointObject(obj)) return { ...obj, id: newId, x: obj.x + dx, y: obj.y + dy }
-  if (isLineObject(obj))  return { ...obj, id: newId, x1: obj.x1 + dx, y1: obj.y1 + dy, x2: obj.x2 + dx, y2: obj.y2 + dy }
-  if (obj.type === 'polyline_road') return { ...obj, id: newId, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
-  if (obj.type === 'curve_road')    return { ...obj, id: newId, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point] }
-  return { ...(obj as Record<string, unknown>), id: newId } as CanvasObject
+  if (isPointObject(clone)) return { ...clone, id: newId, x: clone.x + dx, y: clone.y + dy }
+  if (isLineObject(clone))  return { ...clone, id: newId, x1: clone.x1 + dx, y1: clone.y1 + dy, x2: clone.x2 + dx, y2: clone.y2 + dy }
+  if (clone.type === 'polyline_road') return { ...clone, id: newId, points: clone.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
+  if (clone.type === 'curve_road')    return { ...clone, id: newId, points: clone.points.map(p => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point] }
+  // Fallback: all current CanvasObject variants are handled above; this branch
+  // exists only for forward-compatibility if new variants are added.
+  return { ...(clone as Record<string, unknown>), id: newId } as CanvasObject
 }
 
 // ─── TYPE GUARDS ──────────────────────────────────────────────────────────────

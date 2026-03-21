@@ -898,7 +898,8 @@ function NorthArrow({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
     <div data-testid="north-arrow" style={northArrowStyle}>
-      <svg width="36" height="36" viewBox="0 0 36 36" aria-label="North arrow">
+      <svg width="36" height="36" viewBox="0 0 36 36" role="img" aria-label="North arrow">
+        <title>North arrow</title>
         {/* North needle */}
         <polygon points="18,5 15,19 21,19" fill={COLORS.danger} />
         {/* South needle (muted) */}

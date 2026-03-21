@@ -574,6 +574,7 @@ function TaperShape({ obj, isSelected }: TaperShapeProps) {
   return (
     <Shape
       x={x} y={y} rotation={rotation}
+      listening={false}
       shadowColor={isSelected ? COLORS.selected : undefined}
       shadowBlur={isSelected ? 12 : 0}
       sceneFunc={(ctx: KonvaContext) => {

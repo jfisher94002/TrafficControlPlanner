@@ -139,6 +139,13 @@ const TOOLS: ToolDef[] = [
   { id: "erase",   label: "Erase",     icon: "✕", shortcut: "X" },
 ];
 
+// ─── AUTOSAVE ────────────────────────────────────────────────────────────────
+const AUTOSAVE_KEY = "tcp_autosave";
+function readAutosave() {
+  try { return JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || "null"); }
+  catch { return null; }
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const sectionTitle = (text: string) => (
   <div style={{ fontSize: 10, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, marginTop: 12, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -928,7 +935,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
 
       {obj.type === "taper" && (() => {
         const t = obj as TaperObject;
-        const autoLen = calcTaperLength(t.speed, t.laneWidth);
+        const autoLen = calcTaperLength(t.speed, t.laneWidth, t.numLanes);
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <label style={{ fontSize: 11, color: COLORS.textMuted }}>
@@ -937,7 +944,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => {
                   const speed = +e.target.value;
-                  onUpdate(t.id, { speed, ...(!t.manualLength && { taperLength: calcTaperLength(speed, t.laneWidth) }) });
+                  onUpdate(t.id, { speed, ...(!t.manualLength && { taperLength: calcTaperLength(speed, t.laneWidth, t.numLanes) }) });
                 }} />
             </label>
             <label style={{ fontSize: 11, color: COLORS.textMuted }}>
@@ -946,14 +953,17 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => {
                   const laneWidth = +e.target.value;
-                  onUpdate(t.id, { laneWidth, ...(!t.manualLength && { taperLength: calcTaperLength(t.speed, laneWidth) }) });
+                  onUpdate(t.id, { laneWidth, ...(!t.manualLength && { taperLength: calcTaperLength(t.speed, laneWidth, t.numLanes) }) });
                 }} />
             </label>
             <label style={{ fontSize: 11, color: COLORS.textMuted }}>
               Lanes Closed: {t.numLanes}
               <input type="range" min={1} max={2} step={1} value={t.numLanes}
                 style={{ width: "100%", accentColor: COLORS.accent }}
-                onChange={(e) => onUpdate(t.id, { numLanes: +e.target.value })} />
+                onChange={(e) => {
+                  const numLanes = +e.target.value;
+                  onUpdate(t.id, { numLanes, ...(!t.manualLength && { taperLength: calcTaperLength(t.speed, t.laneWidth, numLanes) }) });
+                }} />
             </label>
             <div style={{ fontSize: 11, color: COLORS.accent, background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)", borderRadius: 4, padding: "4px 8px" }}>
               MUTCD L = {autoLen} ft
@@ -1102,12 +1112,15 @@ export default function TrafficControlPlanner() {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Read autosave once — reused by all useState initializers below
+  const initialAutosave = useRef(readAutosave()).current;
+
   // Core state
   const [tool, setTool] = useState("select");
-  const [objects, setObjects] = useState<CanvasObject[]>([]);
+  const [objects, setObjects] = useState<CanvasObject[]>(() => initialAutosave?.canvasState?.objects ?? []);
   const [selected, setSelected] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState<number>(() => initialAutosave?.canvasZoom ?? 1);
+  const [offset, setOffset] = useState<Point>(() => initialAutosave?.canvasOffset ?? { x: 0, y: 0 });
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 600 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<PanStart | null>(null);
@@ -1120,12 +1133,13 @@ export default function TrafficControlPlanner() {
   const [rightPanel, setRightPanel] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [history, setHistory] = useState<CanvasObject[][]>([[]]);
+  const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [planTitle, setPlanTitle] = useState("Untitled Traffic Control Plan");
-  const [planId, setPlanId] = useState(uid);
-  const [planCreatedAt, setPlanCreatedAt] = useState(() => new Date().toISOString());
-  const [planMeta, setPlanMeta] = useState<PlanMeta>({ projectNumber: "", client: "", location: "", notes: "" });
+  const [planTitle, setPlanTitle] = useState<string>(() => initialAutosave?.name ?? "Untitled Traffic Control Plan");
+  const [planId, setPlanId] = useState<string>(() => initialAutosave?.id ?? uid());
+  const [planCreatedAt, setPlanCreatedAt] = useState<string>(() => initialAutosave?.createdAt ?? new Date().toISOString());
+  const [planMeta, setPlanMeta] = useState<PlanMeta>(() => initialAutosave?.metadata ?? { projectNumber: "", client: "", location: "", notes: "" });
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
@@ -1210,6 +1224,23 @@ export default function TrafficControlPlanner() {
   useEffect(() => {
     localStorage.setItem("tcp_custom_signs", JSON.stringify(customSigns));
   }, [customSigns]);
+
+  // Auto-save plan state on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+        id: planId, name: planTitle, createdAt: planCreatedAt,
+        updatedAt: new Date().toISOString(),
+        canvasOffset: offset, canvasZoom: zoom,
+        canvasState: { objects }, metadata: planMeta,
+      }));
+      setAutosaveError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[TCP] Auto-save failed:", msg);
+      setAutosaveError(msg);
+    }
+  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset]);
 
   // Passive wheel listener to prevent page scroll
   useEffect(() => {
@@ -1303,7 +1334,15 @@ export default function TrafficControlPlanner() {
     };
     for (let i = objects.length - 1; i >= 0; i--) {
       const o = objects[i];
-      if (o.type === "sign" || o.type === "device" || o.type === "text" || o.type === "taper") {
+      if (o.type === "taper") {
+        const storedTaperLength = (o as TaperObject).taperLength;
+        const effectiveTaperLength =
+          typeof storedTaperLength === "number" && Number.isFinite(storedTaperLength) && storedTaperLength > 0
+            ? storedTaperLength
+            : calcTaperLength(o.speed, o.laneWidth, o.numLanes);
+        const taperHitRadius = Math.max(30, Math.min(effectiveTaperLength * TAPER_SCALE / 2, 150));
+        if (dist(wx, wy, o.x, o.y) < taperHitRadius) return o;
+      } else if (o.type === "sign" || o.type === "device" || o.type === "text") {
         if (dist(wx, wy, o.x, o.y) < 30) return o;
       }
       if (o.type === "zone") {
@@ -1541,6 +1580,7 @@ export default function TrafficControlPlanner() {
 
   const newPlan = () => {
     if (objects.length > 0 && !confirm("Start a new plan? Unsaved changes will be lost.")) return;
+    localStorage.removeItem(AUTOSAVE_KEY);
     setObjects([]); pushHistory([]); setSelected(null);
     setPlanTitle("Untitled Traffic Control Plan");
     setPlanId(uid());
@@ -1645,6 +1685,7 @@ export default function TrafficControlPlanner() {
           </div>
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
           <input
+            data-testid="plan-title"
             value={planTitle}
             onChange={(e) => setPlanTitle(e.target.value)}
             style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, width: 220, padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
@@ -1979,6 +2020,10 @@ export default function TrafficControlPlanner() {
               <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
               <span>{snapEnabled ? "Snap: endpoint" : "Snap OFF"}</span>
+              {autosaveError
+                ? <span style={{ color: COLORS.danger }} title={`Auto-save failed: ${autosaveError}`}>⚠ Save failed</span>
+                : <span style={{ color: COLORS.success }} title="Auto-saved to browser storage">● Auto-saved</span>
+              }
             </div>
           </div>
         </div>

@@ -1,22 +1,35 @@
 import type {
   CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
-  SignObject, DeviceObject, ZoneObject, TextObject,
+  SignObject, DeviceObject, ZoneObject, TextObject, TaperObject,
   StraightRoadObject, ArrowObject, MeasureObject,
 } from './types'
 
 // ─── TYPE GUARDS ──────────────────────────────────────────────────────────────
 
-/** Objects with a single x/y position (sign, device, zone, text). */
+/** Objects with a single x/y position (sign, device, zone, text, taper). */
 export const isPointObject = (
   o: CanvasObject,
-): o is SignObject | DeviceObject | ZoneObject | TextObject =>
-  o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text'
+): o is SignObject | DeviceObject | ZoneObject | TextObject | TaperObject =>
+  o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text' || o.type === 'taper'
 
 /** Objects with x1/y1–x2/y2 endpoints (straight road, arrow, measure). */
 export const isLineObject = (
   o: CanvasObject,
 ): o is StraightRoadObject | ArrowObject | MeasureObject =>
   o.type === 'road' || o.type === 'arrow' || o.type === 'measure'
+
+/**
+ * MUTCD taper length formula.
+ *   Speed ≤ 45 mph:  L = W × S² / 60
+ *   Speed > 45 mph:  L = W × S
+ * @param speed     Posted speed in mph
+ * @param laneWidth Lane width in feet
+ * @returns Taper length in feet, rounded to 1 decimal
+ */
+export function calcTaperLength(speed: number, laneWidth: number): number {
+  const L = speed <= 45 ? (laneWidth * speed * speed) / 60 : laneWidth * speed
+  return Math.round(L * 10) / 10
+}
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 

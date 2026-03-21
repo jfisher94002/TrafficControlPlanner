@@ -9,6 +9,7 @@ import {
   geoRoadWidthPx,
   formatSearchPrimary,
   geocodeAddress,
+  calcTaperLength,
 } from '../utils'
 import type { CanvasObject, GeocodeResult } from '../types'
 
@@ -215,5 +216,24 @@ describe('geocodeAddress', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const results = await geocodeAddress('anything')
     expect(results).toEqual([])
+  })
+})
+
+// ─── calcTaperLength ──────────────────────────────────────────────────────────
+describe('calcTaperLength', () => {
+  it('uses L = WS²/60 for speed ≤ 45 (45 mph, 12 ft lane = 405 ft)', () => {
+    expect(calcTaperLength(45, 12)).toBeCloseTo(405)
+  })
+
+  it('uses L = WS for speed > 45 (55 mph, 12 ft lane = 660 ft)', () => {
+    expect(calcTaperLength(55, 12)).toBeCloseTo(660)
+  })
+
+  it('handles minimum inputs (25 mph, 10 ft lane ≈ 104.2 ft)', () => {
+    expect(calcTaperLength(25, 10)).toBeCloseTo(104.2, 0)
+  })
+
+  it('boundary: 45 mph result is less than 46 mph result', () => {
+    expect(calcTaperLength(45, 12)).toBeLessThan(calcTaperLength(46, 12))
   })
 })

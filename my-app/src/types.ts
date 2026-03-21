@@ -133,6 +133,19 @@ export interface MeasureObject {
   y2: number;
 }
 
+export interface TaperObject {
+  id: string;
+  type: 'taper';
+  x: number;
+  y: number;
+  rotation: number;     // degrees
+  laneWidth: number;    // feet, default 12
+  speed: number;        // mph, default 45
+  taperLength: number;  // feet, auto-calculated or manual
+  manualLength: boolean;
+  numLanes: number;     // lanes being closed, 1 or 2
+}
+
 export type CanvasObject =
   | StraightRoadObject
   | PolylineRoadObject
@@ -142,7 +155,8 @@ export type CanvasObject =
   | ZoneObject
   | ArrowObject
   | TextObject
-  | MeasureObject;
+  | MeasureObject
+  | TaperObject;
 
 // ─── PLAN METADATA ────────────────────────────────────────────────────────────
 

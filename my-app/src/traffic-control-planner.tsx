@@ -6,12 +6,12 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject,
-  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject,
+  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject } from './utils';
+import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, calcTaperLength } from './utils';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -135,6 +135,7 @@ const TOOLS: ToolDef[] = [
   { id: "text",    label: "Text",      icon: "T", shortcut: "T" },
   { id: "measure", label: "Measure",   icon: "📏", shortcut: "M" },
   { id: "arrow",   label: "Arrow",     icon: "→", shortcut: "A" },
+  { id: "taper",   label: "Taper",     icon: "⋈", shortcut: "P" },
   { id: "erase",   label: "Erase",     icon: "✕", shortcut: "X" },
 ];
 
@@ -559,6 +560,64 @@ function MeasurementShape({ obj }: MeasurementShapeProps) {
   );
 }
 
+// px per foot — chosen to match road scale (2-lane road = 22 ft realWidth ≈ 80 px → ~3.6 px/ft)
+const TAPER_SCALE = 3;
+
+interface TaperShapeProps { obj: TaperObject; isSelected: boolean; }
+function TaperShape({ obj, isSelected }: TaperShapeProps) {
+  const { x, y, rotation, laneWidth, taperLength, numLanes } = obj;
+  const totalWidthPx = laneWidth * numLanes * TAPER_SCALE;
+  const narrowHalfPx = (laneWidth * TAPER_SCALE) / 2;
+  const lengthPx = taperLength * TAPER_SCALE;
+  const hw = totalWidthPx / 2;
+
+  return (
+    <Shape
+      x={x} y={y} rotation={rotation}
+      listening={false}
+      shadowColor={isSelected ? COLORS.selected : undefined}
+      shadowBlur={isSelected ? 12 : 0}
+      sceneFunc={(ctx: KonvaContext) => {
+        // Trapezoid: wide end centered at origin, narrow end at +lengthPx
+        // Wide end spans ±hw, narrow end spans ±narrowHalfPx (open lane persists)
+        ctx.beginPath();
+        ctx.moveTo(0, -hw);
+        ctx.lineTo(0,  hw);
+        ctx.lineTo(lengthPx,  narrowHalfPx);
+        ctx.lineTo(lengthPx, -narrowHalfPx);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(249,115,22,0.35)";
+        ctx.fill();
+        ctx.strokeStyle = isSelected ? COLORS.selected : "#f97316";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Dashed centerline with arrowhead
+        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(8, 0);
+        ctx.lineTo(lengthPx - 18, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.beginPath();
+        ctx.moveTo(lengthPx - 8, 0);
+        ctx.lineTo(lengthPx - 18, -5);
+        ctx.lineTo(lengthPx - 18, 5);
+        ctx.closePath();
+        ctx.fill();
+        // L label
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 11px 'JetBrains Mono', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`L=${Math.round(obj.taperLength)}ft`, lengthPx / 2, hw + 14);
+      }}
+    />
+  );
+}
+
 interface ObjectShapeProps { obj: CanvasObject; isSelected: boolean; }
 function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
   switch (obj.type) {
@@ -571,6 +630,7 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
     case "arrow":        return <ArrowShape obj={obj} isSelected={isSelected} />;
     case "text":         return <TextLabel obj={obj} isSelected={isSelected} />;
     case "measure":      return <MeasurementShape obj={obj} />;
+    case "taper":        return <TaperShape obj={obj} isSelected={isSelected} />;
     default:             return null;
   }
 }
@@ -837,7 +897,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Curve Road" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Curve Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -865,6 +925,61 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
             style={{ width: "100%", accentColor: COLORS.accent }} />
         </label>
       )}
+
+      {obj.type === "taper" && (() => {
+        const t = obj as TaperObject;
+        const autoLen = calcTaperLength(t.speed, t.laneWidth);
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Speed: {t.speed} mph
+              <input type="range" min={25} max={65} step={5} value={t.speed}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => {
+                  const speed = +e.target.value;
+                  onUpdate(t.id, { speed, ...(!t.manualLength && { taperLength: calcTaperLength(speed, t.laneWidth) }) });
+                }} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Lane Width: {t.laneWidth} ft
+              <input type="range" min={10} max={16} step={1} value={t.laneWidth}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => {
+                  const laneWidth = +e.target.value;
+                  onUpdate(t.id, { laneWidth, ...(!t.manualLength && { taperLength: calcTaperLength(t.speed, laneWidth) }) });
+                }} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Lanes Closed: {t.numLanes}
+              <input type="range" min={1} max={2} step={1} value={t.numLanes}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(t.id, { numLanes: +e.target.value })} />
+            </label>
+            <div style={{ fontSize: 11, color: COLORS.accent, background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)", borderRadius: 4, padding: "4px 8px" }}>
+              MUTCD L = {autoLen} ft
+            </div>
+            <label style={{ fontSize: 11, color: COLORS.textMuted, display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="checkbox" checked={t.manualLength}
+                onChange={(e) => onUpdate(t.id, { manualLength: e.target.checked, taperLength: e.target.checked ? t.taperLength : autoLen })} />
+              Manual override
+            </label>
+            {t.manualLength && (
+              <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+                Length: {t.taperLength} ft
+                <input type="range" min={50} max={2000} step={10} value={t.taperLength}
+                  style={{ width: "100%", accentColor: COLORS.accent }}
+                  onChange={(e) => onUpdate(t.id, { taperLength: +e.target.value })} />
+              </label>
+            )}
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Rotation: {t.rotation}°
+              <input type="range" min={0} max={360} value={t.rotation}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(t.id, { rotation: +e.target.value })} />
+            </label>
+          </div>
+        );
+      })()}
 
       {obj.type === "text" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1188,7 +1303,7 @@ export default function TrafficControlPlanner() {
     };
     for (let i = objects.length - 1; i >= 0; i--) {
       const o = objects[i];
-      if (o.type === "sign" || o.type === "device" || o.type === "text") {
+      if (o.type === "sign" || o.type === "device" || o.type === "text" || o.type === "taper") {
         if (dist(wx, wy, o.x, o.y) < 30) return o;
       }
       if (o.type === "zone") {
@@ -1259,6 +1374,14 @@ export default function TrafficControlPlanner() {
       const newDev: DeviceObject = { id: uid(), type: "device", x: raw.x, y: raw.y, deviceData: selectedDevice, rotation: 0 };
       const newObjs = [...objects, newDev];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newDev.id);
+      return;
+    }
+
+    if (tool === "taper") {
+      const speed = 45, laneWidth = 12;
+      const newTaper: TaperObject = { id: uid(), type: "taper", x: raw.x, y: raw.y, rotation: 0, speed, laneWidth, taperLength: calcTaperLength(speed, laneWidth), manualLength: false, numLanes: 1 };
+      const newObjs = [...objects, newTaper];
+      setObjects(newObjs); pushHistory(newObjs); setSelected(newTaper.id);
       return;
     }
 
@@ -1879,7 +2002,7 @@ export default function TrafficControlPlanner() {
                   <div key={obj.id} onClick={() => setSelected(obj.id)}
                     style={{ padding: "5px 8px", borderRadius: 4, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, background: selected === obj.id ? COLORS.accentDim : "transparent", color: selected === obj.id ? COLORS.accent : COLORS.textMuted, border: selected === obj.id ? `1px solid rgba(245,158,11,0.2)` : "1px solid transparent" }}>
                     <span style={{ fontSize: 12 }}>
-                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : "📏"}
+                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : "📏"}
                     </span>
                     <span>
                       {obj.type === "sign" ? obj.signData.label :
@@ -1888,6 +2011,7 @@ export default function TrafficControlPlanner() {
                        obj.type === "road" ? `${obj.roadType} road` :
                        obj.type === "polyline_road" ? `poly (${obj.points.length}pts)` :
                        obj.type === "curve_road" ? "curve road" :
+                       obj.type === "taper" ? `taper ${obj.speed}mph` :
                        obj.type}
                     </span>
                   </div>

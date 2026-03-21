@@ -978,7 +978,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
       {hasAny && (
         <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", justifyContent: "space-between", fontSize: 10, color: COLORS.textMuted }}>
           <span>Total</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{objects.length}</span>
+          <span data-testid="manifest-count" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{objects.length}</span>
         </div>
       )}
     </div>

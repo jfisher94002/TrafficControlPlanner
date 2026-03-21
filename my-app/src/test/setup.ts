@@ -90,3 +90,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 })
 
 globalThis.prompt = vi.fn().mockReturnValue(null)
+
+// URL object stubs (jsdom doesn't implement createObjectURL/revokeObjectURL)
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+globalThis.URL.revokeObjectURL = vi.fn()

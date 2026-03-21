@@ -1749,8 +1749,13 @@ export default function TrafficControlPlanner() {
   const exportPNG = () => {
     const stage = stageRef.current;
     if (!stage) return;
-    const dataURL = stage.toDataURL({ pixelRatio: 2 });
-    triggerDownload(dataURL, `${safePlanTitle}.png`);
+    const canvas = stage.toCanvas({ pixelRatio: 2 });
+    canvas.toBlob((blob: Blob | null) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `${safePlanTitle}.png`);
+      URL.revokeObjectURL(url);
+    }, "image/png");
   };
 
   const loadPlan = (e: React.ChangeEvent<HTMLInputElement>) => {

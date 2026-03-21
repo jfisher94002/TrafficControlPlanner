@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
-import { stageStub } from './konva-stub'
+import { stageStub, mockCanvas } from './konva-stub'
 
 beforeEach(() => {
   localStorage.clear()
@@ -228,8 +228,12 @@ describe('PNG export', () => {
     await expect(user.click(screen.getByTestId('export-png-button'))).resolves.not.toThrow()
   })
 
-  it('triggers a PNG download with pixelRatio 2 and a .png filename', async () => {
-    stageStub.toDataURL.mockClear()
+  it('triggers a PNG download via Blob with pixelRatio 2 and revokes the URL', async () => {
+    stageStub.toCanvas.mockClear()
+    mockCanvas.toBlob.mockClear()
+    ;(URL.createObjectURL as ReturnType<typeof vi.fn>).mockClear()
+    ;(URL.revokeObjectURL as ReturnType<typeof vi.fn>).mockClear()
+
     const mockAnchor = { href: '', download: '', click: vi.fn() }
     const realCreateElement = document.createElement.bind(document)
     const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) =>
@@ -239,10 +243,12 @@ describe('PNG export', () => {
     const { user } = setup()
     await user.click(screen.getByTestId('export-png-button'))
 
-    expect(stageStub.toDataURL).toHaveBeenCalledWith({ pixelRatio: 2 })
-    expect(mockAnchor.href).toBe('data:image/png;base64,mock')
+    expect(stageStub.toCanvas).toHaveBeenCalledWith({ pixelRatio: 2 })
+    expect(mockCanvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png')
+    expect(mockAnchor.href).toBe('blob:mock-url')
     expect(mockAnchor.download).toMatch(/\.png$/)
     expect(mockAnchor.click).toHaveBeenCalled()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
 
     createElementSpy.mockRestore()
   })

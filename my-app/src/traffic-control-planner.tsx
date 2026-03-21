@@ -17,7 +17,8 @@ import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, 
 const GRID_SIZE = 20;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
-const SNAP_RADIUS = 14; // screen-pixels for endpoint snap
+const SNAP_RADIUS = 14;    // screen-pixels for endpoint snap
+const STATUS_BAR_H = 28;   // height of the bottom status bar in px
 
 const COLORS = {
   bg: "#0f1117",
@@ -875,6 +876,42 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   );
 }
 
+// ─── NORTH ARROW ─────────────────────────────────────────────────────────────
+
+const northArrowStyle: React.CSSProperties = {
+  position: "absolute",
+  bottom: STATUS_BAR_H + 8,
+  right: 12,
+  width: 44,
+  height: 44,
+  borderRadius: "50%",
+  background: "rgba(26,29,39,0.88)",
+  border: `1px solid ${COLORS.panelBorder}`,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  pointerEvents: "none",
+  zIndex: 10,
+};
+
+function NorthArrow({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <div data-testid="north-arrow" style={northArrowStyle}>
+      <svg width="36" height="36" viewBox="0 0 36 36" aria-label="North arrow">
+        {/* North needle */}
+        <polygon points="18,5 15,19 21,19" fill={COLORS.danger} />
+        {/* South needle (muted) */}
+        <polygon points="18,31 15,19 21,19" fill={COLORS.textDim} />
+        {/* Centre pivot */}
+        <circle cx="18" cy="19" r="2.5" fill={COLORS.text} />
+        {/* N label */}
+        <text x="18" y="4" textAnchor="middle" dominantBaseline="auto" fontSize="7" fontWeight="bold" fill={COLORS.danger} fontFamily="'JetBrains Mono',monospace">N</text>
+      </svg>
+    </div>
+  );
+}
+
 // ─── MANIFEST PANEL ──────────────────────────────────────────────────────────
 
 function ManifestRow({ icon, label, count }: { icon: string; label: string; count: number }) {
@@ -1245,6 +1282,7 @@ export default function TrafficControlPlanner() {
   const propertiesTabRef = useRef<HTMLButtonElement | null>(null);
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
+  const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -1942,6 +1980,10 @@ export default function TrafficControlPlanner() {
                     Show Grid
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
+                    <input type="checkbox" checked={showNorthArrow} onChange={(e) => setShowNorthArrow(e.target.checked)} style={{ accentColor: COLORS.accent }} data-testid="north-arrow-toggle" />
+                    North Arrow
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
                     <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} style={{ accentColor: COLORS.accent }} />
                     Snap to Endpoints
                   </label>
@@ -2173,6 +2215,8 @@ export default function TrafficControlPlanner() {
               />
             </Layer>
           </Stage>
+
+          <NorthArrow visible={showNorthArrow} />
 
           {/* Status bar */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>

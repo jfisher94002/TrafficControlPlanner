@@ -86,6 +86,29 @@ describe('Plan metadata', () => {
   })
 })
 
+// ─── North arrow ──────────────────────────────────────────────────────────────
+describe('North arrow', () => {
+  it('is visible by default and does not block canvas interactions', () => {
+    setup()
+    const el = screen.getByTestId('north-arrow')
+    expect(el).toBeInTheDocument()
+    expect(el).toHaveStyle({ pointerEvents: 'none' })
+  })
+
+  it('toggle checkbox hides the north arrow', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('north-arrow-toggle'))
+    expect(screen.queryByTestId('north-arrow')).not.toBeInTheDocument()
+  })
+
+  it('toggle checkbox shows the north arrow again', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('north-arrow-toggle'))
+    await user.click(screen.getByTestId('north-arrow-toggle'))
+    expect(screen.getByTestId('north-arrow')).toBeInTheDocument()
+  })
+})
+
 // ─── Right panel ──────────────────────────────────────────────────────────────
 describe('Right panel', () => {
   it('close button hides the right panel', async () => {

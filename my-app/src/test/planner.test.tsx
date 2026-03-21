@@ -149,6 +149,70 @@ describe('Manifest panel', () => {
     await user.click(screen.getByTestId('tab-manifest'))
     expect(screen.getByTestId('manifest-panel')).toHaveTextContent(/tapers/i)
   })
+
+  it('aggregates multiple identical signs and reflects the correct total', async () => {
+    const { user } = setup()
+    // Place two identical signs
+    fireEvent.keyDown(window, { key: 'S' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+
+    // Global object counter should show 2 objects
+    expect(screen.getByTestId('object-count').textContent).toContain('2 objects')
+
+    // Open manifest and ensure a count of 2 is shown (row and/or total)
+    await user.click(screen.getByTestId('tab-manifest'))
+    const panel = screen.getByTestId('manifest-panel')
+    const counts = within(panel).getAllByTestId('manifest-count')
+    expect(counts.some(el => el.textContent === '2')).toBe(true)
+  })
+
+  it('aggregates multiple identical devices (tapers) into device grouping and total', async () => {
+    const { user } = setup()
+    // Place two tapers using the taper tool
+    fireEvent.keyDown(window, { key: 'P' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+
+    // Global object counter should reflect 2 objects
+    expect(screen.getByTestId('object-count').textContent).toContain('2 objects')
+
+    // Open manifest and check that tapers are grouped and counted
+    await user.click(screen.getByTestId('tab-manifest'))
+    const panel = screen.getByTestId('manifest-panel')
+    expect(panel).toHaveTextContent(/tapers/i)
+    const counts = within(panel).getAllByTestId('manifest-count')
+    expect(counts.some(el => el.textContent === '2')).toBe(true)
+  })
+
+  it('shows a manifest Total that matches the number of canvas objects', async () => {
+    const { user } = setup()
+    const canvas = screen.getByTestId('konva-stage')
+
+    // Place one sign
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(canvas)
+
+    // Place one taper (device)
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(canvas)
+
+    // Read the global object counter to determine how many objects exist
+    const objectCountText = screen.getByTestId('object-count').textContent ?? ''
+    const match = objectCountText.match(/(\d+)\s+objects?/)
+    const totalObjects = match ? Number(match[1]) : NaN
+    expect(Number.isNaN(totalObjects)).toBe(false)
+    expect(totalObjects).toBeGreaterThan(0)
+
+    // Open manifest and ensure that at least one manifest-count equals totalObjects
+    await user.click(screen.getByTestId('tab-manifest'))
+    const panel = screen.getByTestId('manifest-panel')
+    const counts = within(panel).getAllByTestId('manifest-count')
+    const hasMatchingTotal = counts.some(el => el.textContent === String(totalObjects))
+    expect(hasMatchingTotal).toBe(true)
+  })
 })
 
 // ─── Taper tool ───────────────────────────────────────────────────────────────

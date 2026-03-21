@@ -22,12 +22,19 @@ export const isLineObject = (
  * MUTCD taper length formula.
  *   Speed ≤ 45 mph:  L = W × S² / 60
  *   Speed > 45 mph:  L = W × S
+ *
+ * Where:
+ *   S = posted speed in mph
+ *   W = total lateral offset in feet (laneWidthFt × numLanes)
+ *
  * @param speed     Posted speed in mph
- * @param laneWidth Lane width in feet
+ * @param laneWidth Lane width per lane in feet
+ * @param numLanes  Number of lanes being closed (defaults to 1)
  * @returns Taper length in feet, rounded to 1 decimal
  */
-export function calcTaperLength(speed: number, laneWidth: number): number {
-  const L = speed <= 45 ? (laneWidth * speed * speed) / 60 : laneWidth * speed
+export function calcTaperLength(speed: number, laneWidth: number, numLanes: number = 1): number {
+  const W = laneWidth * numLanes
+  const L = speed <= 45 ? (W * speed * speed) / 60 : W * speed
   return Math.round(L * 10) / 10
 }
 

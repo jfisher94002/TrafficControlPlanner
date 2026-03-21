@@ -221,19 +221,27 @@ describe('geocodeAddress', () => {
 
 // ─── calcTaperLength ──────────────────────────────────────────────────────────
 describe('calcTaperLength', () => {
-  it('uses L = WS²/60 for speed ≤ 45 (45 mph, 12 ft lane = 405 ft)', () => {
+  it('uses L = WS²/60 for speed ≤ 45 (45 mph, 12 ft lane, 1 lane = 405 ft)', () => {
     expect(calcTaperLength(45, 12)).toBeCloseTo(405)
   })
 
-  it('uses L = WS for speed > 45 (55 mph, 12 ft lane = 660 ft)', () => {
+  it('uses L = WS for speed > 45 (55 mph, 12 ft lane, 1 lane = 660 ft)', () => {
     expect(calcTaperLength(55, 12)).toBeCloseTo(660)
   })
 
-  it('handles minimum inputs (25 mph, 10 ft lane ≈ 104.2 ft)', () => {
+  it('handles minimum inputs (25 mph, 10 ft lane, 1 lane ≈ 104.2 ft)', () => {
     expect(calcTaperLength(25, 10)).toBeCloseTo(104.2, 0)
   })
 
   it('boundary: 45 mph result is less than 46 mph result', () => {
     expect(calcTaperLength(45, 12)).toBeLessThan(calcTaperLength(46, 12))
+  })
+
+  it('uses total width W = laneWidth × numLanes for multi-lane closure (45 mph, 12 ft, 2 lanes = 810 ft)', () => {
+    expect(calcTaperLength(45, 12, 2)).toBeCloseTo(810)
+  })
+
+  it('multi-lane > single-lane for same speed and lane width', () => {
+    expect(calcTaperLength(55, 12, 2)).toBeGreaterThan(calcTaperLength(55, 12, 1))
   })
 })

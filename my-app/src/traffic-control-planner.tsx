@@ -928,7 +928,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
 
       {obj.type === "taper" && (() => {
         const t = obj as TaperObject;
-        const autoLen = calcTaperLength(t.speed, t.laneWidth);
+        const autoLen = calcTaperLength(t.speed, t.laneWidth, t.numLanes);
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <label style={{ fontSize: 11, color: COLORS.textMuted }}>
@@ -937,7 +937,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => {
                   const speed = +e.target.value;
-                  onUpdate(t.id, { speed, ...(!t.manualLength && { taperLength: calcTaperLength(speed, t.laneWidth) }) });
+                  onUpdate(t.id, { speed, ...(!t.manualLength && { taperLength: calcTaperLength(speed, t.laneWidth, t.numLanes) }) });
                 }} />
             </label>
             <label style={{ fontSize: 11, color: COLORS.textMuted }}>
@@ -946,14 +946,17 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => {
                   const laneWidth = +e.target.value;
-                  onUpdate(t.id, { laneWidth, ...(!t.manualLength && { taperLength: calcTaperLength(t.speed, laneWidth) }) });
+                  onUpdate(t.id, { laneWidth, ...(!t.manualLength && { taperLength: calcTaperLength(t.speed, laneWidth, t.numLanes) }) });
                 }} />
             </label>
             <label style={{ fontSize: 11, color: COLORS.textMuted }}>
               Lanes Closed: {t.numLanes}
               <input type="range" min={1} max={2} step={1} value={t.numLanes}
                 style={{ width: "100%", accentColor: COLORS.accent }}
-                onChange={(e) => onUpdate(t.id, { numLanes: +e.target.value })} />
+                onChange={(e) => {
+                  const numLanes = +e.target.value;
+                  onUpdate(t.id, { numLanes, ...(!t.manualLength && { taperLength: calcTaperLength(t.speed, t.laneWidth, numLanes) }) });
+                }} />
             </label>
             <div style={{ fontSize: 11, color: COLORS.accent, background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)", borderRadius: 4, padding: "4px 8px" }}>
               MUTCD L = {autoLen} ft
@@ -1303,7 +1306,10 @@ export default function TrafficControlPlanner() {
     };
     for (let i = objects.length - 1; i >= 0; i--) {
       const o = objects[i];
-      if (o.type === "sign" || o.type === "device" || o.type === "text" || o.type === "taper") {
+      if (o.type === "taper") {
+        const taperHitRadius = Math.max(30, Math.min(calcTaperLength(o.speed, o.laneWidth, o.numLanes) * TAPER_SCALE / 2, 150));
+        if (dist(wx, wy, o.x, o.y) < taperHitRadius) return o;
+      } else if (o.type === "sign" || o.type === "device" || o.type === "text") {
         if (dist(wx, wy, o.x, o.y) < 30) return o;
       }
       if (o.type === "zone") {

@@ -1199,6 +1199,8 @@ export default function TrafficControlPlanner() {
   const [leftPanel, setLeftPanel] = useState("tools");
   const [rightPanel, setRightPanel] = useState(true);
   const [rightTab, setRightTab] = useState<"properties" | "manifest">("properties");
+  const propertiesTabRef = useRef<HTMLButtonElement | null>(null);
+  const manifestTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
@@ -1339,6 +1341,20 @@ export default function TrafficControlPlanner() {
     setTool(newTool);
     setPolyPoints([]);
     setCurvePoints([]);
+  }, []);
+
+  const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest") => {
+    const next: "properties" | "manifest" | null =
+      e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowUp"
+        ? current === "properties" ? "manifest" : "properties"
+        : e.key === "Home" ? "properties"
+        : e.key === "End"  ? "manifest"
+        : null;
+    if (next) {
+      e.preventDefault();
+      setRightTab(next);
+      (next === "properties" ? propertiesTabRef : manifestTabRef).current?.focus();
+    }
   }, []);
 
   // Keyboard shortcuts
@@ -2099,16 +2115,20 @@ export default function TrafficControlPlanner() {
         {/* ─── RIGHT PANEL ─── */}
         {rightPanel && (
           <div data-testid="right-panel" style={{ width: 220, background: COLORS.panel, borderLeft: `1px solid ${COLORS.panelBorder}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-            <div style={{ borderBottom: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center" }}>
-              <button data-testid="tab-properties" onClick={() => setRightTab("properties")}
+            <div role="tablist" aria-label="Right panel tabs" style={{ borderBottom: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center" }}>
+              <button type="button" role="tab" aria-selected={rightTab === "properties"} tabIndex={rightTab === "properties" ? 0 : -1}
+                ref={propertiesTabRef} data-testid="tab-properties"
+                onClick={() => setRightTab("properties")} onKeyDown={(e) => handleRightTabKeyDown(e, "properties")}
                 style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "properties" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "properties" ? COLORS.accent : COLORS.textDim, cursor: "pointer" }}>
                 Properties
               </button>
-              <button data-testid="tab-manifest" onClick={() => setRightTab("manifest")}
+              <button type="button" role="tab" aria-selected={rightTab === "manifest"} tabIndex={rightTab === "manifest" ? 0 : -1}
+                ref={manifestTabRef} data-testid="tab-manifest"
+                onClick={() => setRightTab("manifest")} onKeyDown={(e) => handleRightTabKeyDown(e, "manifest")}
                 style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "manifest" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "manifest" ? COLORS.accent : COLORS.textDim, cursor: "pointer" }}>
                 Manifest
               </button>
-              <button onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
+              <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
               ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />

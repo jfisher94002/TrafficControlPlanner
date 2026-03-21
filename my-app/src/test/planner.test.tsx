@@ -129,16 +129,17 @@ describe('Manifest panel', () => {
     expect(screen.getByTestId('manifest-panel')).toHaveTextContent(/no objects yet/i)
   })
 
-  it('placing a sign then opening manifest shows count 1', async () => {
+  it('placing a sign then opening manifest shows count 1 in the Signs row', async () => {
     const { user } = setup()
     fireEvent.keyDown(window, { key: 'S' })
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
     await user.click(screen.getByTestId('tab-manifest'))
     const panel = screen.getByTestId('manifest-panel')
+    // Signs section heading is present
     expect(within(panel).getByText(/signs/i)).toBeInTheDocument()
-    const counts = within(panel).getAllByTestId('manifest-count')
-    // total shown at bottom
-    expect(counts.some(el => el.textContent === '1')).toBe(true)
+    // Default selected sign is STOP — scope to that row and assert count = 1
+    const signRow = within(panel).getByText('STOP').closest('div') as HTMLElement
+    expect(within(signRow).getByTestId('manifest-count')).toHaveTextContent('1')
   })
 
   it('placing a taper then opening manifest shows Tapers row', async () => {

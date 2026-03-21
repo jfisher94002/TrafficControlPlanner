@@ -875,6 +875,73 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   );
 }
 
+// ─── MANIFEST PANEL ──────────────────────────────────────────────────────────
+
+function ManifestRow({ icon, label, count }: { icon: string; label: string; count: number }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", fontSize: 10, color: COLORS.textMuted }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11 }}>{icon}</span>
+        {label}
+      </span>
+      <span data-testid="manifest-count" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
+    </div>
+  );
+}
+
+function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
+  const signCounts: Record<string, number> = {};
+  const deviceCounts: Record<string, number> = {};
+  let roads = 0, tapers = 0, zones = 0, arrows = 0, texts = 0, measures = 0;
+  for (const obj of objects) {
+    if (obj.type === "sign")         signCounts[obj.signData.label] = (signCounts[obj.signData.label] ?? 0) + 1;
+    else if (obj.type === "device")  deviceCounts[obj.deviceData.label] = (deviceCounts[obj.deviceData.label] ?? 0) + 1;
+    else if (obj.type === "road" || obj.type === "polyline_road" || obj.type === "curve_road") roads++;
+    else if (obj.type === "taper")   tapers++;
+    else if (obj.type === "zone")    zones++;
+    else if (obj.type === "arrow")   arrows++;
+    else if (obj.type === "text")    texts++;
+    else if (obj.type === "measure") measures++;
+  }
+  const hasAny = objects.length > 0;
+  const otherCount = roads + tapers + zones + arrows + texts + measures;
+  return (
+    <div data-testid="manifest-panel" style={{ padding: 12, overflow: "auto", flex: 1 }}>
+      {!hasAny && <div style={{ fontSize: 10, color: COLORS.textDim, textAlign: "center", padding: 12 }}>No objects yet</div>}
+      {Object.keys(signCounts).length > 0 && (
+        <>{sectionTitle("Signs")}
+          {Object.entries(signCounts).map(([label, count]) => (
+            <ManifestRow key={label} icon="⬡" label={label} count={count} />
+          ))}
+        </>
+      )}
+      {Object.keys(deviceCounts).length > 0 && (
+        <>{sectionTitle("Devices")}
+          {Object.entries(deviceCounts).map(([label, count]) => (
+            <ManifestRow key={label} icon="▲" label={label} count={count} />
+          ))}
+        </>
+      )}
+      {otherCount > 0 && (
+        <>{sectionTitle("Other")}
+          {roads   > 0 && <ManifestRow icon="━" label="Road segments" count={roads} />}
+          {tapers  > 0 && <ManifestRow icon="⋈" label="Tapers"        count={tapers} />}
+          {zones   > 0 && <ManifestRow icon="▨" label="Work zones"    count={zones} />}
+          {arrows  > 0 && <ManifestRow icon="→" label="Arrows"        count={arrows} />}
+          {texts   > 0 && <ManifestRow icon="T" label="Text labels"   count={texts} />}
+          {measures > 0 && <ManifestRow icon="📏" label="Measurements" count={measures} />}
+        </>
+      )}
+      {hasAny && (
+        <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", justifyContent: "space-between", fontSize: 10, color: COLORS.textMuted }}>
+          <span>Total</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{objects.length}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PROPERTY PANEL ──────────────────────────────────────────────────────────
 
 interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
@@ -1131,6 +1198,7 @@ export default function TrafficControlPlanner() {
   const [signCategory, setSignCategory] = useState("regulatory");
   const [leftPanel, setLeftPanel] = useState("tools");
   const [rightPanel, setRightPanel] = useState(true);
+  const [rightTab, setRightTab] = useState<"properties" | "manifest">("properties");
   const [showGrid, setShowGrid] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
@@ -2031,11 +2099,21 @@ export default function TrafficControlPlanner() {
         {/* ─── RIGHT PANEL ─── */}
         {rightPanel && (
           <div data-testid="right-panel" style={{ width: 220, background: COLORS.panel, borderLeft: `1px solid ${COLORS.panelBorder}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-            <div style={{ padding: "10px 12px", borderBottom: `1px solid ${COLORS.panelBorder}`, fontSize: 10, textTransform: "uppercase", letterSpacing: 1.5, color: COLORS.textDim, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              Properties
-              <button onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14 }}>×</button>
+            <div style={{ borderBottom: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center" }}>
+              <button data-testid="tab-properties" onClick={() => setRightTab("properties")}
+                style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "properties" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "properties" ? COLORS.accent : COLORS.textDim, cursor: "pointer" }}>
+                Properties
+              </button>
+              <button data-testid="tab-manifest" onClick={() => setRightTab("manifest")}
+                style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "manifest" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "manifest" ? COLORS.accent : COLORS.textDim, cursor: "pointer" }}>
+                Manifest
+              </button>
+              <button onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
-            <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
+            {rightTab === "properties"
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
+              : <ManifestPanel objects={objects} />
+            }
 
             <div style={{ marginTop: "auto", borderTop: `1px solid ${COLORS.panelBorder}`, padding: 12 }}>
               {sectionTitle("Layers")}

@@ -115,6 +115,41 @@ describe('Object creation', () => {
   })
 })
 
+// ─── Manifest panel ───────────────────────────────────────────────────────────
+describe('Manifest panel', () => {
+  it('clicking the Manifest tab shows the manifest panel', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('tab-manifest'))
+    expect(screen.getByTestId('manifest-panel')).toBeInTheDocument()
+  })
+
+  it('manifest shows "No objects yet" when canvas is empty', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('tab-manifest'))
+    expect(screen.getByTestId('manifest-panel')).toHaveTextContent(/no objects yet/i)
+  })
+
+  it('placing a sign then opening manifest shows count 1', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(screen.getByTestId('tab-manifest'))
+    const panel = screen.getByTestId('manifest-panel')
+    expect(within(panel).getByText(/signs/i)).toBeInTheDocument()
+    const counts = within(panel).getAllByTestId('manifest-count')
+    // total shown at bottom
+    expect(counts.some(el => el.textContent === '1')).toBe(true)
+  })
+
+  it('placing a taper then opening manifest shows Tapers row', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(screen.getByTestId('tab-manifest'))
+    expect(screen.getByTestId('manifest-panel')).toHaveTextContent(/tapers/i)
+  })
+})
+
 // ─── Taper tool ───────────────────────────────────────────────────────────────
 describe('Taper tool', () => {
   it('pressing P activates the taper tool', () => {

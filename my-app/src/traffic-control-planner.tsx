@@ -1827,6 +1827,41 @@ export default function TrafficControlPlanner() {
     }, "image/png");
   };
 
+  const exportPDF = async () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const canvas = stage.toCanvas({ pixelRatio: 2 });
+    const dataUrl: string = canvas.toDataURL("image/png");
+    const b64 = dataUrl.replace("data:image/png;base64,", "");
+    const payload = {
+      id: planId,
+      name: planTitle,
+      createdAt: planCreatedAt,
+      updatedAt: new Date().toISOString(),
+      userId: null,
+      mapCenter: mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lon, zoom: mapCenter.zoom } : null,
+      canvasOffset: offset,
+      canvasZoom: zoom,
+      canvasState: { objects },
+      metadata: planMeta,
+      canvas_image_b64: b64,
+    };
+    try {
+      const res = await fetch("/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `${safePlanTitle}.pdf`);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    }
+  };
+
   const loadPlan = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1909,6 +1944,7 @@ export default function TrafficControlPlanner() {
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
+          <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 

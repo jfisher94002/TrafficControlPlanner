@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
 
-beforeEach(() => { localStorage.clear() })
+beforeEach(() => {
+  localStorage.clear()
+  vi.restoreAllMocks()
+})
 
 function setup() {
   const user = userEvent.setup()
@@ -132,5 +135,63 @@ describe('Taper tool', () => {
     fireEvent.keyDown(window, { key: 'P' })
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
     expect(within(screen.getByTestId('right-panel')).getByText(/taper Properties/i)).toBeInTheDocument()
+  })
+})
+
+// ─── localStorage auto-save ───────────────────────────────────────────────────
+describe('localStorage auto-save', () => {
+  const AUTOSAVE_KEY = 'tcp_autosave'
+
+  const seedAutosave = (overrides = {}) => {
+    const state = {
+      id: 'seed-id',
+      name: 'Saved Plan',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      canvasZoom: 1,
+      canvasOffset: { x: 0, y: 0 },
+      canvasState: { objects: [] },
+      metadata: { projectNumber: 'P-001', client: 'Acme', location: '', notes: '' },
+      ...overrides,
+    }
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state))
+  }
+
+  it('hydrates plan title from existing autosave on mount', () => {
+    seedAutosave({ name: 'My Restored Plan' })
+    setup()
+    expect(screen.getByTestId('plan-title')).toHaveValue('My Restored Plan')
+  })
+
+  it('hydrates plan metadata from existing autosave on mount', () => {
+    seedAutosave({ metadata: { projectNumber: 'TCP-99', client: 'City DOT', location: '', notes: '' } })
+    setup()
+    expect(screen.getByLabelText('Client')).toHaveValue('City DOT')
+  })
+
+  it('writes to tcp_autosave when plan title changes', async () => {
+    const setItemSpy = vi.spyOn(window.localStorage, 'setItem')
+    const { user } = setup()
+    await user.type(screen.getByTestId('plan-title'), 'X')
+    // Use the last autosave call — earlier calls capture the pre-type state
+    const autosaveCalls = setItemSpy.mock.calls.filter(([k]) => k === AUTOSAVE_KEY)
+    expect(autosaveCalls.length).toBeGreaterThan(0)
+    const payload = JSON.parse(autosaveCalls[autosaveCalls.length - 1][1] as string)
+    expect(payload.name).toContain('X')
+    expect(payload).toHaveProperty('updatedAt')
+    expect(payload).toHaveProperty('canvasState')
+    expect(payload).toHaveProperty('canvasZoom')
+    expect(payload).toHaveProperty('metadata')
+  })
+
+  it('New Plan resets autosave to blank state', async () => {
+    // Seed with a named plan (empty objects so confirm() is skipped)
+    seedAutosave({ name: 'Old Plan', canvasState: { objects: [] } })
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: /new/i }))
+    // The autosave effect fires after state reset — check it reflects the blank plan
+    const saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) ?? 'null')
+    expect(saved?.name).toBe('Untitled Traffic Control Plan')
+    expect(saved?.canvasState?.objects).toHaveLength(0)
   })
 })

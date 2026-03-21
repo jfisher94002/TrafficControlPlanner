@@ -1112,12 +1112,15 @@ export default function TrafficControlPlanner() {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Read autosave once — reused by all useState initializers below
+  const initialAutosave = useRef(readAutosave()).current;
+
   // Core state
   const [tool, setTool] = useState("select");
-  const [objects, setObjects] = useState<CanvasObject[]>(() => readAutosave()?.canvasState?.objects ?? []);
+  const [objects, setObjects] = useState<CanvasObject[]>(() => initialAutosave?.canvasState?.objects ?? []);
   const [selected, setSelected] = useState<string | null>(null);
-  const [zoom, setZoom] = useState<number>(() => readAutosave()?.canvasZoom ?? 1);
-  const [offset, setOffset] = useState<Point>(() => readAutosave()?.canvasOffset ?? { x: 0, y: 0 });
+  const [zoom, setZoom] = useState<number>(() => initialAutosave?.canvasZoom ?? 1);
+  const [offset, setOffset] = useState<Point>(() => initialAutosave?.canvasOffset ?? { x: 0, y: 0 });
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 600 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<PanStart | null>(null);
@@ -1130,12 +1133,13 @@ export default function TrafficControlPlanner() {
   const [rightPanel, setRightPanel] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [history, setHistory] = useState<CanvasObject[][]>(() => [readAutosave()?.canvasState?.objects ?? []]);
+  const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [planTitle, setPlanTitle] = useState<string>(() => readAutosave()?.name ?? "Untitled Traffic Control Plan");
-  const [planId, setPlanId] = useState<string>(() => readAutosave()?.id ?? uid());
-  const [planCreatedAt, setPlanCreatedAt] = useState<string>(() => readAutosave()?.createdAt ?? new Date().toISOString());
-  const [planMeta, setPlanMeta] = useState<PlanMeta>(() => readAutosave()?.metadata ?? { projectNumber: "", client: "", location: "", notes: "" });
+  const [planTitle, setPlanTitle] = useState<string>(() => initialAutosave?.name ?? "Untitled Traffic Control Plan");
+  const [planId, setPlanId] = useState<string>(() => initialAutosave?.id ?? uid());
+  const [planCreatedAt, setPlanCreatedAt] = useState<string>(() => initialAutosave?.createdAt ?? new Date().toISOString());
+  const [planMeta, setPlanMeta] = useState<PlanMeta>(() => initialAutosave?.metadata ?? { projectNumber: "", client: "", location: "", notes: "" });
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
@@ -1230,7 +1234,12 @@ export default function TrafficControlPlanner() {
         canvasOffset: offset, canvasZoom: zoom,
         canvasState: { objects }, metadata: planMeta,
       }));
-    } catch { /* storage quota exceeded — silently skip */ }
+      setAutosaveError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[TCP] Auto-save failed:", msg);
+      setAutosaveError(msg);
+    }
   }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset]);
 
   // Passive wheel listener to prevent page scroll
@@ -1671,6 +1680,7 @@ export default function TrafficControlPlanner() {
           </div>
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
           <input
+            data-testid="plan-title"
             value={planTitle}
             onChange={(e) => setPlanTitle(e.target.value)}
             style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, width: 220, padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
@@ -2005,7 +2015,10 @@ export default function TrafficControlPlanner() {
               <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
               <span>{snapEnabled ? "Snap: endpoint" : "Snap OFF"}</span>
-              <span style={{ color: COLORS.success }} title="Auto-saved to browser storage">● Auto-saved</span>
+              {autosaveError
+                ? <span style={{ color: COLORS.danger }} title={`Auto-save failed: ${autosaveError}`}>⚠ Save failed</span>
+                : <span style={{ color: COLORS.success }} title="Auto-saved to browser storage">● Auto-saved</span>
+              }
             </div>
           </div>
         </div>

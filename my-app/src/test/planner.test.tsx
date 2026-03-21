@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
+import { stageStub, mockCanvas } from './konva-stub'
 
 beforeEach(() => {
   localStorage.clear()
@@ -212,6 +213,44 @@ describe('Manifest panel', () => {
     const counts = within(panel).getAllByTestId('manifest-count')
     const hasMatchingTotal = counts.some(el => el.textContent === String(totalObjects))
     expect(hasMatchingTotal).toBe(true)
+  })
+})
+
+// ─── PNG export ───────────────────────────────────────────────────────────────
+describe('PNG export', () => {
+  it('Export PNG button is present in the toolbar', () => {
+    setup()
+    expect(screen.getByTestId('export-png-button')).toBeInTheDocument()
+  })
+
+  it('clicking Export PNG with mocked stage completes without error', async () => {
+    const { user } = setup()
+    await expect(user.click(screen.getByTestId('export-png-button'))).resolves.not.toThrow()
+  })
+
+  it('triggers a PNG download via Blob with pixelRatio 2 and revokes the URL', async () => {
+    stageStub.toCanvas.mockClear()
+    mockCanvas.toBlob.mockClear()
+    ;(URL.createObjectURL as ReturnType<typeof vi.fn>).mockClear()
+    ;(URL.revokeObjectURL as ReturnType<typeof vi.fn>).mockClear()
+
+    const mockAnchor = { href: '', download: '', click: vi.fn() }
+    const realCreateElement = document.createElement.bind(document)
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) =>
+      tag === 'a' ? (mockAnchor as unknown as HTMLElement) : realCreateElement(tag),
+    )
+
+    const { user } = setup()
+    await user.click(screen.getByTestId('export-png-button'))
+
+    expect(stageStub.toCanvas).toHaveBeenCalledWith({ pixelRatio: 2 })
+    expect(mockCanvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png')
+    expect(mockAnchor.href).toBe('blob:mock-url')
+    expect(mockAnchor.download).toMatch(/\.png$/)
+    expect(mockAnchor.click).toHaveBeenCalled()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+
+    createElementSpy.mockRestore()
   })
 })
 

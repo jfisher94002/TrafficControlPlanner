@@ -1718,6 +1718,15 @@ export default function TrafficControlPlanner() {
     setZoom(1);
   };
 
+  const triggerDownload = (href: string, filename: string) => {
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    a.click();
+  };
+
+  const safePlanTitle = planTitle.replace(/[^a-z0-9]/gi, "_") || "plan";
+
   const savePlan = () => {
     const plan = {
       id: planId,
@@ -1733,11 +1742,20 @@ export default function TrafficControlPlanner() {
     };
     const blob = new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${planTitle.replace(/[^a-z0-9]/gi, "_")}.tcp.json`;
-    a.click();
+    triggerDownload(url, `${safePlanTitle}.tcp.json`);
     URL.revokeObjectURL(url);
+  };
+
+  const exportPNG = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const canvas = stage.toCanvas({ pixelRatio: 2 });
+    canvas.toBlob((blob: Blob | null) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `${safePlanTitle}.png`);
+      URL.revokeObjectURL(url);
+    }, "image/png");
   };
 
   const loadPlan = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1821,6 +1839,7 @@ export default function TrafficControlPlanner() {
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
+          <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 

@@ -4,15 +4,12 @@ import React from 'react'
 
 // ─── Konva mock ───────────────────────────────────────────────────────────────
 // jsdom has no canvas; render Stage as a plain div and pass children through.
-vi.mock('react-konva', () => {
+// Async factory so we can import the shared stageStub module.
+vi.mock('react-konva', async () => {
+  const { stageStub } = await import('./konva-stub')
+
   const passThrough = ({ children }: { children?: React.ReactNode }) =>
     React.createElement(React.Fragment, null, children ?? null)
-
-  // Stub that matches the Konva.Stage surface the component relies on
-  const stageStub = {
-    getPointerPosition: () => ({ x: 0, y: 0 }),
-    container: () => document.createElement('div'),
-  }
 
   const Stage = React.forwardRef(
     (
@@ -93,3 +90,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 })
 
 globalThis.prompt = vi.fn().mockReturnValue(null)
+
+// URL object stubs (jsdom doesn't implement createObjectURL/revokeObjectURL)
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+globalThis.URL.revokeObjectURL = vi.fn()

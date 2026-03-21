@@ -1,0 +1,223 @@
+// ─── CORE GEOMETRY ────────────────────────────────────────────────────────────
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface SnapResult extends Point {
+  snapped: boolean;
+}
+
+// ─── SIGN & DEVICE DATA ───────────────────────────────────────────────────────
+
+export type SignShape = 'diamond' | 'rect' | 'octagon' | 'circle' | 'triangle' | 'shield';
+
+export interface SignData {
+  id: string;
+  label: string;
+  shape: SignShape;
+  color: string;
+  textColor: string;
+  border?: string;
+}
+
+export interface DeviceData {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+}
+
+// ─── ROAD TYPES ───────────────────────────────────────────────────────────────
+
+export interface RoadType {
+  id: string;
+  label: string;
+  lanes: number;
+  width: number;
+  realWidth: number;
+}
+
+// ─── CANVAS OBJECTS (discriminated union on `type`) ───────────────────────────
+
+export interface StraightRoadObject {
+  id: string;
+  type: 'road';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  realWidth: number;
+  lanes: number;
+  roadType: string;
+}
+
+export interface PolylineRoadObject {
+  id: string;
+  type: 'polyline_road';
+  points: Point[];
+  width: number;
+  realWidth: number;
+  lanes: number;
+  roadType: string;
+  smooth: boolean;
+}
+
+export interface CurveRoadObject {
+  id: string;
+  type: 'curve_road';
+  points: [Point, Point, Point];
+  width: number;
+  realWidth: number;
+  lanes: number;
+  roadType: string;
+}
+
+export interface SignObject {
+  id: string;
+  type: 'sign';
+  x: number;
+  y: number;
+  signData: SignData;
+  rotation: number;
+  scale: number;
+}
+
+export interface DeviceObject {
+  id: string;
+  type: 'device';
+  x: number;
+  y: number;
+  deviceData: DeviceData;
+  rotation: number;
+}
+
+export interface ZoneObject {
+  id: string;
+  type: 'zone';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface ArrowObject {
+  id: string;
+  type: 'arrow';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+}
+
+export interface TextObject {
+  id: string;
+  type: 'text';
+  x: number;
+  y: number;
+  text: string;
+  fontSize: number;
+  bold: boolean;
+  color: string;
+}
+
+export interface MeasureObject {
+  id: string;
+  type: 'measure';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export type CanvasObject =
+  | StraightRoadObject
+  | PolylineRoadObject
+  | CurveRoadObject
+  | SignObject
+  | DeviceObject
+  | ZoneObject
+  | ArrowObject
+  | TextObject
+  | MeasureObject;
+
+// ─── PLAN METADATA ────────────────────────────────────────────────────────────
+
+export interface CanvasState {
+  objects: CanvasObject[];
+}
+
+export interface PlanMeta {
+  projectNumber: string;
+  client: string;
+  location: string;
+  notes: string;
+}
+
+export interface MapCenter {
+  lat: number;
+  lon: number;
+  zoom: number;
+}
+
+// ─── INTERNAL UI TYPES ────────────────────────────────────────────────────────
+
+export interface DrawStart {
+  x: number;
+  y: number;
+  ox?: number;
+  oy?: number;
+  id?: string;
+  origPoints?: Point[] | null;
+}
+
+export interface PanStart {
+  x: number;
+  y: number;
+}
+
+export interface MapTileEntry {
+  image: HTMLImageElement;
+  loaded: boolean;
+}
+
+export interface MapTile {
+  url: string;
+  x: number;
+  y: number;
+  size: number;
+}
+
+export interface ToolDef {
+  id: string;
+  label: string;
+  icon: string;
+  shortcut: string;
+}
+
+// ─── GEOCODING ────────────────────────────────────────────────────────────────
+
+export interface GeocodeAddress {
+  house_number?: string;
+  road?: string;
+  pedestrian?: string;
+  footway?: string;
+  cycleway?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  hamlet?: string;
+  county?: string;
+  state?: string;
+  state_district?: string;
+}
+
+export interface GeocodeResult {
+  lat: string;
+  lon: string;
+  display_name: string;
+  address: GeocodeAddress;
+}

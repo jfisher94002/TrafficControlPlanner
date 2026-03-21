@@ -1,4 +1,22 @@
-import type { CanvasObject, GeocodeResult, MapCenter, Point, SnapResult } from './types'
+import type {
+  CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
+  SignObject, DeviceObject, ZoneObject, TextObject,
+  StraightRoadObject, ArrowObject, MeasureObject,
+} from './types'
+
+// ─── TYPE GUARDS ──────────────────────────────────────────────────────────────
+
+/** Objects with a single x/y position (sign, device, zone, text). */
+export const isPointObject = (
+  o: CanvasObject,
+): o is SignObject | DeviceObject | ZoneObject | TextObject =>
+  o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text'
+
+/** Objects with x1/y1–x2/y2 endpoints (straight road, arrow, measure). */
+export const isLineObject = (
+  o: CanvasObject,
+): o is StraightRoadObject | ArrowObject | MeasureObject =>
+  o.type === 'road' || o.type === 'arrow' || o.type === 'measure'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 

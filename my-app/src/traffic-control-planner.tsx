@@ -11,7 +11,7 @@ import type {
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress } from './utils';
+import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject } from './utils';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -962,9 +962,9 @@ function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
           (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
         );
         ctx.stroke();
-      } else if ('x' in obj) {
+      } else if (isPointObject(obj)) {
         ctx.fillStyle = COLORS.accent;
-        ctx.fillRect(((obj as SignObject | DeviceObject | ZoneObject | TextObject).x + 2000) * s - 1, ((obj as SignObject | DeviceObject | ZoneObject | TextObject).y + 1500) * s - 1, 3, 3);
+        ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
       }
     });
 
@@ -1219,8 +1219,8 @@ export default function TrafficControlPlanner() {
 
     if (tool === "pan" || e.evt.button === 1) {
       setIsPanning(true);
-      const pos = stageRef.current!.getPointerPosition();
-      setPanStart({ x: pos!.x - offset.x, y: pos!.y - offset.y });
+      const pos = stageRef.current?.getPointerPosition();
+      if (pos) setPanStart({ x: pos.x - offset.x, y: pos.y - offset.y });
       return;
     }
 
@@ -1230,8 +1230,8 @@ export default function TrafficControlPlanner() {
       if (hit) {
         setDrawStart({
           x: raw.x, y: raw.y,
-          ox: 'x' in hit ? (hit as SignObject | DeviceObject | ZoneObject | TextObject).x : ('x1' in hit ? (hit as StraightRoadObject | ArrowObject | MeasureObject).x1 : 0),
-          oy: 'y' in hit ? (hit as SignObject | DeviceObject | ZoneObject | TextObject).y : ('y1' in hit ? (hit as StraightRoadObject | ArrowObject | MeasureObject).y1 : 0),
+          ox: isPointObject(hit) ? hit.x : isLineObject(hit) ? hit.x1 : 0,
+          oy: isPointObject(hit) ? hit.y : isLineObject(hit) ? hit.y1 : 0,
           id: hit.id,
           origPoints: (hit.type === "polyline_road" || hit.type === "curve_road") ? hit.points.map((p) => ({ ...p })) : null,
         });
@@ -1325,8 +1325,8 @@ export default function TrafficControlPlanner() {
     }
 
     if (isPanning && panStart) {
-      const pos = stageRef.current!.getPointerPosition();
-      setOffset({ x: pos!.x - panStart.x, y: pos!.y - panStart.y });
+      const pos = stageRef.current?.getPointerPosition();
+      if (pos) setOffset({ x: pos.x - panStart.x, y: pos.y - panStart.y });
       return;
     }
 
@@ -1337,13 +1337,12 @@ export default function TrafficControlPlanner() {
         if ((o.type === "polyline_road" || o.type === "curve_road") && drawStart.origPoints) {
           return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
         }
-        if ('x' in o && !('x1' in o)) {
-          return { ...o, x: drawStart.ox! + dx, y: drawStart.oy! + dy } as CanvasObject;
+        if (isPointObject(o)) {
+          return { ...o, x: (drawStart.ox ?? 0) + dx, y: (drawStart.oy ?? 0) + dy } as CanvasObject;
         }
-        if ('x1' in o) {
-          const typed = o as StraightRoadObject | ArrowObject | MeasureObject;
-          const sdx = typed.x2 - typed.x1, sdy = typed.y2 - typed.y1;
-          return { ...o, x1: drawStart.ox! + dx, y1: drawStart.oy! + dy, x2: drawStart.ox! + dx + sdx, y2: drawStart.oy! + dy + sdy } as CanvasObject;
+        if (isLineObject(o)) {
+          const sdx = o.x2 - o.x1, sdy = o.y2 - o.y1;
+          return { ...o, x1: (drawStart.ox ?? 0) + dx, y1: (drawStart.oy ?? 0) + dy, x2: (drawStart.ox ?? 0) + dx + sdx, y2: (drawStart.oy ?? 0) + dy + sdy } as CanvasObject;
         }
         return o;
       }));
@@ -1393,8 +1392,9 @@ export default function TrafficControlPlanner() {
   }, [isPanning, drawStart, tool, roadDrawMode, toWorld, trySnap, objects, selectedRoadType, pushHistory]);
 
   const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
-    const pos = stageRef.current!.getPointerPosition();
-    const mx = pos!.x, my = pos!.y;
+    const pos = stageRef.current?.getPointerPosition();
+    if (!pos) return;
+    const mx = pos.x, my = pos.y;
     const factor = e.evt.deltaY < 0 ? 1.1 : 0.9;
     const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * factor));
     setZoom(newZoom);
@@ -1528,7 +1528,7 @@ export default function TrafficControlPlanner() {
           />
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
-          <button onClick={() => fileInputRef.current!.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
+          <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>

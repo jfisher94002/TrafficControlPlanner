@@ -8,21 +8,31 @@ vi.mock('react-konva', () => {
   const passThrough = ({ children }: { children?: React.ReactNode }) =>
     React.createElement(React.Fragment, null, children ?? null)
 
-  return {
-    Stage: ({
-      children,
-      onMouseDown,
-      onMouseMove,
-      onMouseUp,
-      ...rest
-    }: {
-      children?: React.ReactNode
-      onMouseDown?: (e: unknown) => void
-      onMouseMove?: (e: unknown) => void
-      onMouseUp?: (e: unknown) => void
-      [k: string]: unknown
-    }) =>
-      React.createElement(
+  // Stub that matches the Konva.Stage surface the component relies on
+  const stageStub = {
+    getPointerPosition: () => ({ x: 0, y: 0 }),
+    container: () => document.createElement('div'),
+  }
+
+  const Stage = React.forwardRef(
+    (
+      {
+        children,
+        onMouseDown,
+        onMouseMove,
+        onMouseUp,
+        ...rest
+      }: {
+        children?: React.ReactNode
+        onMouseDown?: (e: unknown) => void
+        onMouseMove?: (e: unknown) => void
+        onMouseUp?: (e: unknown) => void
+        [k: string]: unknown
+      },
+      ref: React.Ref<unknown>,
+    ) => {
+      React.useImperativeHandle(ref, () => stageStub)
+      return React.createElement(
         'div',
         {
           'data-testid': rest['data-testid'] ?? 'konva-stage',
@@ -37,7 +47,13 @@ vi.mock('react-konva', () => {
             : undefined,
         },
         children,
-      ),
+      )
+    },
+  )
+  Stage.displayName = 'MockStage'
+
+  return {
+    Stage,
     Layer: passThrough,
     Group: passThrough,
     // Drawing primitives — no visual output needed in tests

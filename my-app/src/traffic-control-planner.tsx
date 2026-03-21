@@ -890,21 +890,64 @@ function ManifestRow({ icon, label, count }: { icon: string; label: string; coun
 }
 
 function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
-  const signCounts: Record<string, number> = {};
-  const deviceCounts: Record<string, number> = {};
-  let roads = 0, tapers = 0, zones = 0, arrows = 0, texts = 0, measures = 0;
-  for (const obj of objects) {
-    if (obj.type === "sign")         signCounts[obj.signData.label] = (signCounts[obj.signData.label] ?? 0) + 1;
-    else if (obj.type === "device")  deviceCounts[obj.deviceData.label] = (deviceCounts[obj.deviceData.label] ?? 0) + 1;
-    else if (obj.type === "road" || obj.type === "polyline_road" || obj.type === "curve_road") roads++;
-    else if (obj.type === "taper")   tapers++;
-    else if (obj.type === "zone")    zones++;
-    else if (obj.type === "arrow")   arrows++;
-    else if (obj.type === "text")    texts++;
-    else if (obj.type === "measure") measures++;
-  }
-  const hasAny = objects.length > 0;
-  const otherCount = roads + tapers + zones + arrows + texts + measures;
+  const {
+    signCounts,
+    deviceCounts,
+    roads,
+    tapers,
+    zones,
+    arrows,
+    texts,
+    measures,
+    hasAny,
+    otherCount,
+  } = useMemo(() => {
+    const nextSignCounts: Record<string, number> = {};
+    const nextDeviceCounts: Record<string, number> = {};
+    let roadsCount = 0;
+    let tapersCount = 0;
+    let zonesCount = 0;
+    let arrowsCount = 0;
+    let textsCount = 0;
+    let measuresCount = 0;
+
+    for (const obj of objects) {
+      if (obj.type === "sign") {
+        nextSignCounts[obj.signData.label] = (nextSignCounts[obj.signData.label] ?? 0) + 1;
+      } else if (obj.type === "device") {
+        nextDeviceCounts[obj.deviceData.label] = (nextDeviceCounts[obj.deviceData.label] ?? 0) + 1;
+      } else if (obj.type === "road" || obj.type === "polyline_road" || obj.type === "curve_road") {
+        roadsCount++;
+      } else if (obj.type === "taper") {
+        tapersCount++;
+      } else if (obj.type === "zone") {
+        zonesCount++;
+      } else if (obj.type === "arrow") {
+        arrowsCount++;
+      } else if (obj.type === "text") {
+        textsCount++;
+      } else if (obj.type === "measure") {
+        measuresCount++;
+      }
+    }
+
+    const hasAnyObjects = objects.length > 0;
+    const otherCountTotal =
+      roadsCount + tapersCount + zonesCount + arrowsCount + textsCount + measuresCount;
+
+    return {
+      signCounts: nextSignCounts,
+      deviceCounts: nextDeviceCounts,
+      roads: roadsCount,
+      tapers: tapersCount,
+      zones: zonesCount,
+      arrows: arrowsCount,
+      texts: textsCount,
+      measures: measuresCount,
+      hasAny: hasAnyObjects,
+      otherCount: otherCountTotal,
+    };
+  }, [objects]);
   return (
     <div data-testid="manifest-panel" style={{ padding: 12, overflow: "auto", flex: 1 }}>
       {!hasAny && <div style={{ fontSize: 10, color: COLORS.textDim, textAlign: "center", padding: 12 }}>No objects yet</div>}

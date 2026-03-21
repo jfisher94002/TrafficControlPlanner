@@ -88,9 +88,11 @@ describe('Plan metadata', () => {
 
 // ─── North arrow ──────────────────────────────────────────────────────────────
 describe('North arrow', () => {
-  it('is visible by default', () => {
+  it('is visible by default and does not block canvas interactions', () => {
     setup()
-    expect(screen.getByTestId('north-arrow')).toBeInTheDocument()
+    const el = screen.getByTestId('north-arrow')
+    expect(el).toBeInTheDocument()
+    expect(el).toHaveStyle({ pointerEvents: 'none' })
   })
 
   it('toggle checkbox hides the north arrow', async () => {

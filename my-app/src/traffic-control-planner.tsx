@@ -17,7 +17,8 @@ import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, 
 const GRID_SIZE = 20;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
-const SNAP_RADIUS = 14; // screen-pixels for endpoint snap
+const SNAP_RADIUS = 14;    // screen-pixels for endpoint snap
+const STATUS_BAR_H = 28;   // height of the bottom status bar in px
 
 const COLORS = {
   bg: "#0f1117",
@@ -877,19 +878,35 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
 
 // ─── NORTH ARROW ─────────────────────────────────────────────────────────────
 
+const northArrowStyle: React.CSSProperties = {
+  position: "absolute",
+  bottom: STATUS_BAR_H + 8,
+  right: 12,
+  width: 44,
+  height: 44,
+  borderRadius: "50%",
+  background: "rgba(26,29,39,0.88)",
+  border: `1px solid ${COLORS.panelBorder}`,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  pointerEvents: "none",
+  zIndex: 10,
+};
+
 function NorthArrow({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
-    <div data-testid="north-arrow" style={{ position: "absolute", bottom: 36, right: 12, width: 44, height: 44, borderRadius: "50%", background: "rgba(26,29,39,0.88)", border: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 10 }}>
+    <div data-testid="north-arrow" style={northArrowStyle}>
       <svg width="36" height="36" viewBox="0 0 36 36" aria-label="North arrow">
-        {/* North needle (red) */}
-        <polygon points="18,5 15,19 21,19" fill="#ef4444" />
+        {/* North needle */}
+        <polygon points="18,5 15,19 21,19" fill={COLORS.danger} />
         {/* South needle (muted) */}
         <polygon points="18,31 15,19 21,19" fill={COLORS.textDim} />
         {/* Centre pivot */}
         <circle cx="18" cy="19" r="2.5" fill={COLORS.text} />
         {/* N label */}
-        <text x="18" y="4" textAnchor="middle" dominantBaseline="auto" fontSize="7" fontWeight="bold" fill="#ef4444" fontFamily="'JetBrains Mono',monospace">N</text>
+        <text x="18" y="4" textAnchor="middle" dominantBaseline="auto" fontSize="7" fontWeight="bold" fill={COLORS.danger} fontFamily="'JetBrains Mono',monospace">N</text>
       </svg>
     </div>
   );

@@ -11,6 +11,8 @@ import {
   geocodeAddress,
   calcTaperLength,
   cloneObject,
+  isPointObject,
+  isLineObject,
 } from '../utils'
 import type { CanvasObject, GeocodeResult } from '../types'
 
@@ -308,4 +310,48 @@ describe('cloneObject', () => {
     clone.signData.label = 'MUTATED'
     expect((sign as typeof sign).signData.label).toBe('STOP')
   })
+})
+
+// ─── isPointObject ────────────────────────────────────────────────────────────
+describe('isPointObject', () => {
+  const sign: CanvasObject = { id: '1', type: 'sign', x: 0, y: 0, signData: { id: 's', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+  const device: CanvasObject = { id: '2', type: 'device', x: 0, y: 0, deviceData: { id: 'd', label: 'Cone', icon: '▲', color: '#f97316' }, rotation: 0 }
+  const zone: CanvasObject = { id: '3', type: 'zone', x: 0, y: 0, w: 100, h: 100 }
+  const text: CanvasObject = { id: '4', type: 'text', x: 0, y: 0, text: 'hi', fontSize: 14, bold: false, color: '#fff' }
+  const taper: CanvasObject = { id: '5', type: 'taper', x: 0, y: 0, rotation: 0, laneWidth: 12, speed: 45, taperLength: 405, manualLength: false, numLanes: 1 }
+  const road: CanvasObject = { id: '6', type: 'road', x1: 0, y1: 0, x2: 100, y2: 0, width: 40, realWidth: 12, lanes: 2, roadType: '2lane' }
+  const arrow: CanvasObject = { id: '7', type: 'arrow', x1: 0, y1: 0, x2: 100, y2: 0, color: '#fff' }
+  const measure: CanvasObject = { id: '8', type: 'measure', x1: 0, y1: 0, x2: 100, y2: 0 }
+  const poly: CanvasObject = { id: '9', type: 'polyline_road', points: [{ x: 0, y: 0 }], width: 40, realWidth: 12, lanes: 2, roadType: '2lane', smooth: false }
+  const curve: CanvasObject = { id: '10', type: 'curve_road', points: [{ x: 0, y: 0 }, { x: 50, y: 50 }, { x: 100, y: 0 }], width: 40, realWidth: 12, lanes: 2, roadType: '2lane' }
+
+  it('returns true for sign', () => { expect(isPointObject(sign)).toBe(true) })
+  it('returns true for device', () => { expect(isPointObject(device)).toBe(true) })
+  it('returns true for zone', () => { expect(isPointObject(zone)).toBe(true) })
+  it('returns true for text', () => { expect(isPointObject(text)).toBe(true) })
+  it('returns true for taper', () => { expect(isPointObject(taper)).toBe(true) })
+  it('returns false for road', () => { expect(isPointObject(road)).toBe(false) })
+  it('returns false for arrow', () => { expect(isPointObject(arrow)).toBe(false) })
+  it('returns false for measure', () => { expect(isPointObject(measure)).toBe(false) })
+  it('returns false for polyline_road', () => { expect(isPointObject(poly)).toBe(false) })
+  it('returns false for curve_road', () => { expect(isPointObject(curve)).toBe(false) })
+})
+
+// ─── isLineObject ─────────────────────────────────────────────────────────────
+describe('isLineObject', () => {
+  const road: CanvasObject = { id: '1', type: 'road', x1: 0, y1: 0, x2: 100, y2: 0, width: 40, realWidth: 12, lanes: 2, roadType: '2lane' }
+  const arrow: CanvasObject = { id: '2', type: 'arrow', x1: 0, y1: 0, x2: 100, y2: 0, color: '#fff' }
+  const measure: CanvasObject = { id: '3', type: 'measure', x1: 0, y1: 0, x2: 100, y2: 0 }
+  const sign: CanvasObject = { id: '4', type: 'sign', x: 0, y: 0, signData: { id: 's', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+  const device: CanvasObject = { id: '5', type: 'device', x: 0, y: 0, deviceData: { id: 'd', label: 'Cone', icon: '▲', color: '#f97316' }, rotation: 0 }
+  const taper: CanvasObject = { id: '6', type: 'taper', x: 0, y: 0, rotation: 0, laneWidth: 12, speed: 45, taperLength: 405, manualLength: false, numLanes: 1 }
+  const poly: CanvasObject = { id: '7', type: 'polyline_road', points: [{ x: 0, y: 0 }], width: 40, realWidth: 12, lanes: 2, roadType: '2lane', smooth: false }
+
+  it('returns true for road', () => { expect(isLineObject(road)).toBe(true) })
+  it('returns true for arrow', () => { expect(isLineObject(arrow)).toBe(true) })
+  it('returns true for measure', () => { expect(isLineObject(measure)).toBe(true) })
+  it('returns false for sign', () => { expect(isLineObject(sign)).toBe(false) })
+  it('returns false for device', () => { expect(isLineObject(device)).toBe(false) })
+  it('returns false for taper', () => { expect(isLineObject(taper)).toBe(false) })
+  it('returns false for polyline_road', () => { expect(isLineObject(poly)).toBe(false) })
 })

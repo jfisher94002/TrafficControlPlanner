@@ -33,7 +33,7 @@ PAGE_W, PAGE_H = landscape(letter)  # 792 × 612 pt
 CONTENT_W = PAGE_W - 2 * MARGIN
 TITLE_H = 1.2 * inch
 LEGEND_MAX_H = 1.6 * inch
-ICON_DIM = 48.0  # pt — matches Drawing size from sign_renderer
+ICON_DIM = 48.0  # pt — icon cell size used in legend layout
 
 
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -48,10 +48,6 @@ def _unique_signs(request: ExportRequest) -> list[SignData]:
                 seen.add(obj.signData.id)
                 result.append(obj.signData)
     return result
-
-
-def _safe_name(text: str, max_len: int = 40) -> str:
-    return "".join(c if c.isalnum() or c in "-_ " else "_" for c in text)[:max_len].strip()
 
 
 def _format_date(iso: str) -> str:

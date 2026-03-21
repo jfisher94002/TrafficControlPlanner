@@ -1841,8 +1841,9 @@ export default function TrafficControlPlanner() {
       metadata: planMeta,
       canvas_image_b64: b64,
     };
+    const apiBase = (import.meta.env.VITE_EXPORT_API_BASE ?? "").replace(/\/$/, "");
     try {
-      const res = await fetch("/export-pdf", {
+      const res = await fetch(`${apiBase}/export-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

@@ -12,6 +12,7 @@ vi.mock('react-konva', () => {
   const stageStub = {
     getPointerPosition: () => ({ x: 0, y: 0 }),
     container: () => document.createElement('div'),
+    toDataURL: () => 'data:image/png;base64,mock',
   }
 
   const Stage = React.forwardRef(

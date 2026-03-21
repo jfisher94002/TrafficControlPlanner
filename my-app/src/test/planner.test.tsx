@@ -215,6 +215,19 @@ describe('Manifest panel', () => {
   })
 })
 
+// ─── PNG export ───────────────────────────────────────────────────────────────
+describe('PNG export', () => {
+  it('Export PNG button is present in the toolbar', () => {
+    setup()
+    expect(screen.getByTestId('export-png-button')).toBeInTheDocument()
+  })
+
+  it('clicking Export PNG does not throw when stage is not available', async () => {
+    const { user } = setup()
+    await expect(user.click(screen.getByTestId('export-png-button'))).resolves.not.toThrow()
+  })
+})
+
 // ─── Taper tool ───────────────────────────────────────────────────────────────
 describe('Taper tool', () => {
   it('pressing P activates the taper tool', () => {

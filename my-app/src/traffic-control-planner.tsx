@@ -1740,6 +1740,16 @@ export default function TrafficControlPlanner() {
     URL.revokeObjectURL(url);
   };
 
+  const exportPNG = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const dataURL = stage.toDataURL({ pixelRatio: 2 });
+    const a = document.createElement("a");
+    a.href = dataURL;
+    a.download = `${planTitle.replace(/[^a-z0-9]/gi, "_")}.png`;
+    a.click();
+  };
+
   const loadPlan = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1821,6 +1831,7 @@ export default function TrafficControlPlanner() {
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
+          <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 

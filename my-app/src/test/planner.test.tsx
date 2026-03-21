@@ -109,3 +109,26 @@ describe('Object creation', () => {
     expect(within(rightPanel).getByText(/sign Properties/i)).toBeInTheDocument()
   })
 })
+
+// ─── Taper tool ───────────────────────────────────────────────────────────────
+describe('Taper tool', () => {
+  it('pressing P activates the taper tool', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    expect(screen.getByTestId('object-count').closest('div')?.textContent).toContain('Tool: TAPER')
+  })
+
+  it('taper tool + canvas click places a taper (object count 1)', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('placing a taper shows Taper Properties in right panel', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(within(screen.getByTestId('right-panel')).getByText(/taper Properties/i)).toBeInTheDocument()
+  })
+})

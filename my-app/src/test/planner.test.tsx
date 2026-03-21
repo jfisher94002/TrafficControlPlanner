@@ -254,6 +254,63 @@ describe('PNG export', () => {
   })
 })
 
+// ─── Copy / paste / duplicate ─────────────────────────────────────────────────
+describe('Copy/paste/duplicate', () => {
+  it('Ctrl+C + Ctrl+V pastes a second object (count goes to 2)', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('2 objects')
+  })
+
+  it('Ctrl+V with nothing in clipboard does nothing', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('Ctrl+D duplicates the selected object (count goes to 2)', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    fireEvent.keyDown(window, { key: 'd', ctrlKey: true })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('2 objects')
+  })
+
+  it('undo after paste restores count to 1', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'v', ctrlKey: true })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('2 objects')
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('Delete key removes the selected object', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    fireEvent.keyDown(window, { key: 'Delete' })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('Ctrl+Y redoes after undo', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+    fireEvent.keyDown(window, { key: 'y', ctrlKey: true })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+})
+
 // ─── Taper tool ───────────────────────────────────────────────────────────────
 describe('Taper tool', () => {
   it('pressing P activates the taper tool', () => {

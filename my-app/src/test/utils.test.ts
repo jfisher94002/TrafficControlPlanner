@@ -10,6 +10,7 @@ import {
   formatSearchPrimary,
   geocodeAddress,
   calcTaperLength,
+  cloneObject,
 } from '../utils'
 import type { CanvasObject, GeocodeResult } from '../types'
 
@@ -243,5 +244,68 @@ describe('calcTaperLength', () => {
 
   it('multi-lane > single-lane for same speed and lane width', () => {
     expect(calcTaperLength(55, 12, 2)).toBeGreaterThan(calcTaperLength(55, 12, 1))
+  })
+})
+
+// ─── cloneObject ─────────────────────────────────────────────────────────────
+describe('cloneObject', () => {
+  it('assigns a new id', () => {
+    const sign: CanvasObject = { id: 'orig', type: 'sign', x: 0, y: 0, signData: { id: 'stop', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+    const clone = cloneObject(sign)
+    expect(clone.id).not.toBe('orig')
+  })
+
+  it('offsets x/y by 20 for a point object (sign)', () => {
+    const sign: CanvasObject = { id: 'a', type: 'sign', x: 100, y: 200, signData: { id: 'stop', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+    const clone = cloneObject(sign) as typeof sign
+    expect(clone.x).toBe(120)
+    expect(clone.y).toBe(220)
+  })
+
+  it('respects custom dx/dy', () => {
+    const sign: CanvasObject = { id: 'a', type: 'sign', x: 0, y: 0, signData: { id: 'stop', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+    const clone = cloneObject(sign, 5, 10) as typeof sign
+    expect(clone.x).toBe(5)
+    expect(clone.y).toBe(10)
+  })
+
+  it('offsets x1/y1/x2/y2 for a line object (road)', () => {
+    const road: CanvasObject = { id: 'r', type: 'road', x1: 0, y1: 0, x2: 100, y2: 0, width: 80, realWidth: 22, lanes: 2, roadType: '2lane' }
+    const clone = cloneObject(road) as typeof road
+    expect(clone.x1).toBe(20); expect(clone.y1).toBe(20)
+    expect(clone.x2).toBe(120); expect(clone.y2).toBe(20)
+  })
+
+  it('offsets all points for a polyline_road', () => {
+    const poly: CanvasObject = { id: 'p', type: 'polyline_road', points: [{ x: 0, y: 0 }, { x: 10, y: 10 }], width: 80, realWidth: 22, lanes: 2, roadType: '2lane', smooth: false }
+    const clone = cloneObject(poly) as typeof poly
+    expect(clone.points[0]).toEqual({ x: 20, y: 20 })
+    expect(clone.points[1]).toEqual({ x: 30, y: 30 })
+  })
+
+  it('does not mutate the original object', () => {
+    const sign: CanvasObject = { id: 'a', type: 'sign', x: 10, y: 10, signData: { id: 'stop', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+    cloneObject(sign)
+    expect((sign as typeof sign).x).toBe(10)
+  })
+
+  it('offsets all three control points for a curve_road', () => {
+    const curve: CanvasObject = {
+      id: 'c', type: 'curve_road',
+      points: [{ x: 0, y: 0 }, { x: 50, y: -50 }, { x: 100, y: 0 }],
+      width: 80, realWidth: 22, lanes: 2, roadType: '2lane',
+    }
+    const clone = cloneObject(curve) as typeof curve
+    expect(clone.id).not.toBe('c')
+    expect(clone.points[0]).toEqual({ x: 20, y: 20 })
+    expect(clone.points[1]).toEqual({ x: 70, y: -30 })
+    expect(clone.points[2]).toEqual({ x: 120, y: 20 })
+  })
+
+  it('deep-clones nested structures so signData is not shared', () => {
+    const sign: CanvasObject = { id: 'a', type: 'sign', x: 0, y: 0, signData: { id: 'stop', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' }, rotation: 0, scale: 1 }
+    const clone = cloneObject(sign) as typeof sign
+    clone.signData.label = 'MUTATED'
+    expect((sign as typeof sign).signData.label).toBe('STOP')
   })
 })

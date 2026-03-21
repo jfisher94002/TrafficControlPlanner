@@ -13,7 +13,10 @@ Layout (letter landscape, 11×8.5 in):
 """
 import base64
 import io
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
@@ -125,7 +128,8 @@ def _draw_canvas_image(
             c.drawImage(reader, draw_x, draw_y, draw_w, draw_h, preserveAspectRatio=True)
             return
         except Exception:
-            pass  # fall through to placeholder
+            logger.warning("Failed to decode canvas image for PDF", exc_info=True)
+            # fall through to placeholder
 
     # Placeholder
     c.setFillColor(colors.HexColor("#f5f5f5"))

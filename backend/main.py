@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -5,6 +7,8 @@ from mangum import Mangum
 
 from models import ExportRequest
 from pdf_generator import build_pdf
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="TCP Export API", version="1.0.0")
 
@@ -25,8 +29,9 @@ def health():
 def export_pdf(payload: ExportRequest) -> Response:
     try:
         pdf_bytes = build_pdf(payload)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("PDF generation failed")
+        raise HTTPException(status_code=500, detail="PDF generation failed")
 
     safe = "".join(c if c.isalnum() or c in "-_ " else "_" for c in payload.name)[:40].strip() or "plan"
     filename = f"{safe}.pdf"

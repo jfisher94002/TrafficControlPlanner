@@ -32,11 +32,13 @@ def test_export_pdf_missing_canvas_state(sample_plan):
     assert res.status_code == 422
 
 
-def test_export_pdf_unknown_object_type(sample_plan):
-    bad = dict(sample_plan)
-    bad["canvasState"] = {"objects": [{"id": "x", "type": "unknown_thing"}]}
-    res = client.post("/export-pdf", json=bad)
-    assert res.status_code == 422
+def test_export_pdf_unknown_object_type_passes_through(sample_plan):
+    # OtherCanvasObject accepts unknown types gracefully (passthrough design)
+    plan = dict(sample_plan)
+    plan["canvasState"] = {"objects": [{"id": "x", "type": "unknown_thing", "extra_field": 42}]}
+    res = client.post("/export-pdf", json=plan)
+    assert res.status_code == 200
+    assert res.content[:4] == b"%PDF"
 
 
 def test_export_pdf_no_signs(plan_no_signs):

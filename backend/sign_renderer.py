@@ -16,8 +16,11 @@ from reportlab.lib.colors import HexColor, white, black
 from models import SignData
 
 
-def _hex(color: str) -> HexColor:
-    return HexColor(color)
+def _hex(color: str, default: str = "#000000") -> HexColor:
+    try:
+        return HexColor(color)
+    except Exception:
+        return HexColor(default)
 
 
 def _octagon_points(cx: float, cy: float, s: float) -> list[float]:

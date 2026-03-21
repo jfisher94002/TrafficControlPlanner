@@ -1335,7 +1335,12 @@ export default function TrafficControlPlanner() {
     for (let i = objects.length - 1; i >= 0; i--) {
       const o = objects[i];
       if (o.type === "taper") {
-        const taperHitRadius = Math.max(30, Math.min(calcTaperLength(o.speed, o.laneWidth, o.numLanes) * TAPER_SCALE / 2, 150));
+        const storedTaperLength = (o as TaperObject).taperLength;
+        const effectiveTaperLength =
+          typeof storedTaperLength === "number" && Number.isFinite(storedTaperLength) && storedTaperLength > 0
+            ? storedTaperLength
+            : calcTaperLength(o.speed, o.laneWidth, o.numLanes);
+        const taperHitRadius = Math.max(30, Math.min(effectiveTaperLength * TAPER_SCALE / 2, 150));
         if (dist(wx, wy, o.x, o.y) < taperHitRadius) return o;
       } else if (o.type === "sign" || o.type === "device" || o.type === "text") {
         if (dist(wx, wy, o.x, o.y) < 30) return o;

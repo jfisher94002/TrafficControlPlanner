@@ -1260,12 +1260,60 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
   );
 }
 
+// ─── MERCATOR HELPERS ─────────────────────────────────────────────────────────
+
+function latLonToPixel(lat: number, lon: number, zoom: number): { x: number; y: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const x = ((lon + 180) / 360) * scale;
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+  const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
+  return { x, y };
+}
+
+function pixelToLatLon(px: number, py: number, zoom: number): { lat: number; lon: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const lon = (px / scale) * 360 - 180;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * py / scale))) * 180 / Math.PI;
+  return { lat, lon };
+}
+
 // ─── MINI MAP ─────────────────────────────────────────────────────────────────
 
-interface MiniMapProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; zoom: number; offset: Point; }
-function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
+interface MiniMapProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; zoom: number; offset: Point; mapCenter: MapCenter | null; }
+function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const mmW = 160, mmH = 100;
+  const tileCache = useRef<Record<string, HTMLImageElement>>({});
+  const [tileTick, setTileTick] = useState(0);
+
+  // Overview zoom: 5 levels above the working zoom gives a useful neighbourhood view
+  const ovZoom = mapCenter ? Math.max(8, Math.min(11, mapCenter.zoom - 4)) : null;
+
+  // Clear tile cache when overview zoom level changes to avoid stale tiles
+  useEffect(() => { tileCache.current = {}; }, [ovZoom]);
+
+  // Fetch overview tiles whenever mapCenter changes
+  useEffect(() => {
+    if (!mapCenter || ovZoom === null) return;
+    const TILE = 256;
+    const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
+    const left = cx - mmW / 2, top = cy - mmH / 2;
+    const maxT = Math.pow(2, ovZoom);
+    const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
+    const tyStart = Math.floor(top / TILE), tyEnd = Math.floor((top + mmH) / TILE);
+    for (let tx = txStart; tx <= txEnd; tx++) {
+      for (let ty = tyStart; ty <= tyEnd; ty++) {
+        if (ty < 0 || ty >= maxT) continue;
+        const wx = ((tx % maxT) + maxT) % maxT;
+        const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+        if (tileCache.current[url]) continue;
+        const img = new Image(); img.crossOrigin = "anonymous";
+        img.onload = () => setTileTick(t => t + 1);
+        img.src = url;
+        tileCache.current[url] = img;
+      }
+    }
+  }, [mapCenter, ovZoom]);
 
   useEffect(() => {
     const cvs = ref.current;
@@ -1273,50 +1321,81 @@ function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
     const ctx = cvs.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, mmW, mmH);
-
-    const worldW = 4000, worldH = 3000;
-    const s = Math.min(mmW / worldW, mmH / worldH);
-
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, mmW, mmH);
 
-    objects.forEach((obj) => {
-      if (obj.type === "road") {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo((obj.x1 + 2000) * s, (obj.y1 + 1500) * s);
-        ctx.lineTo((obj.x2 + 2000) * s, (obj.y2 + 1500) * s);
-        ctx.stroke();
-      } else if (obj.type === "polyline_road" && obj.points?.length >= 2) {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        obj.points.forEach((p, i) => {
-          const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
-          if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
-        });
-        ctx.stroke();
-      } else if (obj.type === "curve_road" && obj.points?.length === 3) {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
-        ctx.quadraticCurveTo(
-          (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
-          (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
-        );
-        ctx.stroke();
-      } else if (isPointObject(obj)) {
-        ctx.fillStyle = COLORS.accent;
-        ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
+    if (mapCenter && ovZoom !== null) {
+      // ── Draw overview tiles ──────────────────────────────────────────────
+      const TILE = 256;
+      const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
+      const left = cx - mmW / 2, top = cy - mmH / 2;
+      const maxT = Math.pow(2, ovZoom);
+      const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
+      const tyStart = Math.floor(top / TILE), tyEnd = Math.floor((top + mmH) / TILE);
+      for (let tx = txStart; tx <= txEnd; tx++) {
+        for (let ty = tyStart; ty <= tyEnd; ty++) {
+          if (ty < 0 || ty >= maxT) continue;
+          const wx = ((tx % maxT) + maxT) % maxT;
+          const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+          const img = tileCache.current[url];
+          if (!img?.complete || !img.naturalWidth) continue;
+          ctx.drawImage(img, tx * TILE - left, ty * TILE - top, TILE, TILE);
+        }
       }
-    });
+      // Slight dark overlay for contrast with the accent viewport rect
+      ctx.fillStyle = "rgba(15,17,23,0.25)";
+      ctx.fillRect(0, 0, mmW, mmH);
 
-    const vx = (-offset.x / zoom + 2000) * s;
-    const vy = (-offset.y / zoom + 1500) * s;
-    const vw = (canvasSize.w / zoom) * s;
-    const vh = (canvasSize.h / zoom) * s;
-    ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
-    ctx.strokeRect(vx, vy, vw, vh);
-  }, [objects, canvasSize, zoom, offset]);
+      // ── Viewport rect ───────────────────────────────────────────────────
+      // mapCenter tracks the geographic center of the canvas view (updated on pan),
+      // so the viewport is always centred in the minimap.
+      const vpScale = Math.pow(2, ovZoom - mapCenter.zoom);
+      const vw = Math.max(2, Math.min(mmW, canvasSize.w * vpScale));
+      const vh = Math.max(2, Math.min(mmH, canvasSize.h * vpScale));
+      ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1.5;
+      ctx.strokeRect(mmW / 2 - vw / 2, mmH / 2 - vh / 2, vw, vh);
+    } else {
+      // ── No map: draw canvas objects on a fixed world grid ───────────────
+      const worldW = 4000, worldH = 3000;
+      const s = Math.min(mmW / worldW, mmH / worldH);
+      objects.forEach((obj) => {
+        if (obj.type === "road") {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.x1 + 2000) * s, (obj.y1 + 1500) * s);
+          ctx.lineTo((obj.x2 + 2000) * s, (obj.y2 + 1500) * s);
+          ctx.stroke();
+        } else if (obj.type === "polyline_road" && obj.points?.length >= 2) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          obj.points.forEach((p, i) => {
+            const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
+            if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
+          });
+          ctx.stroke();
+        } else if (obj.type === "curve_road" && obj.points?.length === 3) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
+          ctx.quadraticCurveTo(
+            (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
+            (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
+          );
+          ctx.stroke();
+        } else if (isPointObject(obj)) {
+          ctx.fillStyle = COLORS.accent;
+          ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
+        }
+      });
+      // Viewport rect — clamped so it never escapes the minimap bounds
+      const vx = (-offset.x / zoom + 2000) * s;
+      const vy = (-offset.y / zoom + 1500) * s;
+      const vw = Math.min((canvasSize.w / zoom) * s, mmW);
+      const vh = Math.min((canvasSize.h / zoom) * s, mmH);
+      ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
+      ctx.strokeRect(Math.max(0, vx), Math.max(0, vy), Math.min(vw, mmW - Math.max(0, vx)), Math.min(vh, mmH - Math.max(0, vy)));
+    }
+  }, [objects, canvasSize, zoom, offset, mapCenter, ovZoom, tileTick]);
 
   return (
     <canvas ref={ref} width={mmW} height={mmH}
@@ -1749,7 +1828,20 @@ export default function TrafficControlPlanner() {
 
     if (isPanning && panStart) {
       const pos = stageRef.current?.getPointerPosition();
-      if (pos) setOffset({ x: pos.x - panStart.x, y: pos.y - panStart.y });
+      if (pos) {
+        const newOffset = { x: pos.x - panStart.x, y: pos.y - panStart.y };
+        const dox = newOffset.x - offset.x;
+        const doy = newOffset.y - offset.y;
+        setOffset(newOffset);
+        // Shift map tiles to follow the pan. Tiles live in screen space (Layer 1,
+        // no Konva transform), so 1 screen pixel == 1 tile pixel: shift mapCenter
+        // by (-dox, -doy) in tile pixel space and convert back to lat/lon.
+        if (mapCenter) {
+          const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, mapCenter.zoom);
+          const { lat: newLat, lon: newLon } = pixelToLatLon(cx - dox, cy - doy, mapCenter.zoom);
+          setMapCenter({ lat: newLat, lon: newLon, zoom: mapCenter.zoom });
+        }
+      }
       return;
     }
 
@@ -1770,7 +1862,7 @@ export default function TrafficControlPlanner() {
         return o;
       }));
     }
-  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom]);
+  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom, offset, mapCenter, setMapCenter]);
 
   const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (isPanning) { setIsPanning(false); setPanStart(null); return; }
@@ -2110,7 +2202,7 @@ export default function TrafficControlPlanner() {
                 <div style={{ fontSize: 11, color: COLORS.textMuted }}>{objects.length} objects on canvas</div>
 
                 {sectionTitle("Mini Map")}
-                <MiniMap objects={objects} canvasSize={canvasSize} zoom={zoom} offset={offset} />
+                <MiniMap objects={objects} canvasSize={canvasSize} zoom={zoom} offset={offset} mapCenter={mapCenter} />
               </>
             )}
 

@@ -1,8 +1,12 @@
 """
 Generate SVG files for all traffic control signs and optionally upload to S3.
 
-Usage:
-    python generate_signs.py              # write SVGs to backend/signs/
+Usage (from repo root):
+    python backend/generate_signs.py              # write SVGs to backend/signs/
+    python backend/generate_signs.py --upload     # write + upload to $ASSETS_BUCKET
+
+Or from within backend/:
+    python generate_signs.py              # write SVGs to signs/
     python generate_signs.py --upload     # write + upload to $ASSETS_BUCKET
 
 Geometry: viewBox 0 0 100 100, center (50,50), radius s=40.
@@ -59,7 +63,6 @@ ALL_SIGNS = [
     ("winding",        "WINDING RD",   "diamond",  "#f97316", "#111",  None),
     ("hillgrade",      "HILL/GRADE",   "diamond",  "#f97316", "#111",  None),
     ("workers",        "WORKERS",      "diamond",  "#f97316", "#111",  None),
-    ("trafficcontrols","SIGNAL AHEAD", "diamond",  "#f97316", "#111",  None),
     # ── Temporary / Work Zone ───────────────────────────────────────────────
     ("roadclosed",   "ROAD CLOSED",   "rect",     "#f97316", "#111",  None),
     ("detour",       "DETOUR",        "rect",     "#f97316", "#111",  None),
@@ -129,7 +132,13 @@ def _octagon_points(cx: float, cy: float, s: float) -> str:
 
 def make_svg(sign_id: str, label: str, shape: str, fill: str, text_color: str, border: str | None) -> str:
     cx, cy, s = 50.0, 50.0, 40.0
-    stroke = border if border else ("#fff" if fill not in ("#fff", "#ffffff") else "#333")
+    # Match drawSign() stroke logic: diamonds use dark stroke, others use white (or border color)
+    if shape == "diamond":
+        stroke = "#111"
+    elif border:
+        stroke = border
+    else:
+        stroke = "#fff" if fill not in ("#fff", "#ffffff") else "#333"
     stroke_w = 2.5
 
     if shape == "octagon":

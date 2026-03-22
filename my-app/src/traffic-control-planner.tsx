@@ -104,7 +104,6 @@ const SIGN_CATEGORIES: Record<string, { label: string; color: string; signs: Sig
       { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111" },
       { id: "hillgrade",      label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111" },
       { id: "workers",        label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "trafficcontrols",label: "SIGNAL AHEAD", shape: "diamond", color: "#f97316", textColor: "#111" },
     ],
   },
   temporary: {
@@ -288,10 +287,11 @@ function drawSign(ctx: CanvasRenderingContext2D, sign: { x: number; y: number; s
   }
 
   ctx.fillStyle = signData.textColor || "#fff";
-  ctx.font = `bold ${Math.max(9, 11 * scale)}px 'JetBrains Mono', monospace`;
+  const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
+  const baseFontSize = label.length <= 4 ? 13 : label.length <= 8 ? 11 : 8;
+  ctx.font = `bold ${Math.max(6, baseFontSize * scale)}px 'JetBrains Mono', monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const label = signData.label.length > 8 ? signData.label.slice(0, 7) + "…" : signData.label;
   ctx.fillText(label, 0, shape === "triangle" ? 4 : 0);
   ctx.restore();
 }
@@ -531,10 +531,11 @@ function SignShape({ obj, isSelected }: SignShapeProps) {
           ctx.strokeRect(-s, -s * 0.65, s * 2, s * 1.3);
         }
         ctx.fillStyle = signData.textColor || "#fff";
-        ctx.font = `bold ${Math.max(9, 11 * sc)}px 'JetBrains Mono', monospace`;
+        const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
+        const baseFontSize = label.length <= 4 ? 13 : label.length <= 8 ? 11 : 8;
+        ctx.font = `bold ${Math.max(6, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const label = signData.label.length > 8 ? signData.label.slice(0, 7) + "…" : signData.label;
         ctx.fillText(label, 0, shp === "triangle" ? 4 : 0);
       }}
     />

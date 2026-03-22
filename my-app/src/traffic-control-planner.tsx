@@ -1094,8 +1094,8 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
 
 // ─── PROPERTY PANEL ──────────────────────────────────────────────────────────
 
-interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
-function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpdateMeta }: PropertyPanelProps) {
+interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; onReorder: (id: string, dir: "front" | "forward" | "backward" | "back") => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
+function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta }: PropertyPanelProps) {
   if (!selected) {
     return (
       <div style={{ padding: 12 }}>
@@ -1245,10 +1245,66 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
         </div>
       )}
 
+      {/* ── Position inputs ────────────────────────────────────────── */}
+      {isPointObject(obj) && (
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {(["x", "y"] as const).map((axis) => (
+            <label key={axis} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+              {axis.toUpperCase()}
+              <input type="number" step="any" value={obj[axis]}
+                onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [axis]: v }); }}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+            </label>
+          ))}
+        </div>
+      )}
+      {isLineObject(obj) && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["x1", "y1"] as const).map((k) => (
+              <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+                {k.toUpperCase()}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["x2", "y2"] as const).map((k) => (
+              <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+                {k.toUpperCase()}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Z-ordering ─────────────────────────────────────────────── */}
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 10, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Layer order</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([
+            ["▲▲", "front", "Bring to Front"],
+            ["▲",  "forward",  "Bring Forward"],
+            ["▼",  "backward", "Send Backward"],
+            ["▼▼", "back",   "Send to Back"],
+          ] as [string, "front" | "forward" | "backward" | "back", string][]).map(([icon, dir, title]) => (
+            <button key={dir} title={title} aria-label={title} onClick={() => onReorder(obj.id, dir)}
+              style={{ flex: 1, padding: "4px 0", background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.textMuted, borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+              {icon}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button
         onClick={() => onDelete(obj.id)}
         style={{
-          marginTop: 12, width: "100%", padding: "6px 0",
+          marginTop: 10, width: "100%", padding: "6px 0",
           background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
           color: COLORS.danger, borderRadius: 6, cursor: "pointer",
           fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
@@ -1927,6 +1983,22 @@ export default function TrafficControlPlanner() {
     setObjects(newObjs); pushHistory(newObjs); setSelected(null);
   };
 
+  const reorderObject = (id: string, dir: "front" | "forward" | "backward" | "back") => {
+    const idx = objects.findIndex(o => o.id === id);
+    if (idx === -1) return;
+    // Short-circuit no-ops so we don't clone or push redundant history entries
+    if ((dir === "front" || dir === "forward") && idx === objects.length - 1) return;
+    if ((dir === "back"  || dir === "backward") && idx === 0) return;
+    const next = [...objects];
+    const [obj] = next.splice(idx, 1);
+    if (dir === "front")         next.push(obj);
+    else if (dir === "back")     next.unshift(obj);
+    else if (dir === "forward")  next.splice(idx + 1, 0, obj);
+    else                         next.splice(idx - 1, 0, obj);
+    setObjects(next);
+    pushHistory(next);
+  };
+
   const clearAll = () => {
     if (confirm("Clear all objects?")) { setObjects([]); pushHistory([]); setSelected(null); }
   };
@@ -2468,7 +2540,7 @@ export default function TrafficControlPlanner() {
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
-              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
               : <ManifestPanel objects={objects} />
             }
 

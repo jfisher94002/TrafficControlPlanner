@@ -375,20 +375,16 @@
   </div>
 
   <div class="auth-notice">
-    <span class="badge">PLACEHOLDER</span>
-    <span>Auth check will go here — only verified tcplanpro.com account holders will be able to submit.</span>
+    <span class="badge">ALPHA</span>
+    <span>Access is currently gated by a shared alpha password (client-side only). Server-side auth for tcplanpro.com accounts will replace this before public launch.</span>
   </div>
 
   <details class="config-panel">
-    <summary>GitHub Configuration</summary>
+    <summary>API Configuration</summary>
     <div class="config-fields">
       <div>
-        <div class="config-label">GitHub Token (Fine-grained, issues:write)</div>
-        <input type="password" id="ghToken" placeholder="github_pat_..." />
-      </div>
-      <div>
-        <div class="config-label">Repository (owner/repo)</div>
-        <input type="text" id="ghRepo" value="jfisher94002/TrafficControlPlanner" />
+        <div class="config-label">Backend API Base URL</div>
+        <input type="text" id="apiBase" placeholder="https://api.example.com (leave blank for same origin)" />
       </div>
     </div>
   </details>
@@ -517,13 +513,6 @@
     selectedPriority = el.dataset.priority;
   }
 
-  const labelMap = {
-    bug:         ['bug', 'backlog'],
-    feature:     ['enhancement', 'feature request', 'backlog'],
-    enhancement: ['enhancement', 'backlog'],
-    question:    ['question', 'backlog']
-  };
-
   const typeDisplay = {
     bug: 'bug',
     feature: 'feature request',
@@ -531,11 +520,8 @@
     question: 'question'
   };
 
-  const priorityEmoji = { low: '🟢', medium: '🟡', high: '🟠', critical: '🔴' };
-
   async function submitIssue() {
-    const token = document.getElementById('ghToken').value.trim();
-    const repo = document.getElementById('ghRepo').value.trim();
+    const apiBase = (document.getElementById('apiBase').value.trim()).replace(/\/$/, '');
     const title = document.getElementById('issueTitle').value.trim();
     const body = document.getElementById('issueBody').value.trim();
     const name = document.getElementById('submitterName').value.trim();
@@ -543,50 +529,33 @@
 
     errorMsg.classList.remove('visible');
 
-    if (!token) return showError('Please enter your GitHub token in the configuration panel above.');
     if (!title) return showError('Please enter a title for the issue.');
     if (!body) return showError('Please enter a description.');
     if (!name) return showError('Please enter your name.');
 
     setLoading(true);
 
-    const issueBody = `## ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Report
-
-**Submitted by:** ${name}
-**Priority:** ${priorityEmoji[selectedPriority]} ${selectedPriority.charAt(0).toUpperCase() + selectedPriority.slice(1)}
-**Type:** ${selectedType}
-
----
-
-${body}
-
----
-*Submitted via TCP Feedback Portal*`;
-
     try {
-      const res = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+      const res = await fetch(`${apiBase}/create-issue`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-          'X-GitHub-Api-Version': '2022-11-28'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `[${selectedType.toUpperCase()}] ${title}`,
-          body: issueBody,
-          labels: labelMap[selectedType]
+          issue_type: selectedType,
+          title,
+          body,
+          priority: selectedPriority,
+          submitter_name: name,
         })
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || `GitHub API error: ${res.status}`);
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error ${res.status}`);
       }
 
       const issue = await res.json();
       document.getElementById('issueLink').href = issue.html_url;
-      document.getElementById('issueLink').textContent = `🔗 View Issue #${issue.number} on GitHub`;
+      document.getElementById('issueLink').textContent = `🔗 View Issue #${issue.issue_number} on GitHub`;
       document.getElementById('typepill').textContent = typeDisplay[selectedType];
       document.getElementById('formContent').classList.add('hidden');
       document.getElementById('successState').classList.add('visible');

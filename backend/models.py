@@ -54,6 +54,16 @@ class MapCenter(BaseModel):
     zoom: float
 
 
+# ─── FEEDBACK / ISSUE CREATION ────────────────────────────────────────────────
+
+class CreateIssueRequest(BaseModel):
+    issue_type: Literal["bug", "feature", "enhancement", "question"]
+    title: str
+    body: str
+    priority: Literal["low", "medium", "high", "critical"]
+    submitter_name: str
+
+
 # ─── EXPORT REQUEST ───────────────────────────────────────────────────────────
 
 class ExportRequest(BaseModel):

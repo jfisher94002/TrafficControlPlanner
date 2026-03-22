@@ -1,3 +1,4 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 
@@ -45,3 +46,26 @@ def test_export_pdf_no_signs(plan_no_signs):
     res = client.post("/export-pdf", json=plan_no_signs)
     assert res.status_code == 200
     assert res.content[:4] == b"%PDF"
+
+
+def test_create_issue_returns_503_when_token_missing(monkeypatch):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    res = client.post("/create-issue", json={
+        "issue_type": "bug",
+        "title": "Test issue",
+        "body": "Test body",
+        "priority": "medium",
+        "submitter_name": "Tester",
+    })
+    assert res.status_code == 503
+
+
+def test_create_issue_validates_input():
+    res = client.post("/create-issue", json={
+        "issue_type": "invalid_type",
+        "title": "x",
+        "body": "x",
+        "priority": "medium",
+        "submitter_name": "x",
+    })
+    assert res.status_code == 422

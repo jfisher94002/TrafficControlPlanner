@@ -18,20 +18,16 @@ from pathlib import Path
 # Each entry: (id, label, shape, fill_color, text_color, border_or_None)
 # shape: octagon | diamond | triangle | circle | shield | rect
 
+_SPEED_SIGNS = [
+    (f"speed{mph}", f"{mph} MPH", "rect", "#fff", "#111", "#111")
+    for mph in (15, 20, 25, 30, 35, 40, 45, 50, 55, 65)
+]
+
 ALL_SIGNS = [
     # ── Regulatory ──────────────────────────────────────────────────────────
     ("stop",         "STOP",         "octagon",  "#ef4444", "#fff",  None),
     ("yield",        "YIELD",        "triangle", "#ef4444", "#fff",  None),
-    ("speed15",      "15 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed20",      "20 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed25",      "25 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed30",      "30 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed35",      "35 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed40",      "40 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed45",      "45 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed50",      "50 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed55",      "55 MPH",       "rect",     "#fff",    "#111",  "#111"),
-    ("speed65",      "65 MPH",       "rect",     "#fff",    "#111",  "#111"),
+    *_SPEED_SIGNS,
     ("noentry",      "NO ENTRY",     "circle",   "#ef4444", "#fff",  None),
     ("oneway",       "ONE WAY",      "rect",     "#111",    "#fff",  None),
     ("donotenter",   "DO NOT ENTER", "rect",     "#ef4444", "#fff",  None),
@@ -224,15 +220,23 @@ def main() -> None:
 
     s3 = boto3.client("s3")
     print(f"Uploading {len(ALL_SIGNS)} SVGs to s3://{bucket}/signs/")
+    failed = []
     for sign_id, *_ in ALL_SIGNS:
         key = f"signs/{sign_id}.svg"
-        s3.put_object(
-            Bucket=bucket,
-            Key=key,
-            Body=(out_dir / f"{sign_id}.svg").read_bytes(),
-            ContentType="image/svg+xml",
-            CacheControl="public, max-age=31536000",
-        )
+        try:
+            s3.put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=(out_dir / f"{sign_id}.svg").read_bytes(),
+                ContentType="image/svg+xml",
+                CacheControl="public, max-age=31536000",
+            )
+        except Exception as exc:
+            print(f"ERROR: failed to upload {key}: {exc}", file=sys.stderr)
+            failed.append(key)
+    if failed:
+        print(f"{len(failed)} upload(s) failed — see errors above.", file=sys.stderr)
+        sys.exit(1)
     print("Upload complete.")
 
 

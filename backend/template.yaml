@@ -78,6 +78,9 @@ Resources:
             Principal: "*"
             Action: s3:GetObject
             Resource: !Sub "arn:aws:s3:::${TcpAssetsBucket}/signs/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "true"
 
 Outputs:
   ApiUrl:

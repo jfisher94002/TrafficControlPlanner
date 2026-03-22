@@ -1223,7 +1223,7 @@ function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
         ctx.beginPath();
         obj.points.forEach((p, i) => {
           const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
-          i === 0 ? ctx.moveTo(mx, my) : ctx.lineTo(mx, my);
+          if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
         });
         ctx.stroke();
       } else if (obj.type === "curve_road" && obj.points?.length === 3) {

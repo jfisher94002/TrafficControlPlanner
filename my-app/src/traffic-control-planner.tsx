@@ -898,7 +898,8 @@ function NorthArrow({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
     <div data-testid="north-arrow" style={northArrowStyle}>
-      <svg width="36" height="36" viewBox="0 0 36 36" aria-label="North arrow">
+      <svg width="36" height="36" viewBox="0 0 36 36" role="img">
+        <title>North arrow</title>
         {/* North needle */}
         <polygon points="18,5 15,19 21,19" fill={COLORS.danger} />
         {/* South needle (muted) */}
@@ -1222,7 +1223,7 @@ function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
         ctx.beginPath();
         obj.points.forEach((p, i) => {
           const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
-          i === 0 ? ctx.moveTo(mx, my) : ctx.lineTo(mx, my);
+          if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
         });
         ctx.stroke();
       } else if (obj.type === "curve_road" && obj.points?.length === 3) {
@@ -1789,7 +1790,11 @@ export default function TrafficControlPlanner() {
     a.click();
   };
 
-  const safePlanTitle = planTitle.replace(/[^a-z0-9]/gi, "_") || "plan";
+  const safePlanTitle =
+    planTitle
+      .replace(/[^a-z0-9]/gi, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "") || "plan";
 
   const savePlan = () => {
     const plan = {

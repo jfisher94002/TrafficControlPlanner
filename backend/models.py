@@ -15,6 +15,11 @@ class SignData(BaseModel):
     textColor: str
     border: Optional[str] = None
 
+    @field_validator("label", mode="before")
+    @classmethod
+    def sanitize_label(cls, v: object) -> object:
+        return sanitize_text(v) if isinstance(v, str) else v
+
 
 # ─── CANVAS OBJECTS ───────────────────────────────────────────────────────────
 

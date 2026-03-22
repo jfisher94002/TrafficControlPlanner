@@ -261,12 +261,13 @@ def test_sanitize_text_noop_on_clean_string():
     assert sanitize_text(original) == original
 
 
-def test_sanitize_text_preserves_angle_brackets_in_math():
-    """Tightened regex must not strip non-HTML angle-bracketed text like '1 < 5'."""
+def test_sanitize_text_strips_bare_angle_bracket_sequences():
+    """Any <...> sequence is stripped — these fields have no legitimate use for angle brackets."""
     from sanitize import sanitize_text
-    result = sanitize_text("speed > 0 and distance < 100")
-    assert ">" in result
-    assert "<" in result
+    result = sanitize_text("<version>2.0</version>")
+    assert "<" not in result
+    assert ">" not in result
+    assert "2.0" in result
 
 
 # ─── PlanMeta full field coverage ─────────────────────────────────────────────
@@ -295,6 +296,17 @@ def test_plan_meta_defaults_are_empty_strings():
     assert meta.client == ""
     assert meta.location == ""
     assert meta.notes == ""
+
+
+def test_sign_data_label_is_sanitized():
+    from models import SignData
+    sign = SignData(
+        id="s1", label="<script>STOP</script>\x00",
+        shape="octagon", color="#FF0000", textColor="#FFFFFF",
+    )
+    assert "<script>" not in sign.label
+    assert "\x00" not in sign.label
+    assert "STOP" in sign.label
 
 
 def test_export_request_name_is_sanitized():

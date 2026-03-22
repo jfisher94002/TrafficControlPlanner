@@ -945,6 +945,96 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   );
 }
 
+// ─── SIGN ICON SVG ────────────────────────────────────────────────────────────
+
+function SignIconSvg({ signData, size = 22 }: { signData: SignData; size?: number }) {
+  const cx = size / 2, cy = size / 2, r = size * 0.42;
+  const { shape, color, textColor, label } = signData;
+  let shapeEl: React.ReactElement;
+  if (shape === "octagon") {
+    const pts = Array.from({ length: 8 }, (_, i) => {
+      const a = Math.PI / 8 + (i * Math.PI) / 4;
+      return `${cx + Math.cos(a) * r},${cy + Math.sin(a) * r}`;
+    }).join(" ");
+    shapeEl = <polygon points={pts} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "diamond") {
+    shapeEl = <polygon points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`} fill={color} stroke="#111" strokeWidth="1.5" />;
+  } else if (shape === "triangle") {
+    shapeEl = <polygon points={`${cx},${cy - r} ${cx + r},${cy + r * 0.7} ${cx - r},${cy + r * 0.7}`} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "circle") {
+    shapeEl = <circle cx={cx} cy={cy} r={r} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "shield") {
+    shapeEl = <polygon points={`${cx - r * 0.7},${cy - r} ${cx + r * 0.7},${cy - r} ${cx + r * 0.8},${cy - r * 0.3} ${cx},${cy + r} ${cx - r * 0.8},${cy - r * 0.3}`} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else {
+    shapeEl = <rect x={cx - r} y={cy - r * 0.65} width={r * 2} height={r * 1.3} fill={color} stroke={signData.border || "#333"} strokeWidth="1.5" />;
+  }
+  const shortLabel = label.length > 5 ? label.slice(0, 4) + "\u2026" : label;
+  const fontSize = label.length <= 3 ? 6 : label.length <= 5 ? 5 : 4;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }} aria-hidden="true">
+      {shapeEl}
+      <text x={cx} y={shape === "triangle" ? cy + r * 0.3 : cy + 1.5} textAnchor="middle" dominantBaseline="middle"
+        fontSize={fontSize} fontWeight="bold" fill={textColor || "#fff"} fontFamily="'JetBrains Mono',monospace">
+        {shortLabel}
+      </text>
+    </svg>
+  );
+}
+
+// ─── LEGEND BOX ───────────────────────────────────────────────────────────────
+
+interface LegendBoxProps { objects: CanvasObject[]; visible: boolean; }
+function LegendBox({ objects, visible }: LegendBoxProps) {
+  const { signEntries, deviceEntries } = useMemo(() => {
+    const signMap: Record<string, { signData: SignData; count: number }> = {};
+    const deviceMap: Record<string, { icon: string; count: number }> = {};
+    for (const obj of objects) {
+      if (obj.type === "sign") {
+        const key = obj.signData.id;
+        if (!signMap[key]) signMap[key] = { signData: obj.signData, count: 0 };
+        signMap[key].count++;
+      } else if (obj.type === "device") {
+        const key = obj.deviceData.label;
+        if (!deviceMap[key]) deviceMap[key] = { icon: obj.deviceData.icon, count: 0 };
+        deviceMap[key].count++;
+      }
+    }
+    return {
+      signEntries: Object.values(signMap),
+      deviceEntries: Object.entries(deviceMap).map(([label, { icon, count }]) => ({ label, icon, count })),
+    };
+  }, [objects]);
+
+  if (!visible || (signEntries.length === 0 && deviceEntries.length === 0)) return null;
+
+  return (
+    <div data-testid="legend-box" style={{
+      position: "absolute", bottom: STATUS_BAR_H + 8, left: 12,
+      background: "rgba(26,29,39,0.92)", border: `1px solid ${COLORS.panelBorder}`,
+      borderRadius: 6, padding: "6px 8px", pointerEvents: "none", zIndex: 10,
+      minWidth: 130, maxWidth: 200,
+    }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>
+        Legend
+      </div>
+      {signEntries.map(({ signData, count }) => (
+        <div key={signData.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <SignIconSvg signData={signData} size={20} />
+          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{signData.label}</span>
+          <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
+        </div>
+      ))}
+      {deviceEntries.map(({ label, icon, count }) => (
+        <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <span style={{ width: 20, textAlign: "center", fontSize: 13, flexShrink: 0 }} aria-hidden="true">{icon}</span>
+          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── NORTH ARROW ─────────────────────────────────────────────────────────────
 
 const northArrowStyle: React.CSSProperties = {
@@ -1488,6 +1578,7 @@ export default function TrafficControlPlanner() {
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
+  const [showLegend, setShowLegend] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -2257,6 +2348,10 @@ export default function TrafficControlPlanner() {
                     North Arrow
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
+                    <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} style={{ accentColor: COLORS.accent }} data-testid="legend-toggle" />
+                    Legend Box
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
                     <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} style={{ accentColor: COLORS.accent }} />
                     Snap to Endpoints
                   </label>
@@ -2490,6 +2585,7 @@ export default function TrafficControlPlanner() {
           </Stage>
 
           <NorthArrow visible={showNorthArrow} />
+          <LegendBox objects={objects} visible={showLegend} />
 
           {/* Status bar */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>

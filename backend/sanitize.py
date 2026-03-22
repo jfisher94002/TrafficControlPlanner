@@ -10,8 +10,26 @@ import re
 # Control characters except tab (\x09), newline (\x0a), carriage return (\x0d)
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
-# HTML/XML tags — bounded length to prevent catastrophic backtracking
-_HTML_TAGS = re.compile(r"<[^>]{0,200}>")
+# HTML/XML tags — only match real tags/declarations, not arbitrary angle-bracketed
+# text like "1 < 5" or "<123>". Bounded attributes prevent catastrophic backtracking.
+_HTML_TAGS = re.compile(
+    r"""
+    (                               # HTML/XML tags:
+        </?                         #   opening or closing tag
+        [A-Za-z][A-Za-z0-9:_-]*    #   tag name must start with a letter
+        (?:\s+[^<>]{0,180})?        #   optional attributes / whitespace
+        \s*/?                       #   optional self-closing slash
+        >                           #   end of tag
+    )
+    |
+    (                               # Declarations / comments:
+        <!                          #   e.g. <!DOCTYPE html>, <!-- comment -->
+        [^>]{0,200}
+        >
+    )
+    """,
+    re.VERBOSE,
+)
 
 
 def sanitize_text(value: str) -> str:

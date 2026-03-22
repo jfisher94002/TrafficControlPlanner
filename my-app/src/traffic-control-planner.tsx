@@ -1252,7 +1252,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
             <label key={axis} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
               {axis.toUpperCase()}
               <input type="number" value={Math.round(obj[axis])}
-                onChange={(e) => onUpdate(obj.id, { [axis]: +e.target.value })}
+                onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onUpdate(obj.id, { [axis]: v }); }}
                 style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
             </label>
           ))}
@@ -1265,7 +1265,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
               <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
                 {k.toUpperCase()}
                 <input type="number" value={Math.round(obj[k])}
-                  onChange={(e) => onUpdate(obj.id, { [k]: +e.target.value })}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onUpdate(obj.id, { [k]: v }); }}
                   style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
               </label>
             ))}
@@ -1275,7 +1275,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
               <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
                 {k.toUpperCase()}
                 <input type="number" value={Math.round(obj[k])}
-                  onChange={(e) => onUpdate(obj.id, { [k]: +e.target.value })}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onUpdate(obj.id, { [k]: v }); }}
                   style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
               </label>
             ))}
@@ -1895,12 +1895,15 @@ export default function TrafficControlPlanner() {
     setObjects(prev => {
       const idx = prev.findIndex(o => o.id === id);
       if (idx === -1) return prev;
+      // Short-circuit no-ops so we don't clone or push redundant history entries
+      if ((dir === "front" || dir === "forward") && idx === prev.length - 1) return prev;
+      if ((dir === "back"  || dir === "backward") && idx === 0) return prev;
       const next = [...prev];
       const [obj] = next.splice(idx, 1);
-      if (dir === "front")    next.push(obj);
-      else if (dir === "back") next.unshift(obj);
-      else if (dir === "forward")  next.splice(Math.min(idx + 1, next.length), 0, obj);
-      else                         next.splice(Math.max(idx - 1, 0), 0, obj);
+      if (dir === "front")         next.push(obj);
+      else if (dir === "back")     next.unshift(obj);
+      else if (dir === "forward")  next.splice(idx + 1, 0, obj);
+      else                         next.splice(idx - 1, 0, obj);
       pushHistory(next);
       return next;
     });

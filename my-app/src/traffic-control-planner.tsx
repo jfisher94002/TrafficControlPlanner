@@ -1260,6 +1260,23 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
   );
 }
 
+// ─── MERCATOR HELPERS ─────────────────────────────────────────────────────────
+
+function latLonToPixel(lat: number, lon: number, zoom: number): { x: number; y: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const x = ((lon + 180) / 360) * scale;
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+  const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
+  return { x, y };
+}
+
+function pixelToLatLon(px: number, py: number, zoom: number): { lat: number; lon: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const lon = (px / scale) * 360 - 180;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * py / scale))) * 180 / Math.PI;
+  return { lat, lon };
+}
+
 // ─── MINI MAP ─────────────────────────────────────────────────────────────────
 
 interface MiniMapProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; zoom: number; offset: Point; mapCenter: MapCenter | null; }
@@ -1272,14 +1289,14 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
   // Overview zoom: 5 levels above the working zoom gives a useful neighbourhood view
   const ovZoom = mapCenter ? Math.max(8, Math.min(11, mapCenter.zoom - 4)) : null;
 
+  // Clear tile cache when overview zoom level changes to avoid stale tiles
+  useEffect(() => { tileCache.current = {}; }, [ovZoom]);
+
   // Fetch overview tiles whenever mapCenter changes
   useEffect(() => {
     if (!mapCenter || ovZoom === null) return;
     const TILE = 256;
-    const scale = Math.pow(2, ovZoom) * TILE;
-    const cx = ((mapCenter.lon + 180) / 360) * scale;
-    const sinLat = Math.sin((mapCenter.lat * Math.PI) / 180);
-    const cy = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
+    const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
     const left = cx - mmW / 2, top = cy - mmH / 2;
     const maxT = Math.pow(2, ovZoom);
     const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
@@ -1310,10 +1327,7 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
     if (mapCenter && ovZoom !== null) {
       // ── Draw overview tiles ──────────────────────────────────────────────
       const TILE = 256;
-      const scale = Math.pow(2, ovZoom) * TILE;
-      const cx = ((mapCenter.lon + 180) / 360) * scale;
-      const sinLat = Math.sin((mapCenter.lat * Math.PI) / 180);
-      const cy = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
+      const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
       const left = cx - mmW / 2, top = cy - mmH / 2;
       const maxT = Math.pow(2, ovZoom);
       const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
@@ -1336,8 +1350,8 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
       // mapCenter tracks the geographic center of the canvas view (updated on pan),
       // so the viewport is always centred in the minimap.
       const vpScale = Math.pow(2, ovZoom - mapCenter.zoom);
-      const vw = Math.max(2, canvasSize.w * vpScale);
-      const vh = Math.max(2, canvasSize.h * vpScale);
+      const vw = Math.max(2, Math.min(mmW, canvasSize.w * vpScale));
+      const vh = Math.max(2, Math.min(mmH, canvasSize.h * vpScale));
       ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1.5;
       ctx.strokeRect(mmW / 2 - vw / 2, mmH / 2 - vh / 2, vw, vh);
     } else {
@@ -1823,15 +1837,8 @@ export default function TrafficControlPlanner() {
         // no Konva transform), so 1 screen pixel == 1 tile pixel: shift mapCenter
         // by (-dox, -doy) in tile pixel space and convert back to lat/lon.
         if (mapCenter) {
-          const TILE = 256;
-          const scale = Math.pow(2, mapCenter.zoom) * TILE;
-          const cx = ((mapCenter.lon + 180) / 360) * scale;
-          const sinLat = Math.sin((mapCenter.lat * Math.PI) / 180);
-          const cy = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
-          const newCx = cx - dox;
-          const newCy = cy - doy;
-          const newLon = (newCx / scale) * 360 - 180;
-          const newLat = Math.atan(Math.sinh(Math.PI * (1 - 2 * newCy / scale))) * 180 / Math.PI;
+          const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, mapCenter.zoom);
+          const { lat: newLat, lon: newLon } = pixelToLatLon(cx - dox, cy - doy, mapCenter.zoom);
           setMapCenter({ lat: newLat, lon: newLon, zoom: mapCenter.zoom });
         }
       }

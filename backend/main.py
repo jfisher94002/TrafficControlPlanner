@@ -43,7 +43,7 @@ def export_pdf(payload: ExportRequest) -> Response:
         logger.exception("PDF generation failed")
         raise HTTPException(status_code=500, detail="PDF generation failed")
 
-    safe = "".join(c if c.isalnum() or c in "-_ " else "_" for c in payload.name)[:40].strip() or "plan"
+    safe = "".join(c if (c.isascii() and c.isalnum()) or c in "-_ " else "_" for c in payload.name)[:40].strip() or "plan"
     filename = f"{safe}.pdf"
 
     return Response(

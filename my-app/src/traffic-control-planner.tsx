@@ -1251,8 +1251,8 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
           {(["x", "y"] as const).map((axis) => (
             <label key={axis} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
               {axis.toUpperCase()}
-              <input type="number" value={Math.round(obj[axis])}
-                onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onUpdate(obj.id, { [axis]: v }); }}
+              <input type="number" step="any" value={obj[axis]}
+                onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [axis]: v }); }}
                 style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
             </label>
           ))}
@@ -1264,8 +1264,8 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
             {(["x1", "y1"] as const).map((k) => (
               <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
                 {k.toUpperCase()}
-                <input type="number" value={Math.round(obj[k])}
-                  onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onUpdate(obj.id, { [k]: v }); }}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
                   style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
               </label>
             ))}
@@ -1274,8 +1274,8 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
             {(["x2", "y2"] as const).map((k) => (
               <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
                 {k.toUpperCase()}
-                <input type="number" value={Math.round(obj[k])}
-                  onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onUpdate(obj.id, { [k]: v }); }}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
                   style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
               </label>
             ))}
@@ -1293,7 +1293,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
             ["▼",  "backward", "Send Backward"],
             ["▼▼", "back",   "Send to Back"],
           ] as [string, "front" | "forward" | "backward" | "back", string][]).map(([icon, dir, title]) => (
-            <button key={dir} title={title} onClick={() => onReorder(obj.id, dir)}
+            <button key={dir} title={title} aria-label={title} onClick={() => onReorder(obj.id, dir)}
               style={{ flex: 1, padding: "4px 0", background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.textMuted, borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
               {icon}
             </button>
@@ -1892,21 +1892,19 @@ export default function TrafficControlPlanner() {
   };
 
   const reorderObject = (id: string, dir: "front" | "forward" | "backward" | "back") => {
-    setObjects(prev => {
-      const idx = prev.findIndex(o => o.id === id);
-      if (idx === -1) return prev;
-      // Short-circuit no-ops so we don't clone or push redundant history entries
-      if ((dir === "front" || dir === "forward") && idx === prev.length - 1) return prev;
-      if ((dir === "back"  || dir === "backward") && idx === 0) return prev;
-      const next = [...prev];
-      const [obj] = next.splice(idx, 1);
-      if (dir === "front")         next.push(obj);
-      else if (dir === "back")     next.unshift(obj);
-      else if (dir === "forward")  next.splice(idx + 1, 0, obj);
-      else                         next.splice(idx - 1, 0, obj);
-      pushHistory(next);
-      return next;
-    });
+    const idx = objects.findIndex(o => o.id === id);
+    if (idx === -1) return;
+    // Short-circuit no-ops so we don't clone or push redundant history entries
+    if ((dir === "front" || dir === "forward") && idx === objects.length - 1) return;
+    if ((dir === "back"  || dir === "backward") && idx === 0) return;
+    const next = [...objects];
+    const [obj] = next.splice(idx, 1);
+    if (dir === "front")         next.push(obj);
+    else if (dir === "back")     next.unshift(obj);
+    else if (dir === "forward")  next.splice(idx + 1, 0, obj);
+    else                         next.splice(idx - 1, 0, obj);
+    setObjects(next);
+    pushHistory(next);
   };
 
   const clearAll = () => {

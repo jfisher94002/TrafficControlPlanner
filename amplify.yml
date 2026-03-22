@@ -15,3 +15,21 @@ frontend:
   cache:
     paths:
       - my-app/node_modules/**/*
+
+# ─── API PROXY ────────────────────────────────────────────────────────────────
+# Routes backend API calls from the Amplify frontend to the Lambda API Gateway.
+# After running `sam deploy`, replace <API_GATEWAY_URL> with the ApiUrl output:
+#   e.g. https://abc123def.execute-api.us-west-2.amazonaws.com
+#
+# To apply: commit this file and trigger an Amplify redeploy, or update the
+# rewrite rules directly in the Amplify console (App settings → Rewrites).
+customRules:
+  - source: /export-pdf
+    target: <API_GATEWAY_URL>/export-pdf
+    status: "200"
+  - source: /create-issue
+    target: <API_GATEWAY_URL>/create-issue
+    status: "200"
+  - source: /health
+    target: <API_GATEWAY_URL>/health
+    status: "200"

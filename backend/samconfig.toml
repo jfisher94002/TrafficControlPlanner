@@ -1,0 +1,21 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "tcp-backend-dev"
+
+[default.build.parameters]
+# use_container compiles Pillow/ReportLab for Amazon Linux arm64.
+# Requires Docker Desktop to be running.
+use_container = true
+
+[default.deploy.parameters]
+capabilities      = "CAPABILITY_IAM"
+region            = "us-west-2"
+resolve_s3        = true
+confirm_changeset = true
+parameter_overrides = [
+  "Stage=dev",
+  "AllowedOrigins=*"
+]
+# GitHubToken must be supplied at deploy time — do NOT commit it here:
+#   sam deploy --parameter-overrides "GitHubToken=github_pat_..."

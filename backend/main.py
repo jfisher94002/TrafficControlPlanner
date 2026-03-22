@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,11 +11,17 @@ from pdf_generator import build_pdf
 
 logger = logging.getLogger(__name__)
 
+# Comma-separated list of allowed origins.  Set ALLOWED_ORIGINS in the
+# deployment environment to restrict access (e.g. "https://example.com").
+# Defaults to "*" so local development works without extra config.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+ALLOWED_ORIGINS: list[str] = [o.strip() for o in _raw_origins.split(",") if o.strip()] or ["*"]
+
 app = FastAPI(title="TCP Export API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["*"],
 )

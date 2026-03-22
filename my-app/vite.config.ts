@@ -16,6 +16,12 @@ export default defineConfig({
     },
   },
   server: {
+    // Proxy backend routes to the local FastAPI server when VITE_EXPORT_API_BASE
+    // is not set (i.e. plain `npm run dev` without a .env override).
+    proxy: {
+      '/export-pdf': 'http://localhost:8000',
+      '/health': 'http://localhost:8000',
+    },
     fs: {
       allow: ['..'],
     },

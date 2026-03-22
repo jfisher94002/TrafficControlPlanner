@@ -1,17 +1,24 @@
 from __future__ import annotations
 from typing import Literal, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from sanitize import sanitize_text
 
 
 # ─── SIGN DATA ────────────────────────────────────────────────────────────────
 
 class SignData(BaseModel):
     id: str
-    label: str
+    label: str = Field(max_length=50)
     shape: Literal["diamond", "rect", "octagon", "circle", "triangle", "shield"]
     color: str
     textColor: str
     border: Optional[str] = None
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def sanitize_label(cls, v: object) -> object:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 # ─── CANVAS OBJECTS ───────────────────────────────────────────────────────────
@@ -38,14 +45,19 @@ CanvasObject = Union[SignObject, OtherCanvasObject]
 # ─── PLAN STRUCTURE ───────────────────────────────────────────────────────────
 
 class CanvasState(BaseModel):
-    objects: list[CanvasObject]
+    objects: list[CanvasObject] = Field(default_factory=list, max_length=1000)
 
 
 class PlanMeta(BaseModel):
-    projectNumber: str = ""
-    client: str = ""
-    location: str = ""
-    notes: str = ""
+    projectNumber: str = Field(default="", max_length=50)
+    client: str = Field(default="", max_length=200)
+    location: str = Field(default="", max_length=200)
+    notes: str = Field(default="", max_length=2000)
+
+    @field_validator("projectNumber", "client", "location", "notes", mode="before")
+    @classmethod
+    def sanitize_meta_strings(cls, v: object) -> object:
+        return sanitize_text(v) if isinstance(v, str) else v
 
 
 class MapCenter(BaseModel):
@@ -58,17 +70,20 @@ class MapCenter(BaseModel):
 
 class CreateIssueRequest(BaseModel):
     issue_type: Literal["bug", "feature", "enhancement", "question"]
-    title: str
-    body: str
+    title: str = Field(max_length=200)
+    body: str = Field(max_length=5000)
     priority: Literal["low", "medium", "high", "critical"]
-    submitter_name: str
+    submitter_name: str = Field(max_length=100)
 
 
 # ─── EXPORT REQUEST ───────────────────────────────────────────────────────────
 
+# ~7.5 MB decoded image; enough for a high-res canvas screenshot
+_MAX_IMAGE_B64_LEN = 10_000_000
+
 class ExportRequest(BaseModel):
     id: str
-    name: str
+    name: str = Field(max_length=200)
     createdAt: str
     updatedAt: str
     userId: Optional[str] = None
@@ -77,4 +92,9 @@ class ExportRequest(BaseModel):
     canvasZoom: float = 1.0
     canvasState: CanvasState
     metadata: PlanMeta = Field(default_factory=PlanMeta)
-    canvas_image_b64: Optional[str] = None
+    canvas_image_b64: Optional[str] = Field(default=None, max_length=_MAX_IMAGE_B64_LEN)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def sanitize_name(cls, v: object) -> object:
+        return sanitize_text(v) if isinstance(v, str) else v

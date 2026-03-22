@@ -270,23 +270,75 @@ def test_sanitize_text_strips_bare_angle_bracket_sequences():
     assert "2.0" in result
 
 
+# ─── sanitize_notes unit tests ────────────────────────────────────────────────
+
+def test_sanitize_notes_preserves_angle_brackets():
+    """Free-form prose can contain comparison operators — they must not be stripped."""
+    from sanitize import sanitize_notes
+    result = sanitize_notes("flow < 500 vph and speed > 25 mph")
+    assert "<" in result
+    assert ">" in result
+    assert "flow" in result
+
+
+def test_sanitize_notes_strips_control_chars():
+    from sanitize import sanitize_notes
+    result = sanitize_notes("Note\x00\x01\x1fText")
+    assert "\x00" not in result
+    assert "\x01" not in result
+    assert "\x1f" not in result
+    assert "Note" in result
+    assert "Text" in result
+
+
+def test_sanitize_notes_preserves_whitespace():
+    from sanitize import sanitize_notes
+    result = sanitize_notes("Line 1\nLine 2\tTabbed")
+    assert "\n" in result
+    assert "\t" in result
+
+
+def test_sanitize_notes_noop_on_clean_string():
+    from sanitize import sanitize_notes
+    original = "Normal note with <angle brackets> and 1 < 2."
+    assert sanitize_notes(original) == original
+
+
 # ─── PlanMeta full field coverage ─────────────────────────────────────────────
 
-def test_plan_meta_sanitizes_all_fields():
+def test_plan_meta_sanitizes_structured_fields():
+    """Structured fields (projectNumber, client, location) strip HTML tags and control chars."""
     from models import PlanMeta
     meta = PlanMeta(
         projectNumber="<b>PN-001</b>\x00",
         client="Client\x00Name<script>",
         location="<b>Loc</b>\x01",
-        notes="Note<script>x</script>\x00",
     )
-    for field in (meta.projectNumber, meta.client, meta.location, meta.notes):
-        assert "<script>" not in field
+    for field in (meta.projectNumber, meta.client, meta.location):
+        assert "<" not in field
         assert "\x00" not in field
     assert "PN-001" in meta.projectNumber
     assert "Client" in meta.client
     assert "Loc" in meta.location
+
+
+def test_plan_meta_notes_preserves_angle_brackets():
+    """Notes is free-form prose; angle brackets (e.g. 'flow < 500') must not be stripped."""
+    from models import PlanMeta
+    meta = PlanMeta(notes="flow < 500 vph and speed > 25 mph\x00")
+    assert "<" in meta.notes
+    assert ">" in meta.notes
+    assert "flow" in meta.notes
+    assert "\x00" not in meta.notes  # control chars still stripped
+
+
+def test_plan_meta_notes_strips_control_chars():
+    from models import PlanMeta
+    meta = PlanMeta(notes="Note\x00\x01\x1fText")
+    assert "\x00" not in meta.notes
+    assert "\x01" not in meta.notes
     assert "Note" in meta.notes
+    assert "Text" in meta.notes
 
 
 def test_plan_meta_defaults_are_empty_strings():

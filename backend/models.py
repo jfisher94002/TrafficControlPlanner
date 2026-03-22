@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from sanitize import sanitize_text
+from sanitize import sanitize_notes, sanitize_text
 
 
 # ─── SIGN DATA ────────────────────────────────────────────────────────────────
@@ -54,10 +54,16 @@ class PlanMeta(BaseModel):
     location: str = Field(default="", max_length=200)
     notes: str = Field(default="", max_length=2000)
 
-    @field_validator("projectNumber", "client", "location", "notes", mode="before")
+    @field_validator("projectNumber", "client", "location", mode="before")
     @classmethod
     def sanitize_meta_strings(cls, v: object) -> object:
         return sanitize_text(v) if isinstance(v, str) else v
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def sanitize_notes_field(cls, v: object) -> object:
+        # notes is free-form prose; preserve angle brackets (e.g. "flow < 500 vph")
+        return sanitize_notes(v) if isinstance(v, str) else v
 
 
 class MapCenter(BaseModel):

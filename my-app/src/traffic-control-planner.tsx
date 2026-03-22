@@ -1272,8 +1272,10 @@ function latLonToPixel(lat: number, lon: number, zoom: number): { x: number; y: 
 
 function pixelToLatLon(px: number, py: number, zoom: number): { lat: number; lon: number } {
   const scale = Math.pow(2, zoom) * 256;
-  const lon = (px / scale) * 360 - 180;
-  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * py / scale))) * 180 / Math.PI;
+  // Clamp py to [0, scale] so lat stays within Web Mercator bounds (~±85.0511°)
+  const clampedPy = Math.min(Math.max(py, 0), scale);
+  const lon = Math.min(180, Math.max(-180, (px / scale) * 360 - 180));
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * clampedPy / scale))) * 180 / Math.PI;
   return { lat, lon };
 }
 
@@ -1309,6 +1311,7 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
         if (tileCache.current[url]) continue;
         const img = new Image(); img.crossOrigin = "anonymous";
         img.onload = () => setTileTick(t => t + 1);
+        img.onerror = () => { delete tileCache.current[url]; };
         img.src = url;
         tileCache.current[url] = img;
       }
@@ -1387,13 +1390,17 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
           ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
         }
       });
-      // Viewport rect — clamped so it never escapes the minimap bounds
+      // Viewport rect — clamp origin and shrink dimensions for off-screen portion
       const vx = (-offset.x / zoom + 2000) * s;
       const vy = (-offset.y / zoom + 1500) * s;
-      const vw = Math.min((canvasSize.w / zoom) * s, mmW);
-      const vh = Math.min((canvasSize.h / zoom) * s, mmH);
+      const vw = (canvasSize.w / zoom) * s;
+      const vh = (canvasSize.h / zoom) * s;
+      const clampedVx = Math.max(0, vx);
+      const clampedVy = Math.max(0, vy);
+      const clampedVw = Math.max(0, Math.min(vx + vw, mmW) - clampedVx);
+      const clampedVh = Math.max(0, Math.min(vy + vh, mmH) - clampedVy);
       ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
-      ctx.strokeRect(Math.max(0, vx), Math.max(0, vy), Math.min(vw, mmW - Math.max(0, vx)), Math.min(vh, mmH - Math.max(0, vy)));
+      ctx.strokeRect(clampedVx, clampedVy, clampedVw, clampedVh);
     }
   }, [objects, canvasSize, zoom, offset, mapCenter, ovZoom, tileTick]);
 
@@ -1451,6 +1458,9 @@ export default function TrafficControlPlanner() {
   const [mapCenter, setMapCenter] = useState<MapCenter | null>(null);
   const [mapRenderTick, setMapRenderTick] = useState(0);
   const mapTileCacheRef = useRef<Record<string, MapTileEntry>>({});
+  // Tracks the last pointer position during a pan to compute per-event deltas
+  // without relying on stale `offset` state (avoids over-applied tile shifts).
+  const panPosRef = useRef<Point | null>(null);
 
   const [roadDrawMode, setRoadDrawMode] = useState("straight");
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
@@ -1714,7 +1724,10 @@ export default function TrafficControlPlanner() {
     if (tool === "pan" || e.evt.button === 1) {
       setIsPanning(true);
       const pos = stageRef.current?.getPointerPosition();
-      if (pos) setPanStart({ x: pos.x - offset.x, y: pos.y - offset.y });
+      if (pos) {
+        setPanStart({ x: pos.x - offset.x, y: pos.y - offset.y });
+        panPosRef.current = pos;
+      }
       return;
     }
 
@@ -1830,13 +1843,17 @@ export default function TrafficControlPlanner() {
       const pos = stageRef.current?.getPointerPosition();
       if (pos) {
         const newOffset = { x: pos.x - panStart.x, y: pos.y - panStart.y };
-        const dox = newOffset.x - offset.x;
-        const doy = newOffset.y - offset.y;
+        // Compute delta from the previous pointer position (ref) rather than from
+        // stale `offset` state, which may not yet reflect earlier batched events.
+        const prev = panPosRef.current ?? pos;
+        const dox = pos.x - prev.x;
+        const doy = pos.y - prev.y;
+        panPosRef.current = pos;
         setOffset(newOffset);
         // Shift map tiles to follow the pan. Tiles live in screen space (Layer 1,
         // no Konva transform), so 1 screen pixel == 1 tile pixel: shift mapCenter
         // by (-dox, -doy) in tile pixel space and convert back to lat/lon.
-        if (mapCenter) {
+        if (mapCenter && (dox !== 0 || doy !== 0)) {
           const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, mapCenter.zoom);
           const { lat: newLat, lon: newLon } = pixelToLatLon(cx - dox, cy - doy, mapCenter.zoom);
           setMapCenter({ lat: newLat, lon: newLon, zoom: mapCenter.zoom });

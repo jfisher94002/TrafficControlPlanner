@@ -17,7 +17,21 @@ _HTML_TAGS = re.compile(r"<[^>]*>")
 
 
 def sanitize_text(value: str) -> str:
-    """Strip control characters and HTML tags from a user-supplied string."""
+    """Strip control characters and HTML tags from a user-supplied string.
+
+    Intended for structured fields (name, location, label) where angle brackets
+    have no legitimate use.  Do NOT apply to free-form prose fields — use
+    sanitize_notes() instead.
+    """
     value = _CONTROL_CHARS.sub("", value)
     value = _HTML_TAGS.sub("", value)
     return value
+
+
+def sanitize_notes(value: str) -> str:
+    """Strip only control characters from free-form prose fields.
+
+    Notes fields can legitimately contain angle brackets (e.g. 'flow < 500 vph'),
+    so HTML-tag stripping is skipped.
+    """
+    return _CONTROL_CHARS.sub("", value)

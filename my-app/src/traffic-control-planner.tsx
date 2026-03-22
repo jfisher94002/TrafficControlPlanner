@@ -1946,6 +1946,8 @@ export default function TrafficControlPlanner() {
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
           <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
+          <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
+          <button onClick={() => window.open("/feedback.html", "_blank")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 

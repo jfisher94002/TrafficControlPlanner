@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP Feedback Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #F97316;
+    --orange-dark: #EA580C;
+    --orange-glow: rgba(249,115,22,0.15);
+    --dark: #111111;
+    --dark-2: #1A1A1A;
+    --dark-3: #242424;
+    --dark-4: #2E2E2E;
+    --border: rgba(255,255,255,0.08);
+    --text: #F5F5F5;
+    --text-muted: #888;
+    --success: #22C55E;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 40px,
+      rgba(249,115,22,0.02) 40px,
+      rgba(249,115,22,0.02) 80px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── PASSWORD GATE ─────────────────────────────────────── */
+
+  #gate {
+    position: fixed; inset: 0;
+    background: var(--dark);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+
+  #gate.hidden { display: none; }
+
+  .gate-card {
+    background: var(--dark-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px 36px;
+    width: 100%; max-width: 380px;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .gate-logo-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .gate-logo-icon {
+    width: 36px; height: 36px;
+    background: var(--orange); border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800; font-size: 15px; color: white; letter-spacing: -1px;
+  }
+
+  .gate-logo-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 18px; color: var(--text);
+  }
+  .gate-logo-text span { color: var(--orange); }
+
+  .gate-card h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px; font-weight: 800; margin-bottom: 6px;
+  }
+
+  .gate-card p {
+    color: var(--text-muted); font-size: 13px; margin-bottom: 24px; line-height: 1.5;
+  }
+
+  .gate-field label {
+    display: block; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 8px;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+
+  .gate-field input {
+    width: 100%; background: var(--dark-3);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'Barlow', sans-serif;
+    font-size: 14px; padding: 12px 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none; -webkit-appearance: none;
+    margin-bottom: 16px;
+  }
+  .gate-field input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-glow); }
+  .gate-field input::placeholder { color: #555; }
+
+  .gate-btn {
+    width: 100%; background: var(--orange); color: white;
+    border: none; border-radius: 8px; padding: 13px 24px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px; font-weight: 700; letter-spacing: 0.5px;
+    cursor: pointer; transition: all 0.15s ease;
+  }
+  .gate-btn:hover { background: var(--orange-dark); }
+
+  .gate-error {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 6px; padding: 10px 14px;
+    font-size: 13px; color: #FCA5A5; margin-top: 14px; display: none;
+  }
+  .gate-error.visible { display: block; }
+
+  /* ─── MAIN CONTENT ──────────────────────────────────────── */
+
+  #main { display: none; }
+  #main.visible { display: block; }
+
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header { margin-bottom: 40px; animation: fadeDown 0.5s ease both; }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: var(--orange);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800; font-size: 18px; color: white; letter-spacing: -1px;
+  }
+
+  .logo-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 20px; letter-spacing: 0.5px; color: var(--text);
+  }
+  .logo-text span { color: var(--orange); }
+
+  .tape {
+    height: 24px;
+    background: repeating-linear-gradient(90deg, var(--orange) 0px, var(--orange) 32px, var(--dark) 32px, var(--dark) 64px);
+    border-radius: 2px; margin-bottom: 28px; opacity: 0.85;
+  }
+
+  h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 42px; font-weight: 800; line-height: 1.05;
+    letter-spacing: -0.5px; margin-bottom: 10px;
+  }
+  h1 em { color: var(--orange); font-style: normal; }
+
+  .subtitle { color: var(--text-muted); font-size: 15px; line-height: 1.6; }
+
+  .auth-notice {
+    background: var(--dark-3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--orange);
+    border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 32px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--text-muted);
+    animation: fadeDown 0.5s 0.1s ease both;
+  }
+
+  .auth-notice .badge {
+    background: var(--orange); color: white;
+    font-size: 10px; font-weight: 700; padding: 2px 7px;
+    border-radius: 3px; white-space: nowrap;
+    font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.5px;
+  }
+
+  .form-card {
+    background: var(--dark-2);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px;
+    animation: fadeUp 0.5s 0.15s ease both;
+  }
+
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 28px; }
+
+  .type-btn {
+    background: var(--dark-3);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px;
+    cursor: pointer; transition: all 0.15s ease;
+    text-align: left; color: var(--text);
+  }
+  .type-btn:hover { border-color: var(--orange); background: var(--orange-glow); }
+  .type-btn.selected { border-color: var(--orange); background: var(--orange-glow); box-shadow: 0 0 0 1px var(--orange); }
+  .type-btn .type-icon { font-size: 20px; margin-bottom: 6px; display: block; }
+  .type-btn .type-label { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.3px; display: block; margin-bottom: 2px; }
+  .type-btn .type-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+  .field { margin-bottom: 20px; }
+
+  label {
+    display: block; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 8px;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+  label .required { color: var(--orange); margin-left: 3px; }
+
+  input, textarea {
+    width: 100%; background: var(--dark-3);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'Barlow', sans-serif;
+    font-size: 14px; padding: 12px 14px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    outline: none; -webkit-appearance: none;
+  }
+  input:focus, textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-glow); }
+  input::placeholder, textarea::placeholder { color: #555; }
+  textarea { resize: vertical; min-height: 120px; line-height: 1.6; }
+
+  .priority-row { display: flex; gap: 8px; }
+  .priority-chip {
+    flex: 1; background: var(--dark-3);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; cursor: pointer; text-align: center;
+    font-size: 12px; font-weight: 600;
+    font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.3px;
+    transition: all 0.15s ease; color: var(--text-muted);
+  }
+  .priority-chip:hover { border-color: var(--orange); color: var(--text); }
+  .priority-chip.selected { border-color: var(--orange); background: var(--orange-glow); color: var(--orange); }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  .submit-btn {
+    width: 100%; background: var(--orange); color: white;
+    border: none; border-radius: 8px; padding: 15px 24px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 17px; font-weight: 700; letter-spacing: 0.5px;
+    cursor: pointer; transition: all 0.15s ease;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .submit-btn:hover:not(:disabled) { background: var(--orange-dark); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(249,115,22,0.3); }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .submit-btn .arrow { transition: transform 0.15s ease; }
+  .submit-btn:hover:not(:disabled) .arrow { transform: translateX(3px); }
+
+  .success-state { display: none; text-align: center; padding: 48px 32px; animation: fadeUp 0.4s ease both; }
+  .success-state.visible { display: block; }
+  .form-content.hidden { display: none; }
+
+  .success-icon {
+    width: 64px; height: 64px;
+    background: rgba(34,197,94,0.1);
+    border: 2px solid var(--success); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; margin: 0 auto 20px;
+  }
+  .success-state h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+  .success-state p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+
+  .label-pills { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+  .label-pill {
+    font-size: 11px; font-weight: 600; padding: 3px 10px;
+    border-radius: 12px; font-family: 'Barlow Condensed', sans-serif;
+    letter-spacing: 0.3px;
+  }
+  .pill-type { background: rgba(249,115,22,0.15); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
+  .pill-backlog { background: rgba(107,114,128,0.15); color: #9CA3AF; border: 1px solid rgba(107,114,128,0.3); }
+
+  .issue-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--dark-3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 16px;
+    font-size: 13px; color: var(--orange);
+    text-decoration: none; transition: border-color 0.15s;
+    margin-bottom: 20px;
+  }
+  .issue-link:hover { border-color: var(--orange); }
+
+  .reset-btn {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 13px; cursor: pointer; text-decoration: underline;
+    font-family: 'Barlow', sans-serif;
+  }
+
+  .error-msg {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 6px; padding: 12px 14px;
+    font-size: 13px; color: #FCA5A5; margin-top: 16px; display: none;
+  }
+  .error-msg.visible { display: block; }
+
+  .config-panel {
+    background: var(--dark-3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; margin-bottom: 24px;
+    font-size: 12px; animation: fadeDown 0.5s 0.2s ease both;
+  }
+  .config-panel summary {
+    cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+    color: var(--text-muted); text-transform: uppercase;
+    user-select: none; display: flex; align-items: center; gap: 8px;
+  }
+  .config-panel summary::before { content: '⚙'; color: var(--orange); }
+  .config-fields { margin-top: 14px; display: grid; gap: 10px; }
+  .config-fields input { font-size: 12px; padding: 9px 12px; font-family: 'JetBrains Mono', 'Courier New', monospace; }
+  .config-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  @keyframes fadeDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+  .spinner.visible { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ─── PASSWORD GATE ──────────────────────────────────────────────────────── -->
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-logo-row">
+      <div class="gate-logo-icon">TCP</div>
+      <div class="gate-logo-text">Traffic Control <span>Planner</span></div>
+    </div>
+    <h2>Alpha Access</h2>
+    <p>This feedback portal is restricted to alpha testers. Enter the access password to continue.</p>
+    <div class="gate-field">
+      <label>Password</label>
+      <input type="password" id="gatePassword" placeholder="Enter access password" onkeydown="if(event.key==='Enter') checkPassword()" autofocus />
+    </div>
+    <button class="gate-btn" onclick="checkPassword()">Enter Portal →</button>
+    <div class="gate-error" id="gateError">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<!-- ─── MAIN CONTENT ───────────────────────────────────────────────────────── -->
+<div id="main">
+<div class="container">
+
+  <div class="header">
+    <div class="logo-row">
+      <div class="logo-icon">TCP</div>
+      <div class="logo-text">Traffic Control <span>Planner</span></div>
+    </div>
+    <div class="tape"></div>
+    <h1>Submit <em>Feedback</em><br>or Report an Issue</h1>
+    <p class="subtitle">Help us build a better tool. Bug reports, feature ideas, and questions all go directly into our development backlog.</p>
+  </div>
+
+  <div class="auth-notice">
+    <span class="badge">PLACEHOLDER</span>
+    <span>Auth check will go here — only verified tcplanpro.com account holders will be able to submit.</span>
+  </div>
+
+  <details class="config-panel">
+    <summary>GitHub Configuration</summary>
+    <div class="config-fields">
+      <div>
+        <div class="config-label">GitHub Token (Fine-grained, issues:write)</div>
+        <input type="password" id="ghToken" placeholder="github_pat_..." />
+      </div>
+      <div>
+        <div class="config-label">Repository (owner/repo)</div>
+        <input type="text" id="ghRepo" value="jfisher94002/TrafficControlPlanner" />
+      </div>
+    </div>
+  </details>
+
+  <div class="form-card">
+
+    <div class="form-content" id="formContent">
+
+      <div class="field">
+        <label>Issue Type <span class="required">*</span></label>
+        <div class="type-grid">
+          <button class="type-btn selected" data-type="bug" onclick="selectType(this)">
+            <span class="type-icon">🐛</span>
+            <span class="type-label">Bug Report</span>
+            <span class="type-desc">Something isn't working as expected</span>
+          </button>
+          <button class="type-btn" data-type="feature" onclick="selectType(this)">
+            <span class="type-icon">✨</span>
+            <span class="type-label">Feature Request</span>
+            <span class="type-desc">A new capability you'd like to see</span>
+          </button>
+          <button class="type-btn" data-type="enhancement" onclick="selectType(this)">
+            <span class="type-icon">⚡</span>
+            <span class="type-label">Enhancement</span>
+            <span class="type-desc">Improve something that already exists</span>
+          </button>
+          <button class="type-btn" data-type="question" onclick="selectType(this)">
+            <span class="type-icon">💬</span>
+            <span class="type-label">Question</span>
+            <span class="type-desc">Not sure how something works</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Title <span class="required">*</span></label>
+        <input type="text" id="issueTitle" placeholder="Brief, descriptive summary..." maxlength="120" />
+      </div>
+
+      <div class="field">
+        <label>Description <span class="required">*</span></label>
+        <textarea id="issueBody" placeholder="Describe the issue or request in detail. For bugs, include steps to reproduce, what you expected, and what actually happened."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Priority</label>
+        <div class="priority-row">
+          <button class="priority-chip" data-priority="low" onclick="selectPriority(this)">Low</button>
+          <button class="priority-chip selected" data-priority="medium" onclick="selectPriority(this)">Medium</button>
+          <button class="priority-chip" data-priority="high" onclick="selectPriority(this)">High</button>
+          <button class="priority-chip" data-priority="critical" onclick="selectPriority(this)">Critical</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Your Name <span class="required">*</span></label>
+        <input type="text" id="submitterName" placeholder="Pulled from account — placeholder for now" />
+      </div>
+
+      <hr class="divider">
+
+      <button class="submit-btn" id="submitBtn" onclick="submitIssue()">
+        <span id="btnText">Submit to Backlog</span>
+        <span class="spinner" id="spinner"></span>
+        <span class="arrow" id="btnArrow">→</span>
+      </button>
+
+      <div class="error-msg" id="errorMsg"></div>
+
+    </div>
+
+    <div class="success-state" id="successState">
+      <div class="success-icon">✓</div>
+      <h2>Issue Submitted!</h2>
+      <p>Your feedback has been added to the development backlog.</p>
+      <div class="label-pills">
+        <span class="label-pill pill-type" id="typepill"></span>
+        <span class="label-pill pill-backlog">backlog</span>
+      </div>
+      <a class="issue-link" id="issueLink" href="#" target="_blank">🔗 View on GitHub</a>
+      <br>
+      <button class="reset-btn" onclick="resetForm()">Submit another</button>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+  // ─── PASSWORD GATE ────────────────────────────────────────────────────────
+  const SESSION_KEY = 'tcp_feedback_auth';
+
+  function checkPassword() {
+    const input = document.getElementById('gatePassword').value;
+    if (input === 'TCP-alpha-2026') {
+      sessionStorage.setItem(SESSION_KEY, '1');
+      document.getElementById('gate').classList.add('hidden');
+      document.getElementById('main').classList.add('visible');
+    } else {
+      const err = document.getElementById('gateError');
+      err.classList.add('visible');
+      document.getElementById('gatePassword').value = '';
+      document.getElementById('gatePassword').focus();
+    }
+  }
+
+  // Persist auth within the session so refreshing doesn't re-prompt
+  if (sessionStorage.getItem(SESSION_KEY) === '1') {
+    document.getElementById('gate').classList.add('hidden');
+    document.getElementById('main').classList.add('visible');
+  }
+
+  // ─── FORM LOGIC ───────────────────────────────────────────────────────────
+  let selectedType = 'bug';
+  let selectedPriority = 'medium';
+
+  function selectType(el) {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedType = el.dataset.type;
+  }
+
+  function selectPriority(el) {
+    document.querySelectorAll('.priority-chip').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedPriority = el.dataset.priority;
+  }
+
+  const labelMap = {
+    bug:         ['bug', 'backlog'],
+    feature:     ['enhancement', 'feature request', 'backlog'],
+    enhancement: ['enhancement', 'backlog'],
+    question:    ['question', 'backlog']
+  };
+
+  const typeDisplay = {
+    bug: 'bug',
+    feature: 'feature request',
+    enhancement: 'enhancement',
+    question: 'question'
+  };
+
+  const priorityEmoji = { low: '🟢', medium: '🟡', high: '🟠', critical: '🔴' };
+
+  async function submitIssue() {
+    const token = document.getElementById('ghToken').value.trim();
+    const repo = document.getElementById('ghRepo').value.trim();
+    const title = document.getElementById('issueTitle').value.trim();
+    const body = document.getElementById('issueBody').value.trim();
+    const name = document.getElementById('submitterName').value.trim();
+    const errorMsg = document.getElementById('errorMsg');
+
+    errorMsg.classList.remove('visible');
+
+    if (!token) return showError('Please enter your GitHub token in the configuration panel above.');
+    if (!title) return showError('Please enter a title for the issue.');
+    if (!body) return showError('Please enter a description.');
+    if (!name) return showError('Please enter your name.');
+
+    setLoading(true);
+
+    const issueBody = `## ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Report
+
+**Submitted by:** ${name}
+**Priority:** ${priorityEmoji[selectedPriority]} ${selectedPriority.charAt(0).toUpperCase() + selectedPriority.slice(1)}
+**Type:** ${selectedType}
+
+---
+
+${body}
+
+---
+*Submitted via TCP Feedback Portal*`;
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        },
+        body: JSON.stringify({
+          title: `[${selectedType.toUpperCase()}] ${title}`,
+          body: issueBody,
+          labels: labelMap[selectedType]
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || `GitHub API error: ${res.status}`);
+      }
+
+      const issue = await res.json();
+      document.getElementById('issueLink').href = issue.html_url;
+      document.getElementById('issueLink').textContent = `🔗 View Issue #${issue.number} on GitHub`;
+      document.getElementById('typepill').textContent = typeDisplay[selectedType];
+      document.getElementById('formContent').classList.add('hidden');
+      document.getElementById('successState').classList.add('visible');
+
+    } catch (err) {
+      showError(`Failed to submit: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+
+  function setLoading(loading) {
+    const btn = document.getElementById('submitBtn');
+    const spinner = document.getElementById('spinner');
+    const arrow = document.getElementById('btnArrow');
+    const text = document.getElementById('btnText');
+    btn.disabled = loading;
+    spinner.classList.toggle('visible', loading);
+    arrow.style.display = loading ? 'none' : 'inline';
+    text.textContent = loading ? 'Submitting...' : 'Submit to Backlog';
+  }
+
+  function resetForm() {
+    document.getElementById('issueTitle').value = '';
+    document.getElementById('issueBody').value = '';
+    document.getElementById('submitterName').value = '';
+    document.getElementById('formContent').classList.remove('hidden');
+    document.getElementById('successState').classList.remove('visible');
+    document.getElementById('errorMsg').classList.remove('visible');
+    selectType(document.querySelector('[data-type="bug"]'));
+    selectPriority(document.querySelector('[data-priority="medium"]'));
+  }
+</script>
+</body>
+</html>

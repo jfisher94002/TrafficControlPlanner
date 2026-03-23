@@ -11,7 +11,7 @@ import type {
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, calcTaperLength, cloneObject } from './utils';
+import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isRoad, isMultiPointRoad, calcTaperLength, cloneObject } from './utils';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -1225,7 +1225,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         nextSignCounts[obj.signData.label] = (nextSignCounts[obj.signData.label] ?? 0) + 1;
       } else if (obj.type === "device") {
         nextDeviceCounts[obj.deviceData.label] = (nextDeviceCounts[obj.deviceData.label] ?? 0) + 1;
-      } else if (obj.type === "road" || obj.type === "polyline_road" || obj.type === "curve_road" || obj.type === "cubic_bezier_road") {
+      } else if (isRoad(obj)) {
         roadsCount++;
       } else if (obj.type === "taper") {
         tapersCount++;
@@ -1323,7 +1323,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Curve Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -1434,7 +1434,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
         </div>
       )}
 
-      {(obj.type === "polyline_road" || obj.type === "curve_road" || obj.type === "cubic_bezier_road") && (
+      {isMultiPointRoad(obj) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
             {obj.type === "polyline_road"
@@ -2000,7 +2000,7 @@ export default function TrafficControlPlanner() {
       if (selected) {
         const selObj = objects.find((o) => o.id === selected);
         if (selObj?.type === "cubic_bezier_road") {
-          const handleRadius = 10 / zoom;
+          const handleRadius = Math.min(10 / zoom, 20);
           for (let i = 0; i < selObj.points.length; i++) {
             const p = selObj.points[i];
             if (dist(raw.x, raw.y, p.x, p.y) < handleRadius) {
@@ -2023,7 +2023,7 @@ export default function TrafficControlPlanner() {
           ox: isPointObject(hit) ? hit.x : isLineObject(hit) ? hit.x1 : 0,
           oy: isPointObject(hit) ? hit.y : isLineObject(hit) ? hit.y1 : 0,
           id: hit.id,
-          origPoints: (hit.type === "polyline_road" || hit.type === "curve_road" || hit.type === "cubic_bezier_road") ? hit.points.map((p) => ({ ...p })) : null,
+          origPoints: isMultiPointRoad(hit) ? hit.points.map((p) => ({ ...p })) : null,
         });
       }
       return;
@@ -2778,7 +2778,7 @@ export default function TrafficControlPlanner() {
               )}
               {curveInProgress && (
                 <span style={{ color: COLORS.info }}>
-                  Curve: {curvePoints.length === 1 ? "click control point" : "click end point"} · Esc cancel
+                  Quad: {curvePoints.length === 1 ? "click control point" : "click end point"} · Esc cancel
                 </span>
               )}
               {cubicInProgress && (
@@ -2839,7 +2839,7 @@ export default function TrafficControlPlanner() {
                        obj.type === "text" ? `"${obj.text.slice(0, 12)}"` :
                        obj.type === "road" ? `${obj.roadType} road` :
                        obj.type === "polyline_road" ? `poly (${obj.points.length}pts)` :
-                       obj.type === "curve_road" ? "curve road" :
+                       obj.type === "curve_road" ? "quad road" :
                        obj.type === "cubic_bezier_road" ? "cubic road" :
                        obj.type === "taper" ? `taper ${obj.speed}mph` :
                        obj.type}

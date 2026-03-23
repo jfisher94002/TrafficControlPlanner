@@ -1,7 +1,7 @@
 import type {
   CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
   SignObject, DeviceObject, ZoneObject, TextObject, TaperObject,
-  StraightRoadObject, ArrowObject, MeasureObject,
+  StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject,
 } from './types'
 
 // ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
@@ -39,6 +39,18 @@ export const isLineObject = (
   o: CanvasObject,
 ): o is StraightRoadObject | ArrowObject | MeasureObject =>
   o.type === 'road' || o.type === 'arrow' || o.type === 'measure'
+
+/** Any road type (straight, polyline, curve, cubic). */
+export const isRoad = (
+  o: CanvasObject,
+): o is StraightRoadObject | PolylineRoadObject | CurveRoadObject | CubicBezierRoadObject =>
+  o.type === 'road' || o.type === 'polyline_road' || o.type === 'curve_road' || o.type === 'cubic_bezier_road'
+
+/** Roads defined by a points array (polyline, curve, cubic). */
+export const isMultiPointRoad = (
+  o: CanvasObject,
+): o is PolylineRoadObject | CurveRoadObject | CubicBezierRoadObject =>
+  o.type === 'polyline_road' || o.type === 'curve_road' || o.type === 'cubic_bezier_road'
 
 /**
  * MUTCD taper length formula.
@@ -110,6 +122,7 @@ export function snapToEndpoint(
 }
 
 export function sampleCubicBezier(p0: Point, p1: Point, p2: Point, p3: Point, n: number): Point[] {
+  if (n <= 0) return [{ ...p0 }, { ...p3 }]
   const pts: Point[] = []
   for (let i = 0; i <= n; i++) {
     const t = i / n, mt = 1 - t

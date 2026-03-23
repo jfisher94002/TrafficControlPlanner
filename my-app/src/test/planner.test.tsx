@@ -604,6 +604,17 @@ describe('Cubic Bézier road', () => {
     expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
   })
 
+  it('Escape after three clicks cancels without placing an object', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)  // p0
+    fireEvent.mouseDown(canvas)  // cp1
+    fireEvent.mouseDown(canvas)  // cp2
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
   it('placed cubic road is undoable', async () => {
     const { user } = setup()
     await activateCubicMode(user)

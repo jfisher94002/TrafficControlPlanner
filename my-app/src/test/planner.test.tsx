@@ -547,3 +547,102 @@ describe('Z-order controls', () => {
     expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
   })
 })
+
+// ─── Legend Box ───────────────────────────────────────────────────────────────
+describe('Legend Box', () => {
+  it('is not shown when canvas is empty', () => {
+    setup()
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
+
+  it('appears after placing a sign', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+  })
+
+  it('shows count of 1 after placing one sign', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('1')
+  })
+
+  it('updates count to 2 after placing a second identical sign', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('2')
+  })
+
+  it('disappears after deleting the only object', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Delete' })
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
+
+  it('toggle checkbox hides the legend box', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    await user.click(screen.getByTestId('legend-toggle'))
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
+
+  it('toggle checkbox shows the legend box again', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(screen.getByTestId('legend-toggle'))
+    await user.click(screen.getByTestId('legend-toggle'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+  })
+
+  it('does not appear after placing a taper (non-sign, non-device object)', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('appears after placing a device and shows count of 1', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('1')
+  })
+
+  it('increments device count when placing the same device twice', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'D' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('2')
+  })
+
+  it('shows separate entries for a sign and a device', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts).toHaveLength(2)
+    expect(counts[0]).toHaveTextContent('1')
+    expect(counts[1]).toHaveTextContent('1')
+  })
+})

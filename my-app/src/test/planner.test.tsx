@@ -86,6 +86,27 @@ describe('Plan metadata', () => {
   })
 })
 
+// ─── Legend box ───────────────────────────────────────────────────────────────
+describe('Legend box', () => {
+  it('legend toggle checkbox is checked by default', () => {
+    setup()
+    expect(screen.getByTestId('legend-toggle')).toBeChecked()
+  })
+
+  it('unchecking legend toggle does not crash', async () => {
+    const { user } = setup()
+    await expect(user.click(screen.getByTestId('legend-toggle'))).resolves.not.toThrow()
+    expect(screen.getByTestId('legend-toggle')).not.toBeChecked()
+  })
+
+  it('legend toggle re-checks correctly', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('legend-toggle'))
+    await user.click(screen.getByTestId('legend-toggle'))
+    expect(screen.getByTestId('legend-toggle')).toBeChecked()
+  })
+})
+
 // ─── North arrow ──────────────────────────────────────────────────────────────
 describe('North arrow', () => {
   it('is visible by default and does not block canvas interactions', () => {

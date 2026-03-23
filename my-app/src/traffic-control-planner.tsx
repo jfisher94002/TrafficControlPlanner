@@ -945,6 +945,55 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   );
 }
 
+// ─── LEGEND BOX ──────────────────────────────────────────────────────────────
+
+const LEGEND_PAD  = 10;
+const LEGEND_LINE = 16;
+const LEGEND_W    = 172;
+
+interface LegendBoxProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; visible: boolean; }
+function LegendBox({ objects, canvasSize, visible }: LegendBoxProps) {
+  if (!visible) return null;
+
+  const signCounts:   Record<string, number> = {};
+  const deviceCounts: Record<string, number> = {};
+  for (const obj of objects) {
+    if (obj.type === 'sign')        signCounts[obj.signData.label]    = (signCounts[obj.signData.label]    ?? 0) + 1;
+    else if (obj.type === 'device') deviceCounts[obj.deviceData.label] = (deviceCounts[obj.deviceData.label] ?? 0) + 1;
+  }
+
+  const rows: Array<{ icon: string; label: string; count: number }> = [
+    ...Object.entries(signCounts).map(([label, count]) => ({ icon: '⬡', label, count })),
+    ...Object.entries(deviceCounts).map(([label, count]) => ({ icon: '▲', label, count })),
+  ];
+  if (rows.length === 0) return null;
+
+  const titleH = 18;
+  const sepH   = 6;
+  const totalH = LEGEND_PAD * 2 + titleH + sepH + rows.length * LEGEND_LINE;
+  const x = 12;
+  const y = canvasSize.h - STATUS_BAR_H - totalH - 12;
+
+  return (
+    <Group x={x} y={y} listening={false}>
+      <Rect width={LEGEND_W} height={totalH} fill="rgba(26,29,39,0.9)" stroke={COLORS.panelBorder} strokeWidth={1} cornerRadius={4} />
+      <KonvaText x={LEGEND_PAD} y={LEGEND_PAD} text="LEGEND" fontSize={9} fill={COLORS.textDim} fontFamily="'JetBrains Mono',monospace" letterSpacing={1.5} />
+      <Line points={[LEGEND_PAD, LEGEND_PAD + titleH, LEGEND_W - LEGEND_PAD, LEGEND_PAD + titleH]} stroke={COLORS.panelBorder} strokeWidth={1} />
+      {rows.map((row, i) => {
+        const label = row.label.length > 16 ? row.label.slice(0, 15) + '…' : row.label;
+        return (
+          <KonvaText key={row.icon + row.label}
+            x={LEGEND_PAD} y={LEGEND_PAD + titleH + sepH + i * LEGEND_LINE}
+            text={`${row.icon} ${label}  ×${row.count}`}
+            fontSize={9} fill={COLORS.textMuted} fontFamily="'JetBrains Mono',monospace"
+            width={LEGEND_W - LEGEND_PAD * 2}
+          />
+        );
+      })}
+    </Group>
+  );
+}
+
 // ─── NORTH ARROW ─────────────────────────────────────────────────────────────
 
 const northArrowStyle: React.CSSProperties = {
@@ -1353,6 +1402,7 @@ export default function TrafficControlPlanner() {
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
+  const [showLegend, setShowLegend] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -2093,6 +2143,10 @@ export default function TrafficControlPlanner() {
                     North Arrow
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
+                    <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} style={{ accentColor: COLORS.accent }} data-testid="legend-toggle" />
+                    Legend Box
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
                     <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} style={{ accentColor: COLORS.accent }} />
                     Snap to Endpoints
                   </label>
@@ -2311,7 +2365,12 @@ export default function TrafficControlPlanner() {
               })}
             </Layer>
 
-            {/* Layer 3: Drawing overlays — same world-space transform as Layer 2 */}
+            {/* Layer 3: Screen-space overlays — legend box, no world transform */}
+            <Layer>
+              <LegendBox objects={objects} canvasSize={canvasSize} visible={showLegend} />
+            </Layer>
+
+            {/* Layer 4: Drawing overlays — same world-space transform as Layer 2 */}
             <Layer x={offset.x} y={offset.y} scaleX={zoom} scaleY={zoom}>
               <DrawingOverlays
                 tool={tool}

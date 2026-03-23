@@ -10,8 +10,8 @@ import re
 # Control characters except tab (\x09), newline (\x0a), carriage return (\x0d)
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
-# HTML/XML tags — bounded length to prevent catastrophic backtracking
-_HTML_TAGS = re.compile(r"<[^>]{0,200}>")
+# HTML/XML tags — linear-time pattern; upstream max_length limits keep input bounded
+_HTML_TAGS = re.compile(r"<[^>]*>")
 
 
 def sanitize_text(value: str) -> str:

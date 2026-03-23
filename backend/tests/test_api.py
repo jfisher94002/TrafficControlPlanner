@@ -1,4 +1,5 @@
 import os
+import re
 import pytest
 from fastapi.testclient import TestClient
 
@@ -116,11 +117,41 @@ def test_pdf_too_many_objects_rejected(sample_plan):
 
 
 def test_pdf_oversized_image_rejected(sample_plan):
-    # 10_000_001 chars of base64 exceeds the limit
     sample_plan["canvas_image_b64"] = "A" * 10_000_001
     res = client.post("/export-pdf", json=sample_plan)
     assert res.status_code == 422
 
+
+# ── Boundary: values exactly at the limit should be accepted ─────────────────
+
+def test_pdf_name_at_limit_accepted(sample_plan):
+    sample_plan["name"] = "A" * 200
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+
+
+def test_pdf_location_at_limit_accepted(sample_plan):
+    sample_plan["metadata"]["location"] = "X" * 200
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+
+
+def test_pdf_canvas_objects_at_limit_accepted(sample_plan):
+    obj = {"id": "x", "type": "road", "x": 0, "y": 0}
+    sample_plan["canvasState"]["objects"] = [
+        {**obj, "id": f"obj-{i}"} for i in range(1000)
+    ]
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+
+
+def test_pdf_canvas_image_b64_at_limit_accepted(sample_plan):
+    sample_plan["canvas_image_b64"] = "A" * 10_000_000
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+
+
+# ── Unicode: filename in Content-Disposition must be ASCII-only ───────────────
 
 def test_pdf_unicode_in_metadata(sample_plan):
     sample_plan["name"] = "Pläne für Straßen 🚧"
@@ -128,12 +159,81 @@ def test_pdf_unicode_in_metadata(sample_plan):
     res = client.post("/export-pdf", json=sample_plan)
     assert res.status_code == 200
     assert res.content[:4] == b"%PDF"
+    cd = res.headers.get("content-disposition", "")
+    match = re.search(r'filename="?([^";]+)"?', cd)
+    assert match is not None
+    filename = match.group(1)
+    assert all(ord(c) < 128 for c in filename), f"Non-ASCII chars in filename: {filename!r}"
+    for disallowed in ("ä", "ü", "ö", "ß", "🚧"):
+        assert disallowed not in filename
 
 
-def test_pdf_sanitize_model_directly():
-    """Sanitization happens at the model level before PDF generation."""
+# ── CreateIssueRequest length limits ─────────────────────────────────────────
+
+def test_create_issue_title_too_long_rejected():
+    res = client.post("/create-issue", json={
+        "issue_type": "bug", "title": "T" * 201, "body": "x",
+        "priority": "low", "submitter_name": "x",
+    })
+    assert res.status_code == 422
+
+
+def test_create_issue_body_too_long_rejected():
+    res = client.post("/create-issue", json={
+        "issue_type": "bug", "title": "x", "body": "B" * 5001,
+        "priority": "low", "submitter_name": "x",
+    })
+    assert res.status_code == 422
+
+
+def test_create_issue_submitter_name_too_long_rejected():
+    res = client.post("/create-issue", json={
+        "issue_type": "bug", "title": "x", "body": "x",
+        "priority": "low", "submitter_name": "N" * 101,
+    })
+    assert res.status_code == 422
+
+
+def test_create_issue_at_limits_accepted(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token-for-limit-test")
+    res = client.post("/create-issue", json={
+        "issue_type": "bug",
+        "title": "T" * 200,
+        "body": "B" * 5000,
+        "priority": "low",
+        "submitter_name": "N" * 100,
+    })
+    # Token is fake so GitHub call will fail, but validation should pass (not 422)
+    assert res.status_code != 422
+
+
+# ── Model-level sanitization unit tests ──────────────────────────────────────
+
+def test_pdf_sanitize_plan_meta_fields():
     from models import PlanMeta
-    meta = PlanMeta(location="<script>x</script>Clean", client="Test\x00Client")
-    assert "<script>" not in meta.location
-    assert "\x00" not in meta.client
-    assert "Clean" in meta.location
+    meta = PlanMeta(
+        projectNumber="<script>PN-001</script>\x00",
+        client="Client\x00Name<b>",
+        location="<b>Main St</b>\x01",
+        notes="Note<script>x</script>\x00",
+    )
+    for field in (meta.projectNumber, meta.client, meta.location, meta.notes):
+        assert "<" not in field
+        assert ">" not in field
+        assert "\x00" not in field
+    assert "PN-001" in meta.projectNumber
+    assert "Client" in meta.client
+    assert "Main St" in meta.location
+    assert "Note" in meta.notes
+
+
+def test_pdf_sanitize_export_request_name():
+    from models import ExportRequest
+    req = ExportRequest(
+        id="t", name="<script>alert('x')</script> Valid-Name\x00",
+        createdAt="2024-01-01T00:00:00Z", updatedAt="2024-01-01T00:00:00Z",
+        canvasState={"objects": []},
+    )
+    assert "<" not in req.name
+    assert "\x00" not in req.name
+    assert "Valid-Name" in req.name

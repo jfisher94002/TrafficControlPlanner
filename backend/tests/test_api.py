@@ -309,6 +309,14 @@ def test_sign_data_label_is_sanitized():
     assert "STOP" in sign.label
 
 
+def test_device_data_label_is_sanitized():
+    from models import DeviceData
+    dev = DeviceData(id="cone", label="<script>Cone</script>\x00", icon="▲", color="#f97316")
+    assert "<script>" not in dev.label
+    assert "\x00" not in dev.label
+    assert "Cone" in dev.label
+
+
 def test_export_request_name_is_sanitized():
     from models import ExportRequest, CanvasState
     req = ExportRequest(
@@ -319,3 +327,82 @@ def test_export_request_name_is_sanitized():
     assert "<script>" not in req.name
     assert "\x00" not in req.name
     assert "Valid" in req.name
+
+
+# ─── Legend / _sign_counts / _device_counts ───────────────────────────────────
+
+def test_sign_counts_returns_zero_for_empty_canvas(sample_plan):
+    from pdf_generator import _sign_counts
+    from models import ExportRequest
+    sample_plan["canvasState"]["objects"] = []
+    req = ExportRequest(**sample_plan)
+    assert _sign_counts(req) == []
+
+
+def test_sign_counts_returns_one_entry_for_one_sign(sample_plan):
+    from pdf_generator import _sign_counts
+    from models import ExportRequest
+    sign = {"id": "s1", "type": "sign", "x": 0, "y": 0, "rotation": 0, "scale": 1,
+            "signData": {"id": "stop", "label": "STOP", "shape": "octagon", "color": "#FF0000", "textColor": "#FFFFFF"}}
+    sample_plan["canvasState"]["objects"] = [sign]
+    req = ExportRequest(**sample_plan)
+    counts = _sign_counts(req)
+    assert len(counts) == 1
+    assert counts[0][1] == 1  # count is 1
+
+
+def test_sign_counts_deduplicates(sample_plan):
+    from pdf_generator import _sign_counts
+    from models import ExportRequest
+    sign = {"id": "s1", "type": "sign", "x": 0, "y": 0, "rotation": 0, "scale": 1,
+            "signData": {"id": "stop", "label": "STOP", "shape": "octagon", "color": "#FF0000", "textColor": "#FFFFFF"}}
+    sample_plan["canvasState"]["objects"] = [sign, {**sign, "id": "s2"}, {**sign, "id": "s3"}]
+    req = ExportRequest(**sample_plan)
+    counts = _sign_counts(req)
+    assert len(counts) == 1
+    assert counts[0][1] == 3  # 3 instances of the same sign type
+
+
+def test_device_counts_returns_devices(sample_plan):
+    from pdf_generator import _device_counts
+    from models import ExportRequest
+    device = {"id": "d1", "type": "device", "x": 0, "y": 0,
+              "deviceData": {"id": "cone", "label": "Traffic Cone", "icon": "▲", "color": "#f97316"}}
+    sample_plan["canvasState"]["objects"] = [device, {**device, "id": "d2"}]
+    req = ExportRequest(**sample_plan)
+    counts = _device_counts(req)
+    assert len(counts) == 1
+    icon, label, count = counts[0]
+    assert label == "Traffic Cone"
+    assert count == 2
+
+
+def test_pdf_with_devices_returns_pdf(sample_plan):
+    device = {"id": "d1", "type": "device", "x": 0, "y": 0,
+              "deviceData": {"id": "cone", "label": "Traffic Cone", "icon": "▲", "color": "#f97316"}}
+    sample_plan["canvasState"]["objects"] = [device]
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+    assert res.content[:4] == b"%PDF"
+
+
+def test_pdf_legend_includes_sign_count(sample_plan):
+    """PDF is generated without error when canvas has multiple of the same sign."""
+    sign = {"id": "s1", "type": "sign", "x": 0, "y": 0, "rotation": 0, "scale": 1,
+            "signData": {"id": "stop", "label": "STOP", "shape": "octagon", "color": "#FF0000", "textColor": "#FFFFFF"}}
+    sample_plan["canvasState"]["objects"] = [sign, {**sign, "id": "s2"}, {**sign, "id": "s3"}]
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+    assert res.content[:4] == b"%PDF"
+
+
+def test_pdf_legend_with_signs_and_devices(sample_plan):
+    """PDF is generated without error when canvas has both signs and devices."""
+    sign = {"id": "s1", "type": "sign", "x": 0, "y": 0, "rotation": 0, "scale": 1,
+            "signData": {"id": "stop", "label": "STOP", "shape": "octagon", "color": "#FF0000", "textColor": "#FFFFFF"}}
+    device = {"id": "d1", "type": "device", "x": 10, "y": 10,
+              "deviceData": {"id": "cone", "label": "Traffic Cone", "icon": "▲", "color": "#f97316"}}
+    sample_plan["canvasState"]["objects"] = [sign, device]
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+    assert res.content[:4] == b"%PDF"

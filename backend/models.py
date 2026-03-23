@@ -33,13 +33,36 @@ class SignObject(BaseModel):
     scale: float
 
 
+class DeviceData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    id: str
+    label: str = Field(default="", max_length=50)
+    icon: str = Field(default="")
+    color: str = Field(default="")
+
+    @field_validator("label", "icon", "color", mode="before")
+    @classmethod
+    def sanitize_device_fields(cls, v: object) -> object:
+        return sanitize_text(v) if isinstance(v, str) else v
+
+
+class DeviceObject(BaseModel):
+    id: str
+    type: Literal["device"]
+    x: float
+    y: float
+    deviceData: DeviceData
+    rotation: float = 0.0
+    scale: float = 1.0
+
+
 class OtherCanvasObject(BaseModel):
     """Passthrough for any non-sign canvas object. Accepts arbitrary fields."""
     model_config = ConfigDict(extra="allow")
     type: str
 
 
-CanvasObject = Union[SignObject, OtherCanvasObject]
+CanvasObject = Union[SignObject, DeviceObject, OtherCanvasObject]
 
 
 # ─── PLAN STRUCTURE ───────────────────────────────────────────────────────────

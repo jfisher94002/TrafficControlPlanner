@@ -945,6 +945,97 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   );
 }
 
+// ─── SIGN ICON SVG ────────────────────────────────────────────────────────────
+
+function SignIconSvg({ signData, size = 22 }: { signData: SignData; size?: number }) {
+  const cx = size / 2, cy = size / 2, r = size * 0.42;
+  const { shape, color, textColor, label } = signData;
+  let shapeEl: React.ReactElement;
+  if (shape === "octagon") {
+    const pts = Array.from({ length: 8 }, (_, i) => {
+      const a = Math.PI / 8 + (i * Math.PI) / 4;
+      return `${cx + Math.cos(a) * r},${cy + Math.sin(a) * r}`;
+    }).join(" ");
+    shapeEl = <polygon points={pts} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "diamond") {
+    shapeEl = <polygon points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`} fill={color} stroke="#111" strokeWidth="1.5" />;
+  } else if (shape === "triangle") {
+    shapeEl = <polygon points={`${cx},${cy - r} ${cx + r},${cy + r * 0.7} ${cx - r},${cy + r * 0.7}`} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "circle") {
+    shapeEl = <circle cx={cx} cy={cy} r={r} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "shield") {
+    shapeEl = <polygon points={`${cx - r * 0.7},${cy - r} ${cx + r * 0.7},${cy - r} ${cx + r * 0.8},${cy - r * 0.3} ${cx},${cy + r} ${cx - r * 0.8},${cy - r * 0.3}`} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else {
+    shapeEl = <rect x={cx - r} y={cy - r * 0.65} width={r * 2} height={r * 1.3} fill={color} stroke={signData.border || "#333"} strokeWidth="1.5" />;
+  }
+  const shortLabel = label.length > 5 ? label.slice(0, 4) + "\u2026" : label;
+  const fontSize = label.length <= 3 ? 6 : label.length <= 5 ? 5 : 4;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }} aria-hidden="true">
+      {shapeEl}
+      <text x={cx} y={shape === "triangle" ? cy + r * 0.3 : cy + 1.5} textAnchor="middle" dominantBaseline="middle"
+        fontSize={fontSize} fontWeight="bold" fill={textColor || "#fff"} fontFamily="'JetBrains Mono',monospace">
+        {shortLabel}
+      </text>
+    </svg>
+  );
+}
+
+// ─── LEGEND BOX ───────────────────────────────────────────────────────────────
+
+interface LegendBoxProps { objects: CanvasObject[]; visible: boolean; }
+function LegendBox({ objects, visible }: LegendBoxProps) {
+  const { signEntries, deviceEntries } = useMemo(() => {
+    const signMap: Record<string, { signData: SignData; count: number }> = {};
+    const deviceMap: Record<string, { id: string; icon: string; label: string; count: number }> = {};
+    for (const obj of objects) {
+      if (obj.type === "sign") {
+        const key = obj.signData.id;
+        if (!signMap[key]) signMap[key] = { signData: obj.signData, count: 0 };
+        signMap[key].count++;
+      } else if (obj.type === "device") {
+        // Key by id (stable) to avoid conflating distinct types that share a label
+        const key = obj.deviceData.id;
+        if (!deviceMap[key]) deviceMap[key] = { id: key, icon: obj.deviceData.icon, label: obj.deviceData.label, count: 0 };
+        deviceMap[key].count++;
+      }
+    }
+    return {
+      signEntries: Object.values(signMap),
+      deviceEntries: Object.values(deviceMap),
+    };
+  }, [objects]);
+
+  if (!visible || (signEntries.length === 0 && deviceEntries.length === 0)) return null;
+
+  return (
+    <div data-testid="legend-box" style={{
+      position: "absolute", bottom: STATUS_BAR_H + 8, left: 12,
+      background: "rgba(26,29,39,0.92)", border: `1px solid ${COLORS.panelBorder}`,
+      borderRadius: 6, padding: "6px 8px", pointerEvents: "none", zIndex: 10,
+      minWidth: 130, maxWidth: 200,
+    }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>
+        Legend
+      </div>
+      {signEntries.map(({ signData, count }) => (
+        <div key={signData.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <SignIconSvg signData={signData} size={20} />
+          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{signData.label}</span>
+          <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
+        </div>
+      ))}
+      {deviceEntries.map(({ id, label, icon, count }) => (
+        <div key={id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <span style={{ width: 20, textAlign: "center", fontSize: 13, flexShrink: 0 }} aria-hidden="true">{icon}</span>
+          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── NORTH ARROW ─────────────────────────────────────────────────────────────
 
 const northArrowStyle: React.CSSProperties = {
@@ -1094,8 +1185,8 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
 
 // ─── PROPERTY PANEL ──────────────────────────────────────────────────────────
 
-interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
-function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpdateMeta }: PropertyPanelProps) {
+interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; onReorder: (id: string, dir: "front" | "forward" | "backward" | "back") => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
+function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta }: PropertyPanelProps) {
   if (!selected) {
     return (
       <div style={{ padding: 12 }}>
@@ -1245,10 +1336,66 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
         </div>
       )}
 
+      {/* ── Position inputs ────────────────────────────────────────── */}
+      {isPointObject(obj) && (
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {(["x", "y"] as const).map((axis) => (
+            <label key={axis} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+              {axis.toUpperCase()}
+              <input type="number" step="any" value={obj[axis]}
+                onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [axis]: v }); }}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+            </label>
+          ))}
+        </div>
+      )}
+      {isLineObject(obj) && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["x1", "y1"] as const).map((k) => (
+              <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+                {k.toUpperCase()}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["x2", "y2"] as const).map((k) => (
+              <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+                {k.toUpperCase()}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Z-ordering ─────────────────────────────────────────────── */}
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 10, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Layer order</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([
+            ["▲▲", "front", "Bring to Front"],
+            ["▲",  "forward",  "Bring Forward"],
+            ["▼",  "backward", "Send Backward"],
+            ["▼▼", "back",   "Send to Back"],
+          ] as [string, "front" | "forward" | "backward" | "back", string][]).map(([icon, dir, title]) => (
+            <button key={dir} title={title} aria-label={title} onClick={() => onReorder(obj.id, dir)}
+              style={{ flex: 1, padding: "4px 0", background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.textMuted, borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+              {icon}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button
         onClick={() => onDelete(obj.id)}
         style={{
-          marginTop: 12, width: "100%", padding: "6px 0",
+          marginTop: 10, width: "100%", padding: "6px 0",
           background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
           color: COLORS.danger, borderRadius: 6, cursor: "pointer",
           fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
@@ -1260,12 +1407,60 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
   );
 }
 
+// ─── MERCATOR HELPERS ─────────────────────────────────────────────────────────
+
+function latLonToPixel(lat: number, lon: number, zoom: number): { x: number; y: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const x = ((lon + 180) / 360) * scale;
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+  const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
+  return { x, y };
+}
+
+function pixelToLatLon(px: number, py: number, zoom: number): { lat: number; lon: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const lon = (px / scale) * 360 - 180;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * py / scale))) * 180 / Math.PI;
+  return { lat, lon };
+}
+
 // ─── MINI MAP ─────────────────────────────────────────────────────────────────
 
-interface MiniMapProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; zoom: number; offset: Point; }
-function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
+interface MiniMapProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; zoom: number; offset: Point; mapCenter: MapCenter | null; }
+function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const mmW = 160, mmH = 100;
+  const tileCache = useRef<Record<string, HTMLImageElement>>({});
+  const [tileTick, setTileTick] = useState(0);
+
+  // Overview zoom: 5 levels above the working zoom gives a useful neighbourhood view
+  const ovZoom = mapCenter ? Math.max(8, Math.min(11, mapCenter.zoom - 4)) : null;
+
+  // Clear tile cache when overview zoom level changes to avoid stale tiles
+  useEffect(() => { tileCache.current = {}; }, [ovZoom]);
+
+  // Fetch overview tiles whenever mapCenter changes
+  useEffect(() => {
+    if (!mapCenter || ovZoom === null) return;
+    const TILE = 256;
+    const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
+    const left = cx - mmW / 2, top = cy - mmH / 2;
+    const maxT = Math.pow(2, ovZoom);
+    const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
+    const tyStart = Math.floor(top / TILE), tyEnd = Math.floor((top + mmH) / TILE);
+    for (let tx = txStart; tx <= txEnd; tx++) {
+      for (let ty = tyStart; ty <= tyEnd; ty++) {
+        if (ty < 0 || ty >= maxT) continue;
+        const wx = ((tx % maxT) + maxT) % maxT;
+        const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+        if (tileCache.current[url]) continue;
+        const img = new Image(); img.crossOrigin = "anonymous";
+        img.onload = () => setTileTick(t => t + 1);
+        img.src = url;
+        tileCache.current[url] = img;
+      }
+    }
+  }, [mapCenter, ovZoom]);
 
   useEffect(() => {
     const cvs = ref.current;
@@ -1273,50 +1468,81 @@ function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
     const ctx = cvs.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, mmW, mmH);
-
-    const worldW = 4000, worldH = 3000;
-    const s = Math.min(mmW / worldW, mmH / worldH);
-
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, mmW, mmH);
 
-    objects.forEach((obj) => {
-      if (obj.type === "road") {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo((obj.x1 + 2000) * s, (obj.y1 + 1500) * s);
-        ctx.lineTo((obj.x2 + 2000) * s, (obj.y2 + 1500) * s);
-        ctx.stroke();
-      } else if (obj.type === "polyline_road" && obj.points?.length >= 2) {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        obj.points.forEach((p, i) => {
-          const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
-          if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
-        });
-        ctx.stroke();
-      } else if (obj.type === "curve_road" && obj.points?.length === 3) {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
-        ctx.quadraticCurveTo(
-          (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
-          (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
-        );
-        ctx.stroke();
-      } else if (isPointObject(obj)) {
-        ctx.fillStyle = COLORS.accent;
-        ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
+    if (mapCenter && ovZoom !== null) {
+      // ── Draw overview tiles ──────────────────────────────────────────────
+      const TILE = 256;
+      const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
+      const left = cx - mmW / 2, top = cy - mmH / 2;
+      const maxT = Math.pow(2, ovZoom);
+      const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
+      const tyStart = Math.floor(top / TILE), tyEnd = Math.floor((top + mmH) / TILE);
+      for (let tx = txStart; tx <= txEnd; tx++) {
+        for (let ty = tyStart; ty <= tyEnd; ty++) {
+          if (ty < 0 || ty >= maxT) continue;
+          const wx = ((tx % maxT) + maxT) % maxT;
+          const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+          const img = tileCache.current[url];
+          if (!img?.complete || !img.naturalWidth) continue;
+          ctx.drawImage(img, tx * TILE - left, ty * TILE - top, TILE, TILE);
+        }
       }
-    });
+      // Slight dark overlay for contrast with the accent viewport rect
+      ctx.fillStyle = "rgba(15,17,23,0.25)";
+      ctx.fillRect(0, 0, mmW, mmH);
 
-    const vx = (-offset.x / zoom + 2000) * s;
-    const vy = (-offset.y / zoom + 1500) * s;
-    const vw = (canvasSize.w / zoom) * s;
-    const vh = (canvasSize.h / zoom) * s;
-    ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
-    ctx.strokeRect(vx, vy, vw, vh);
-  }, [objects, canvasSize, zoom, offset]);
+      // ── Viewport rect ───────────────────────────────────────────────────
+      // mapCenter tracks the geographic center of the canvas view (updated on pan),
+      // so the viewport is always centred in the minimap.
+      const vpScale = Math.pow(2, ovZoom - mapCenter.zoom);
+      const vw = Math.max(2, Math.min(mmW, canvasSize.w * vpScale));
+      const vh = Math.max(2, Math.min(mmH, canvasSize.h * vpScale));
+      ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1.5;
+      ctx.strokeRect(mmW / 2 - vw / 2, mmH / 2 - vh / 2, vw, vh);
+    } else {
+      // ── No map: draw canvas objects on a fixed world grid ───────────────
+      const worldW = 4000, worldH = 3000;
+      const s = Math.min(mmW / worldW, mmH / worldH);
+      objects.forEach((obj) => {
+        if (obj.type === "road") {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.x1 + 2000) * s, (obj.y1 + 1500) * s);
+          ctx.lineTo((obj.x2 + 2000) * s, (obj.y2 + 1500) * s);
+          ctx.stroke();
+        } else if (obj.type === "polyline_road" && obj.points?.length >= 2) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          obj.points.forEach((p, i) => {
+            const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
+            if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
+          });
+          ctx.stroke();
+        } else if (obj.type === "curve_road" && obj.points?.length === 3) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
+          ctx.quadraticCurveTo(
+            (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
+            (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
+          );
+          ctx.stroke();
+        } else if (isPointObject(obj)) {
+          ctx.fillStyle = COLORS.accent;
+          ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
+        }
+      });
+      // Viewport rect — clamped so it never escapes the minimap bounds
+      const vx = (-offset.x / zoom + 2000) * s;
+      const vy = (-offset.y / zoom + 1500) * s;
+      const vw = Math.min((canvasSize.w / zoom) * s, mmW);
+      const vh = Math.min((canvasSize.h / zoom) * s, mmH);
+      ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
+      ctx.strokeRect(Math.max(0, vx), Math.max(0, vy), Math.min(vw, mmW - Math.max(0, vx)), Math.min(vh, mmH - Math.max(0, vy)));
+    }
+  }, [objects, canvasSize, zoom, offset, mapCenter, ovZoom, tileTick]);
 
   return (
     <canvas ref={ref} width={mmW} height={mmH}
@@ -1353,6 +1579,7 @@ export default function TrafficControlPlanner() {
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
+  const [showLegend, setShowLegend] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -1749,7 +1976,20 @@ export default function TrafficControlPlanner() {
 
     if (isPanning && panStart) {
       const pos = stageRef.current?.getPointerPosition();
-      if (pos) setOffset({ x: pos.x - panStart.x, y: pos.y - panStart.y });
+      if (pos) {
+        const newOffset = { x: pos.x - panStart.x, y: pos.y - panStart.y };
+        const dox = newOffset.x - offset.x;
+        const doy = newOffset.y - offset.y;
+        setOffset(newOffset);
+        // Shift map tiles to follow the pan. Tiles live in screen space (Layer 1,
+        // no Konva transform), so 1 screen pixel == 1 tile pixel: shift mapCenter
+        // by (-dox, -doy) in tile pixel space and convert back to lat/lon.
+        if (mapCenter) {
+          const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, mapCenter.zoom);
+          const { lat: newLat, lon: newLon } = pixelToLatLon(cx - dox, cy - doy, mapCenter.zoom);
+          setMapCenter({ lat: newLat, lon: newLon, zoom: mapCenter.zoom });
+        }
+      }
       return;
     }
 
@@ -1770,7 +2010,7 @@ export default function TrafficControlPlanner() {
         return o;
       }));
     }
-  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom]);
+  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom, offset, mapCenter, setMapCenter]);
 
   const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (isPanning) { setIsPanning(false); setPanStart(null); return; }
@@ -1833,6 +2073,22 @@ export default function TrafficControlPlanner() {
   const deleteObject = (id: string) => {
     const newObjs = objects.filter((o) => o.id !== id);
     setObjects(newObjs); pushHistory(newObjs); setSelected(null);
+  };
+
+  const reorderObject = (id: string, dir: "front" | "forward" | "backward" | "back") => {
+    const idx = objects.findIndex(o => o.id === id);
+    if (idx === -1) return;
+    // Short-circuit no-ops so we don't clone or push redundant history entries
+    if ((dir === "front" || dir === "forward") && idx === objects.length - 1) return;
+    if ((dir === "back"  || dir === "backward") && idx === 0) return;
+    const next = [...objects];
+    const [obj] = next.splice(idx, 1);
+    if (dir === "front")         next.push(obj);
+    else if (dir === "back")     next.unshift(obj);
+    else if (dir === "forward")  next.splice(idx + 1, 0, obj);
+    else                         next.splice(idx - 1, 0, obj);
+    setObjects(next);
+    pushHistory(next);
   };
 
   const clearAll = () => {
@@ -2093,6 +2349,10 @@ export default function TrafficControlPlanner() {
                     North Arrow
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
+                    <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} style={{ accentColor: COLORS.accent }} data-testid="legend-toggle" />
+                    Legend Box
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: COLORS.textMuted, cursor: "pointer" }}>
                     <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} style={{ accentColor: COLORS.accent }} />
                     Snap to Endpoints
                   </label>
@@ -2110,7 +2370,7 @@ export default function TrafficControlPlanner() {
                 <div style={{ fontSize: 11, color: COLORS.textMuted }}>{objects.length} objects on canvas</div>
 
                 {sectionTitle("Mini Map")}
-                <MiniMap objects={objects} canvasSize={canvasSize} zoom={zoom} offset={offset} />
+                <MiniMap objects={objects} canvasSize={canvasSize} zoom={zoom} offset={offset} mapCenter={mapCenter} />
               </>
             )}
 
@@ -2326,6 +2586,7 @@ export default function TrafficControlPlanner() {
           </Stage>
 
           <NorthArrow visible={showNorthArrow} />
+          <LegendBox objects={objects} visible={showLegend} />
 
           {/* Status bar */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>
@@ -2376,7 +2637,7 @@ export default function TrafficControlPlanner() {
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
-              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
               : <ManifestPanel objects={objects} />
             }
 

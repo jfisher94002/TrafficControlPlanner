@@ -5,13 +5,13 @@ import type { Context as KonvaContext } from 'konva/lib/Context';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
-  CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject,
+  CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
   SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, calcTaperLength, cloneObject } from './utils';
+import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isRoad, isMultiPointRoad, calcTaperLength, cloneObject } from './utils';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -477,6 +477,67 @@ function CurveRoad({ obj, isSelected }: CurveRoadProps) {
   );
 }
 
+interface CubicBezierRoadProps { obj: CubicBezierRoadObject; isSelected: boolean; }
+function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
+  const { points, width, lanes, roadType } = obj;
+  if (!points || points.length < 4) return null;
+  const [p0, p1, p2, p3] = points;
+
+  const spine = sampleCubicBezier(p0, p1, p2, p3, 32);
+  const flat = spine.flatMap((p) => [p.x, p.y]);
+  const hw = width / 2;
+  const laneMarkings = [];
+  const laneW = width / lanes;
+  for (let li = 1; li < lanes; li++) {
+    const off = -hw + li * laneW;
+    const isCenter = li === lanes / 2 && roadType !== "2lane";
+    for (let si = 0; si < spine.length - 1; si++) {
+      const { x: x1, y: y1 } = spine[si];
+      const { x: x2, y: y2 } = spine[si + 1];
+      const perp = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
+      const cx = Math.cos(perp), cy = Math.sin(perp);
+      if (isCenter) {
+        for (const d of [-2, 2]) {
+          laneMarkings.push(
+            <Line key={`c${li}_${si}_${d}`}
+              points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
+              stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
+          );
+        }
+      } else {
+        laneMarkings.push(
+          <Line key={`l${li}_${si}`}
+            points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
+            stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
+        );
+      }
+    }
+  }
+
+  return (
+    <Group listening={false}>
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      {laneMarkings}
+      {isSelected && (
+        <>
+          <Line points={flat} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />
+          {/* Tangent arms: p0→cp1 and cp2→p3 */}
+          <Line points={[p0.x, p0.y, p1.x, p1.y]} stroke="rgba(59,130,246,0.5)" strokeWidth={1} dash={[3, 3]} />
+          <Line points={[p2.x, p2.y, p3.x, p3.y]} stroke="rgba(59,130,246,0.5)" strokeWidth={1} dash={[3, 3]} />
+          {/* Endpoint handles (green circles) */}
+          <Circle x={p0.x} y={p0.y} radius={6} fill={COLORS.success} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Circle x={p3.x} y={p3.y} radius={6} fill={COLORS.success} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          {/* Control point handles (blue circles) */}
+          <Circle x={p1.x} y={p1.y} radius={5} fill={COLORS.info} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Circle x={p2.x} y={p2.y} radius={5} fill={COLORS.info} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+        </>
+      )}
+    </Group>
+  );
+}
+
 interface SignShapeProps { obj: SignObject; isSelected: boolean; }
 function SignShape({ obj, isSelected }: SignShapeProps) {
   const { x, y, signData, rotation = 0, scale: sc = 1 } = obj;
@@ -700,7 +761,8 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
   switch (obj.type) {
     case "road":         return <RoadSegment obj={obj} isSelected={isSelected} />;
     case "polyline_road":return <PolylineRoad obj={obj} isSelected={isSelected} />;
-    case "curve_road":   return <CurveRoad obj={obj} isSelected={isSelected} />;
+    case "curve_road":         return <CurveRoad obj={obj} isSelected={isSelected} />;
+    case "cubic_bezier_road":  return <CubicBezierRoad obj={obj} isSelected={isSelected} />;
     case "sign":         return <SignShape obj={obj} isSelected={isSelected} />;
     case "device":       return <DeviceShape obj={obj} isSelected={isSelected} />;
     case "zone":         return <WorkZone obj={obj} isSelected={isSelected} />;
@@ -712,8 +774,8 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
   }
 }
 
-interface DrawingOverlaysProps { tool: string; roadDrawMode: string; drawStart: DrawStart | null; cursorPos: Point; snapIndicator: Point | null; polyPoints: Point[]; curvePoints: Point[]; }
-function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicator, polyPoints, curvePoints }: DrawingOverlaysProps) {
+interface DrawingOverlaysProps { tool: string; roadDrawMode: string; drawStart: DrawStart | null; cursorPos: Point; snapIndicator: Point | null; polyPoints: Point[]; curvePoints: Point[]; cubicPoints: Point[]; }
+function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicator, polyPoints, curvePoints, cubicPoints }: DrawingOverlaysProps) {
   const previewTarget = snapIndicator || cursorPos;
   const elements = [];
 
@@ -785,6 +847,55 @@ function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicat
     curvePoints.forEach((p, idx) => {
       elements.push(
         <Circle key={`curve-pt-${idx}`} x={p.x} y={p.y} radius={5}
+          fill={idx === 0 ? COLORS.success : COLORS.info}
+          stroke="rgba(255,255,255,0.6)" strokeWidth={1} listening={false} />
+      );
+    });
+  }
+
+  // Cubic bezier in-progress
+  if (tool === "road" && roadDrawMode === "cubic" && cubicPoints.length > 0) {
+    const [q0, q1, q2] = cubicPoints;
+    if (cubicPoints.length === 1) {
+      // Step 1: line from p0 to cursor
+      elements.push(
+        <Line key="cubic-preview-1"
+          points={[q0.x, q0.y, previewTarget.x, previewTarget.y]}
+          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} listening={false} />
+      );
+    } else if (cubicPoints.length === 2) {
+      // Step 2: cp1 placed, collapse cp2+p3 to cursor for preview
+      const spine = sampleCubicBezier(q0, q1, previewTarget, previewTarget, 20);
+      elements.push(
+        <Line key="cubic-preview-2" points={spine.flatMap((p) => [p.x, p.y])}
+          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
+      );
+      elements.push(
+        <Line key="cubic-tangent-1"
+          points={[q0.x, q0.y, q1.x, q1.y]}
+          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
+      );
+    } else {
+      // Step 3: cp1 + cp2 placed, preview p3 at cursor
+      const spine = sampleCubicBezier(q0, q1, q2, previewTarget, 20);
+      elements.push(
+        <Line key="cubic-preview-3" points={spine.flatMap((p) => [p.x, p.y])}
+          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
+      );
+      elements.push(
+        <Line key="cubic-tangent-1"
+          points={[q0.x, q0.y, q1.x, q1.y]}
+          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
+      );
+      elements.push(
+        <Line key="cubic-tangent-2"
+          points={[q2.x, q2.y, previewTarget.x, previewTarget.y]}
+          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
+      );
+    }
+    cubicPoints.forEach((p, idx) => {
+      elements.push(
+        <Circle key={`cubic-pt-${idx}`} x={p.x} y={p.y} radius={5}
           fill={idx === 0 ? COLORS.success : COLORS.info}
           stroke="rgba(255,255,255,0.6)" strokeWidth={1} listening={false} />
       );
@@ -1114,7 +1225,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         nextSignCounts[obj.signData.label] = (nextSignCounts[obj.signData.label] ?? 0) + 1;
       } else if (obj.type === "device") {
         nextDeviceCounts[obj.deviceData.label] = (nextDeviceCounts[obj.deviceData.label] ?? 0) + 1;
-      } else if (obj.type === "road" || obj.type === "polyline_road" || obj.type === "curve_road") {
+      } else if (isRoad(obj)) {
         roadsCount++;
       } else if (obj.type === "taper") {
         tapersCount++;
@@ -1212,7 +1323,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Curve Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -1323,11 +1434,13 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
         </div>
       )}
 
-      {(obj.type === "polyline_road" || obj.type === "curve_road") && (
+      {isMultiPointRoad(obj) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
             {obj.type === "polyline_road"
               ? `Polyline — ${obj.points.length} points`
+              : obj.type === "cubic_bezier_road"
+              ? "Cubic Bézier curve — drag handles to reshape"
               : "Quadratic Bézier curve"}
           </div>
           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
@@ -1529,6 +1642,16 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
             (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
           );
           ctx.stroke();
+        } else if (obj.type === "cubic_bezier_road" && obj.points?.length === 4) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
+          ctx.bezierCurveTo(
+            (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
+            (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s,
+            (obj.points[3].x + 2000) * s, (obj.points[3].y + 1500) * s,
+          );
+          ctx.stroke();
         } else if (isPointObject(obj)) {
           ctx.fillStyle = COLORS.accent;
           ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
@@ -1603,6 +1726,7 @@ export default function TrafficControlPlanner() {
   const [roadDrawMode, setRoadDrawMode] = useState("straight");
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
   const [curvePoints, setCurvePoints] = useState<Point[]>([]);
+  const [cubicPoints, setCubicPoints] = useState<Point[]>([]);
   const [snapIndicator, setSnapIndicator] = useState<Point | null>(null);
   const [signSubTab, setSignSubTab] = useState("library");
   const [customSigns, setCustomSigns] = useState<SignData[]>(() => {
@@ -1661,12 +1785,12 @@ export default function TrafficControlPlanner() {
     return () => ro.disconnect();
   }, []);
 
-  // Clear poly/curve in-progress when tool or draw mode changes
+  // Clear poly/curve/cubic in-progress when tool or draw mode changes
   useEffect(() => {
-    if (tool !== "road") { setPolyPoints([]); setCurvePoints([]); }
+    if (tool !== "road") { setPolyPoints([]); setCurvePoints([]); setCubicPoints([]); }
   }, [tool]);
   useEffect(() => {
-    setPolyPoints([]); setCurvePoints([]);
+    setPolyPoints([]); setCurvePoints([]); setCubicPoints([]);
   }, [roadDrawMode]);
 
   // Sync custom signs to localStorage
@@ -1720,6 +1844,7 @@ export default function TrafficControlPlanner() {
     setTool(newTool);
     setPolyPoints([]);
     setCurvePoints([]);
+    setCubicPoints([]);
   }, []);
 
   const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest") => {
@@ -1773,7 +1898,7 @@ export default function TrafficControlPlanner() {
       }
 
       if (key === "ESCAPE") {
-        setPolyPoints([]); setCurvePoints([]); setDrawStart(null); return;
+        setPolyPoints([]); setCurvePoints([]); setCubicPoints([]); setDrawStart(null); return;
       }
 
       if (key === "ENTER") {
@@ -1848,6 +1973,10 @@ export default function TrafficControlPlanner() {
         const sampledPts = sampleBezier(o.points[0], o.points[1], o.points[2], 20);
         if (distToPolyline(wx, wy, sampledPts) < effectiveHalfWidth(o)) return o;
       }
+      if (o.type === "cubic_bezier_road" && o.points?.length === 4) {
+        const sampledPts = sampleCubicBezier(o.points[0], o.points[1], o.points[2], o.points[3], 20);
+        if (distToPolyline(wx, wy, sampledPts) < effectiveHalfWidth(o)) return o;
+      }
     }
     return null;
   }, [objects, mapCenter]);
@@ -1867,6 +1996,25 @@ export default function TrafficControlPlanner() {
     }
 
     if (tool === "select") {
+      // Check if click is near a handle of the currently selected cubic bezier road
+      if (selected) {
+        const selObj = objects.find((o) => o.id === selected);
+        if (selObj?.type === "cubic_bezier_road") {
+          const handleRadius = Math.min(10 / zoom, 20);
+          for (let i = 0; i < selObj.points.length; i++) {
+            const p = selObj.points[i];
+            if (dist(raw.x, raw.y, p.x, p.y) < handleRadius) {
+              setDrawStart({
+                x: raw.x, y: raw.y,
+                id: selObj.id,
+                handleIndex: i,
+                origPoints: selObj.points.map((pt) => ({ ...pt })),
+              });
+              return;
+            }
+          }
+        }
+      }
       const hit = hitTest(raw.x, raw.y);
       setSelected(hit ? hit.id : null);
       if (hit) {
@@ -1875,7 +2023,7 @@ export default function TrafficControlPlanner() {
           ox: isPointObject(hit) ? hit.x : isLineObject(hit) ? hit.x1 : 0,
           oy: isPointObject(hit) ? hit.y : isLineObject(hit) ? hit.y1 : 0,
           id: hit.id,
-          origPoints: (hit.type === "polyline_road" || hit.type === "curve_road") ? hit.points.map((p) => ({ ...p })) : null,
+          origPoints: isMultiPointRoad(hit) ? hit.points.map((p) => ({ ...p })) : null,
         });
       }
       return;
@@ -1956,12 +2104,24 @@ export default function TrafficControlPlanner() {
         }
         return;
       }
+
+      if (roadDrawMode === "cubic") {
+        const newCubicPts = [...cubicPoints, { x, y }];
+        if (newCubicPts.length === 4) {
+          const newRoad: CubicBezierRoadObject = { id: uid(), type: "cubic_bezier_road", points: newCubicPts as [Point, Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
+          const newObjs = [...objects, newRoad];
+          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
+        } else {
+          setCubicPoints(newCubicPts);
+        }
+        return;
+      }
     }
 
     if (["zone", "arrow", "measure"].includes(tool)) {
       setDrawStart({ x: raw.x, y: raw.y });
     }
-  }, [tool, roadDrawMode, toWorld, trySnap, hitTest, offset, objects, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, pushHistory, zoom]);
+  }, [tool, roadDrawMode, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     const raw = toWorld();
@@ -1997,6 +2157,17 @@ export default function TrafficControlPlanner() {
       const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
       setObjects((prev) => prev.map((o) => {
         if (o.id !== drawStart.id) return o;
+        if (o.type === "cubic_bezier_road" && drawStart.origPoints) {
+          if (drawStart.handleIndex != null) {
+            // Drag a single handle
+            const newPoints = drawStart.origPoints.map((p, i) =>
+              i === drawStart.handleIndex ? { x: p.x + dx, y: p.y + dy } : { ...p }
+            ) as [Point, Point, Point, Point];
+            return { ...o, points: newPoints };
+          }
+          // Drag whole object
+          return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point, Point] };
+        }
         if ((o.type === "polyline_road" || o.type === "curve_road") && drawStart.origPoints) {
           return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
         }
@@ -2243,6 +2414,7 @@ export default function TrafficControlPlanner() {
 
   const polyInProgress = tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length > 0;
   const curveInProgress = tool === "road" && roadDrawMode === "curve" && curvePoints.length > 0;
+  const cubicInProgress = tool === "road" && roadDrawMode === "cubic" && cubicPoints.length > 0;
 
   // suppress mapRenderTick lint warning — used to trigger re-render when tiles load
   void mapRenderTick;
@@ -2484,7 +2656,8 @@ export default function TrafficControlPlanner() {
                     { id: "straight", label: "Straight", icon: "━" },
                     { id: "poly",     label: "Polyline", icon: "⌇" },
                     { id: "smooth",   label: "Smooth",   icon: "∿" },
-                    { id: "curve",    label: "Curve",    icon: "⌒" },
+                    { id: "curve",    label: "Quad",     icon: "⌒" },
+                    { id: "cubic",    label: "Cubic",    icon: "⌣" },
                   ].map((mode) => (
                     <button key={mode.id}
                       onClick={() => { setRoadDrawMode(mode.id); switchTool("road"); }}
@@ -2519,6 +2692,7 @@ export default function TrafficControlPlanner() {
                     {roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
                     {roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
                     {roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
+                    {roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
                   </div>
                 </div>
               </>
@@ -2581,6 +2755,7 @@ export default function TrafficControlPlanner() {
                 snapIndicator={snapIndicator}
                 polyPoints={polyPoints}
                 curvePoints={curvePoints}
+                cubicPoints={cubicPoints}
               />
             </Layer>
           </Stage>
@@ -2603,7 +2778,12 @@ export default function TrafficControlPlanner() {
               )}
               {curveInProgress && (
                 <span style={{ color: COLORS.info }}>
-                  Curve: {curvePoints.length === 1 ? "click control point" : "click end point"} · Esc cancel
+                  Quad: {curvePoints.length === 1 ? "click control point" : "click end point"} · Esc cancel
+                </span>
+              )}
+              {cubicInProgress && (
+                <span style={{ color: COLORS.info }}>
+                  Cubic: {cubicPoints.length === 1 ? "click cp1" : cubicPoints.length === 2 ? "click cp2" : "click end"} · Esc cancel
                 </span>
               )}
               <span data-testid="object-count">{objects.length} objects</span>
@@ -2651,7 +2831,7 @@ export default function TrafficControlPlanner() {
                   <div key={obj.id} onClick={() => setSelected(obj.id)}
                     style={{ padding: "5px 8px", borderRadius: 4, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, background: selected === obj.id ? COLORS.accentDim : "transparent", color: selected === obj.id ? COLORS.accent : COLORS.textMuted, border: selected === obj.id ? `1px solid rgba(245,158,11,0.2)` : "1px solid transparent" }}>
                     <span style={{ fontSize: 12 }}>
-                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : "📏"}
+                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : "📏"}
                     </span>
                     <span>
                       {obj.type === "sign" ? obj.signData.label :
@@ -2659,7 +2839,8 @@ export default function TrafficControlPlanner() {
                        obj.type === "text" ? `"${obj.text.slice(0, 12)}"` :
                        obj.type === "road" ? `${obj.roadType} road` :
                        obj.type === "polyline_road" ? `poly (${obj.points.length}pts)` :
-                       obj.type === "curve_road" ? "curve road" :
+                       obj.type === "curve_road" ? "quad road" :
+                       obj.type === "cubic_bezier_road" ? "cubic road" :
                        obj.type === "taper" ? `taper ${obj.speed}mph` :
                        obj.type}
                     </span>

@@ -5,6 +5,7 @@ import {
   distToSegment,
   distToPolyline,
   sampleBezier,
+  sampleCubicBezier,
   snapToEndpoint,
   geoRoadWidthPx,
   formatSearchPrimary,
@@ -136,6 +137,18 @@ describe('snapToEndpoint', () => {
     expect(result.snapped).toBe(true)
     expect(result.x).toBe(200)
     expect(result.y).toBe(200)
+  })
+
+  it('snaps to cubic_bezier_road endpoint within threshold', () => {
+    const cubicObj: CanvasObject = {
+      id: 'cb1', type: 'cubic_bezier_road',
+      points: [{ x: 400, y: 400 }, { x: 420, y: 380 }, { x: 480, y: 380 }, { x: 500, y: 400 }],
+      width: 40, realWidth: 12, lanes: 2, roadType: '2lane',
+    }
+    const result = snapToEndpoint(503, 403, [cubicObj], 14, 1)
+    expect(result.snapped).toBe(true)
+    expect(result.x).toBe(500)
+    expect(result.y).toBe(400)
   })
 })
 
@@ -307,5 +320,60 @@ describe('cloneObject', () => {
     const clone = cloneObject(sign) as typeof sign
     clone.signData.label = 'MUTATED'
     expect((sign as typeof sign).signData.label).toBe('STOP')
+  })
+
+  it('offsets all four control points for a cubic_bezier_road', () => {
+    const cubic: CanvasObject = {
+      id: 'cb', type: 'cubic_bezier_road',
+      points: [{ x: 0, y: 0 }, { x: 10, y: -20 }, { x: 90, y: -20 }, { x: 100, y: 0 }],
+      width: 80, realWidth: 22, lanes: 2, roadType: '2lane',
+    }
+    const clone = cloneObject(cubic) as typeof cubic
+    expect(clone.id).not.toBe('cb')
+    expect(clone.points[0]).toEqual({ x: 20, y: 20 })
+    expect(clone.points[1]).toEqual({ x: 30, y: 0 })
+    expect(clone.points[2]).toEqual({ x: 110, y: 0 })
+    expect(clone.points[3]).toEqual({ x: 120, y: 20 })
+  })
+})
+
+// ─── sampleCubicBezier ────────────────────────────────────────────────────────
+describe('sampleCubicBezier', () => {
+  const p0 = { x: 0, y: 0 }
+  const p1 = { x: 0, y: 100 }
+  const p2 = { x: 100, y: 100 }
+  const p3 = { x: 100, y: 0 }
+  const n = 4
+
+  it('returns n+1 points', () => {
+    expect(sampleCubicBezier(p0, p1, p2, p3, n)).toHaveLength(n + 1)
+  })
+
+  it('first point equals p0', () => {
+    const pts = sampleCubicBezier(p0, p1, p2, p3, n)
+    expect(pts[0]).toEqual(p0)
+  })
+
+  it('last point equals p3', () => {
+    const pts = sampleCubicBezier(p0, p1, p2, p3, n)
+    expect(pts[n]).toEqual(p3)
+  })
+
+  it('midpoint matches cubic bezier formula at t=0.5', () => {
+    // t=0.5, mt=0.5: x = 0.125*0 + 3*0.25*0.5*0 + 3*0.5*0.25*100 + 0.125*100
+    //             x = 0 + 0 + 37.5 + 12.5 = 50
+    // y = 0.125*0 + 3*0.25*0.5*100 + 3*0.5*0.25*100 + 0.125*0
+    //             y = 0 + 37.5 + 37.5 + 0 = 75
+    const pts = sampleCubicBezier(p0, p1, p2, p3, 2)
+    expect(pts[1].x).toBeCloseTo(50)
+    expect(pts[1].y).toBeCloseTo(75)
+  })
+
+  it('collinear control points yield a straight line at t=0.5', () => {
+    // All four points on x-axis
+    const a = { x: 0, y: 0 }, b = { x: 33, y: 0 }, c = { x: 67, y: 0 }, d = { x: 100, y: 0 }
+    const pts = sampleCubicBezier(a, b, c, d, 2)
+    expect(pts[1].y).toBeCloseTo(0)
+    expect(pts[1].x).toBeCloseTo(50)
   })
 })

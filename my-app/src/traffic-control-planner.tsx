@@ -987,21 +987,22 @@ interface LegendBoxProps { objects: CanvasObject[]; visible: boolean; }
 function LegendBox({ objects, visible }: LegendBoxProps) {
   const { signEntries, deviceEntries } = useMemo(() => {
     const signMap: Record<string, { signData: SignData; count: number }> = {};
-    const deviceMap: Record<string, { icon: string; count: number }> = {};
+    const deviceMap: Record<string, { id: string; icon: string; label: string; count: number }> = {};
     for (const obj of objects) {
       if (obj.type === "sign") {
         const key = obj.signData.id;
         if (!signMap[key]) signMap[key] = { signData: obj.signData, count: 0 };
         signMap[key].count++;
       } else if (obj.type === "device") {
-        const key = obj.deviceData.label;
-        if (!deviceMap[key]) deviceMap[key] = { icon: obj.deviceData.icon, count: 0 };
+        // Key by id (stable) to avoid conflating distinct types that share a label
+        const key = obj.deviceData.id;
+        if (!deviceMap[key]) deviceMap[key] = { id: key, icon: obj.deviceData.icon, label: obj.deviceData.label, count: 0 };
         deviceMap[key].count++;
       }
     }
     return {
       signEntries: Object.values(signMap),
-      deviceEntries: Object.entries(deviceMap).map(([label, { icon, count }]) => ({ label, icon, count })),
+      deviceEntries: Object.values(deviceMap),
     };
   }, [objects]);
 
@@ -1024,8 +1025,8 @@ function LegendBox({ objects, visible }: LegendBoxProps) {
           <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
         </div>
       ))}
-      {deviceEntries.map(({ label, icon, count }) => (
-        <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+      {deviceEntries.map(({ id, label, icon, count }) => (
+        <div key={id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
           <span style={{ width: 20, textAlign: "center", fontSize: 13, flexShrink: 0 }} aria-hidden="true">{icon}</span>
           <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
           <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>

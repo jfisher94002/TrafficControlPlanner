@@ -51,15 +51,18 @@ def _sign_counts(request: ExportRequest) -> list[tuple[SignData, int]]:
 
 
 def _device_counts(request: ExportRequest) -> list[tuple[str, str, int]]:
-    """Return (icon, label, count) tuples for each unique device type, ordered by first appearance."""
+    """Return (icon, label, count) tuples for each unique device type, ordered by first appearance.
+
+    Keyed by deviceData.id (stable) to avoid conflating distinct types that share a label.
+    """
     seen: dict[str, list] = {}
     for obj in request.canvasState.objects:
         if isinstance(obj, DeviceObject):
-            label = obj.deviceData.label
-            if label not in seen:
-                seen[label] = [obj.deviceData.icon, 0]
-            seen[label][1] += 1
-    return [(icon, label, cnt) for label, (icon, cnt) in seen.items()]
+            key = obj.deviceData.id
+            if key not in seen:
+                seen[key] = [obj.deviceData.icon, obj.deviceData.label, 0]
+            seen[key][2] += 1
+    return [(icon, label, cnt) for icon, label, cnt in seen.values()]
 
 
 def _format_date(iso: str) -> str:
@@ -174,19 +177,25 @@ def _draw_legend(
     y_icons = legend_y + (legend_h - header_h - cell_h) / 2
 
     # ── Sign icons with count ─────────────────────────────────────────────────
+    icon_size = 20.0
+    rendered_sign_count = 0
     for i, (sign, count) in enumerate(sign_counts):
         icon_x = x + i * cell_w
         if icon_x + cell_w > PAGE_W - MARGIN:
             break
-        render_sign_to_canvas(c, sign, icon_x + cell_w / 2, y_icons + 14, size=20)
+        # Centre the icon within cell_w (x is lower-left corner of the Drawing)
+        render_sign_to_canvas(c, sign, icon_x + (cell_w - icon_size) / 2, y_icons + 14, size=icon_size)
         label = sign.label if len(sign.label) <= 8 else sign.label[:7] + "\u2026"
         c.setFont("Helvetica", 7)
         c.setFillColor(colors.black)
         c.drawCentredString(icon_x + cell_w / 2, y_icons + 2, f"{label} \u00d7{count}")
+        rendered_sign_count = i + 1
 
-    # ── Device rows (text, right of signs) ───────────────────────────────────
+    # ── Device rows (text + icon prefix, right of rendered signs) ─────────────
     if device_counts:
-        dev_x = x + len(sign_counts) * cell_w + 8
+        # Base dev_x on actually rendered sign cells, not total sign_counts length,
+        # to avoid placing the column off-page when the sign loop broke early.
+        dev_x = x + rendered_sign_count * cell_w + 8
         c.setFont("Helvetica-Bold", 7)
         c.setFillColor(colors.black)
         c.drawString(dev_x, y_icons + 28, "Devices")
@@ -195,7 +204,7 @@ def _draw_legend(
             if dy < legend_y:
                 break
             c.setFont("Helvetica", 7)
-            c.drawString(dev_x, dy, f"{label}: {count}")
+            c.drawString(dev_x, dy, f"{icon} {label}: {count}")
 
     c.setStrokeColor(colors.HexColor("#cccccc"))
     c.line(MARGIN, legend_y + legend_h, PAGE_W - MARGIN, legend_y + legend_h)

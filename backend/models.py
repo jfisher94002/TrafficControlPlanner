@@ -40,6 +40,11 @@ class DeviceData(BaseModel):
     icon: str = Field(default="")
     color: str = Field(default="")
 
+    @field_validator("label", "icon", "color", mode="before")
+    @classmethod
+    def sanitize_device_fields(cls, v: object) -> object:
+        return sanitize_text(v) if isinstance(v, str) else v
+
 
 class DeviceObject(BaseModel):
     id: str

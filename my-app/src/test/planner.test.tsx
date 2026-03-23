@@ -607,12 +607,42 @@ describe('Legend Box', () => {
     expect(screen.getByTestId('legend-box')).toBeInTheDocument()
   })
 
-  it('appears after placing a taper (device)', () => {
+  it('does not appear after placing a taper (non-sign, non-device object)', () => {
     setup()
     fireEvent.keyDown(window, { key: 'P' })
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
-    // tapers are not devices, so legend stays hidden (only sign/device types shown)
-    // object count should be 1 regardless
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
     expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('appears after placing a device and shows count of 1', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('1')
+  })
+
+  it('increments device count when placing the same device twice', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'D' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('2')
+  })
+
+  it('shows separate entries for a sign and a device', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts).toHaveLength(2)
+    expect(counts[0]).toHaveTextContent('1')
+    expect(counts[1]).toHaveTextContent('1')
   })
 })

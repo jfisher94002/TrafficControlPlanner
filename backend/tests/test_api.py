@@ -309,6 +309,14 @@ def test_sign_data_label_is_sanitized():
     assert "STOP" in sign.label
 
 
+def test_device_data_label_is_sanitized():
+    from models import DeviceData
+    dev = DeviceData(id="cone", label="<script>Cone</script>\x00", icon="▲", color="#f97316")
+    assert "<script>" not in dev.label
+    assert "\x00" not in dev.label
+    assert "Cone" in dev.label
+
+
 def test_export_request_name_is_sanitized():
     from models import ExportRequest, CanvasState
     req = ExportRequest(
@@ -323,12 +331,24 @@ def test_export_request_name_is_sanitized():
 
 # ─── Legend / _sign_counts / _device_counts ───────────────────────────────────
 
-def test_sign_counts_returns_counts(sample_plan):
+def test_sign_counts_returns_zero_for_empty_canvas(sample_plan):
     from pdf_generator import _sign_counts
     from models import ExportRequest
+    sample_plan["canvasState"]["objects"] = []
+    req = ExportRequest(**sample_plan)
+    assert _sign_counts(req) == []
+
+
+def test_sign_counts_returns_one_entry_for_one_sign(sample_plan):
+    from pdf_generator import _sign_counts
+    from models import ExportRequest
+    sign = {"id": "s1", "type": "sign", "x": 0, "y": 0, "rotation": 0, "scale": 1,
+            "signData": {"id": "stop", "label": "STOP", "shape": "octagon", "color": "#FF0000", "textColor": "#FFFFFF"}}
+    sample_plan["canvasState"]["objects"] = [sign]
     req = ExportRequest(**sample_plan)
     counts = _sign_counts(req)
-    assert len(counts) >= 0  # no crash; may be 0 if sample_plan has no signs
+    assert len(counts) == 1
+    assert counts[0][1] == 1  # count is 1
 
 
 def test_sign_counts_deduplicates(sample_plan):

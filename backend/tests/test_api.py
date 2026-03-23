@@ -167,6 +167,29 @@ def test_pdf_canvas_image_b64_at_limit_accepted(sample_plan):
     assert res.status_code == 200
 
 
+def test_image_b64_limit_enforced_at_model_level():
+    """Model-level boundary check avoids expensive HTTP decode path."""
+    import pytest
+    from pydantic import ValidationError
+    from models import ExportRequest, CanvasState
+    # At limit: accepted
+    req = ExportRequest(
+        id="1", name="x",
+        createdAt="2026-01-01T00:00:00Z", updatedAt="2026-01-01T00:00:00Z",
+        canvasState=CanvasState(objects=[]),
+        canvas_image_b64="A" * _MAX_IMAGE_B64_LEN,
+    )
+    assert req.canvas_image_b64 is not None
+    # Over limit: rejected
+    with pytest.raises(ValidationError):
+        ExportRequest(
+            id="1", name="x",
+            createdAt="2026-01-01T00:00:00Z", updatedAt="2026-01-01T00:00:00Z",
+            canvasState=CanvasState(objects=[]),
+            canvas_image_b64="A" * (_MAX_IMAGE_B64_LEN + 1),
+        )
+
+
 # ─── Content-Disposition ASCII filename ──────────────────────────────────────
 
 def test_pdf_unicode_content_disposition_is_ascii(sample_plan):

@@ -548,6 +548,76 @@ describe('Z-order controls', () => {
   })
 })
 
+// ─── Cubic Bézier road ────────────────────────────────────────────────────────
+describe('Cubic Bézier road', () => {
+  async function activateCubicMode(user: ReturnType<typeof userEvent.setup>) {
+    // Navigate to the Roads tab and click the Cubic mode button
+    await user.click(screen.getByRole('button', { name: /^roads$/i }))
+    await user.click(screen.getByRole('button', { name: /cubic/i }))
+  }
+
+  it('activating Cubic mode sets tool to ROAD (cubic)', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    expect(screen.getByTestId('object-count').closest('div')?.textContent).toContain('Tool: ROAD (cubic)')
+  })
+
+  it('4 canvas clicks place one cubic_bezier_road (object count 1)', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('3 clicks do not yet place an object', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('placing a cubic road shows Cubic Bézier Road in the properties panel', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(within(screen.getByTestId('right-panel')).getByText(/cubic bézier road/i)).toBeInTheDocument()
+  })
+
+  it('Escape mid-draw cancels without placing an object', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('placed cubic road is undoable', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+})
+
 // ─── Legend Box ───────────────────────────────────────────────────────────────
 describe('Legend Box', () => {
   it('is not shown when canvas is empty', () => {

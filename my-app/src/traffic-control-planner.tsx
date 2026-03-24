@@ -2345,6 +2345,8 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     const newTitle = (data.name as string | undefined) ?? 'Untitled Traffic Control Plan';
     const newCreatedAt = (data.createdAt as string | undefined) ?? new Date().toISOString();
     const newMeta = (data.metadata as PlanMeta | undefined) ?? { projectNumber: '', client: '', location: '', notes: '' };
+    const newOffset = (data.canvasOffset as Point | undefined) ?? { x: 0, y: 0 };
+    const newZoom = typeof data.canvasZoom === 'number' ? data.canvasZoom : 1;
     setPlanId(newId);
     setPlanTitle(newTitle);
     setPlanCreatedAt(newCreatedAt);
@@ -2353,6 +2355,8 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     setHistory([newObjects]);
     setHistoryIndex(0);
     setSelected(null);
+    setOffset(newOffset);
+    setZoom(newZoom);
     setShowDashboard(false);
   };
 

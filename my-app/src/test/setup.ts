@@ -94,3 +94,11 @@ globalThis.prompt = vi.fn().mockReturnValue(null)
 // URL object stubs (jsdom doesn't implement createObjectURL/revokeObjectURL)
 globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
 globalThis.URL.revokeObjectURL = vi.fn()
+
+// ─── AWS Amplify Storage mock ─────────────────────────────────────────────────
+vi.mock('aws-amplify/storage', () => ({
+  uploadData: vi.fn(() => ({ result: Promise.resolve() })),
+  list: vi.fn(() => Promise.resolve({ items: [] })),
+  getUrl: vi.fn(() => Promise.resolve({ url: new URL('https://example.com/plan.json') })),
+  remove: vi.fn(() => Promise.resolve()),
+}))

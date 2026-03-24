@@ -15,7 +15,7 @@ class SignData(BaseModel):
     textColor: str
     border: Optional[str] = None
 
-    @field_validator("label", mode="before")
+    @field_validator("label", mode="after")
     @classmethod
     def sanitize_label(cls, v: object) -> object:
         return sanitize_text(v) if isinstance(v, str) else v
@@ -33,13 +33,36 @@ class SignObject(BaseModel):
     scale: float
 
 
+class DeviceData(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    id: str
+    label: str = Field(default="", max_length=50)
+    icon: str = Field(default="")
+    color: str = Field(default="")
+
+    @field_validator("label", "icon", "color", mode="after")
+    @classmethod
+    def sanitize_device_fields(cls, v: object) -> object:
+        return sanitize_text(v) if isinstance(v, str) else v
+
+
+class DeviceObject(BaseModel):
+    id: str
+    type: Literal["device"]
+    x: float
+    y: float
+    deviceData: DeviceData
+    rotation: float = 0.0
+    scale: float = 1.0
+
+
 class OtherCanvasObject(BaseModel):
     """Passthrough for any non-sign canvas object. Accepts arbitrary fields."""
     model_config = ConfigDict(extra="allow")
     type: str
 
 
-CanvasObject = Union[SignObject, OtherCanvasObject]
+CanvasObject = Union[SignObject, DeviceObject, OtherCanvasObject]
 
 
 # ─── PLAN STRUCTURE ───────────────────────────────────────────────────────────
@@ -54,7 +77,7 @@ class PlanMeta(BaseModel):
     location: str = Field(default="", max_length=200)
     notes: str = Field(default="", max_length=2000)
 
-    @field_validator("projectNumber", "client", "location", "notes", mode="before")
+    @field_validator("projectNumber", "client", "location", "notes", mode="after")
     @classmethod
     def sanitize_meta_strings(cls, v: object) -> object:
         return sanitize_text(v) if isinstance(v, str) else v
@@ -94,7 +117,7 @@ class ExportRequest(BaseModel):
     metadata: PlanMeta = Field(default_factory=PlanMeta)
     canvas_image_b64: Optional[str] = Field(default=None, max_length=_MAX_IMAGE_B64_LEN)
 
-    @field_validator("name", mode="before")
+    @field_validator("name", mode="after")
     @classmethod
     def sanitize_name(cls, v: object) -> object:
         return sanitize_text(v) if isinstance(v, str) else v

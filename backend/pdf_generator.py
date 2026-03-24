@@ -25,7 +25,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Table, TableStyle
 from reportlab.pdfgen import canvas as pdfgen_canvas
 
-from models import ExportRequest, SignData, SignObject
+from models import DeviceObject, ExportRequest, SignData, SignObject
 from sign_renderer import render_sign_to_canvas
 
 MARGIN = 0.5 * inch
@@ -38,16 +38,31 @@ ICON_DIM = 48.0  # pt — icon cell size used in legend layout
 
 # ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-def _unique_signs(request: ExportRequest) -> list[SignData]:
-    """Return de-duplicated SignData list ordered by first appearance."""
-    seen: set[str] = set()
-    result: list[SignData] = []
+def _sign_counts(request: ExportRequest) -> list[tuple[SignData, int]]:
+    """Return (SignData, count) pairs ordered by first appearance."""
+    seen: dict[str, list] = {}
     for obj in request.canvasState.objects:
         if isinstance(obj, SignObject):
-            if obj.signData.id not in seen:
-                seen.add(obj.signData.id)
-                result.append(obj.signData)
-    return result
+            key = obj.signData.id
+            if key not in seen:
+                seen[key] = [obj.signData, 0]
+            seen[key][1] += 1
+    return [(sd, cnt) for sd, cnt in seen.values()]
+
+
+def _device_counts(request: ExportRequest) -> list[tuple[str, str, int]]:
+    """Return (icon, label, count) tuples for each unique device type, ordered by first appearance.
+
+    Keyed by deviceData.id (stable) to avoid conflating distinct types that share a label.
+    """
+    seen: dict[str, list] = {}
+    for obj in request.canvasState.objects:
+        if isinstance(obj, DeviceObject):
+            key = obj.deviceData.id
+            if key not in seen:
+                seen[key] = [obj.deviceData.icon, obj.deviceData.label, 0]
+            seen[key][2] += 1
+    return [(icon, label, cnt) for icon, label, cnt in seen.values()]
 
 
 def _format_date(iso: str) -> str:
@@ -140,37 +155,56 @@ def _draw_canvas_image(
 
 def _draw_legend(
     c: pdfgen_canvas.Canvas,
-    unique_signs: list[SignData],
+    sign_counts: list[tuple[SignData, int]],
+    device_counts: list[tuple[str, str, int]],
     legend_y: float,
     legend_h: float,
 ) -> None:
-    if not unique_signs:
+    if not sign_counts and not device_counts:
         return
 
     header_h = 16.0
     cell_w = 64.0
-    cell_h = ICON_DIM + 16.0  # icon + label
+    cell_h = ICON_DIM + 16.0
 
     x = MARGIN
     y_header = legend_y + legend_h - header_h
 
     c.setFont("Helvetica-Bold", 9)
     c.setFillColor(colors.black)
-    c.drawString(x, y_header, "SIGN LEGEND")
+    c.drawString(x, y_header, "LEGEND")
 
     y_icons = legend_y + (legend_h - header_h - cell_h) / 2
 
-    for i, sign in enumerate(unique_signs):
+    # ── Sign icons with count ─────────────────────────────────────────────────
+    icon_size = 20.0
+    rendered_sign_count = 0
+    for i, (sign, count) in enumerate(sign_counts):
         icon_x = x + i * cell_w
         if icon_x + cell_w > PAGE_W - MARGIN:
-            break  # only one row for MVP; overflow handled gracefully
-
-        render_sign_to_canvas(c, sign, icon_x, y_icons + 14, size=20)
-
+            break
+        # Centre the icon within cell_w (x is lower-left corner of the Drawing)
+        render_sign_to_canvas(c, sign, icon_x + (cell_w - icon_size) / 2, y_icons + 14, size=icon_size)
         label = sign.label if len(sign.label) <= 8 else sign.label[:7] + "\u2026"
-        c.setFont("Helvetica", 8)
+        c.setFont("Helvetica", 7)
         c.setFillColor(colors.black)
-        c.drawCentredString(icon_x + cell_w / 2, y_icons + 2, label)
+        c.drawCentredString(icon_x + cell_w / 2, y_icons + 2, f"{label} \u00d7{count}")
+        rendered_sign_count = i + 1
+
+    # ── Device rows (text + icon prefix, right of rendered signs) ─────────────
+    if device_counts:
+        # Base dev_x on actually rendered sign cells, not total sign_counts length,
+        # to avoid placing the column off-page when the sign loop broke early.
+        dev_x = x + rendered_sign_count * cell_w + 8
+        c.setFont("Helvetica-Bold", 7)
+        c.setFillColor(colors.black)
+        c.drawString(dev_x, y_icons + 28, "Devices")
+        for j, (icon, label, count) in enumerate(device_counts):
+            dy = y_icons + 16 - j * 12
+            if dy < legend_y:
+                break
+            c.setFont("Helvetica", 7)
+            c.drawString(dev_x, dy, f"{icon} {label}: {count}")
 
     c.setStrokeColor(colors.HexColor("#cccccc"))
     c.line(MARGIN, legend_y + legend_h, PAGE_W - MARGIN, legend_y + legend_h)
@@ -183,8 +217,10 @@ def build_pdf(request: ExportRequest) -> bytes:
     c = pdfgen_canvas.Canvas(buf, pagesize=landscape(letter))
     c.setTitle(request.name or "Traffic Control Plan")
 
-    unique_signs = _unique_signs(request)
-    legend_h = LEGEND_MAX_H if unique_signs else 0.0
+    sign_counts = _sign_counts(request)
+    device_counts = _device_counts(request)
+    has_legend = bool(sign_counts or device_counts)
+    legend_h = LEGEND_MAX_H if has_legend else 0.0
 
     # Vertical zones (bottom-up in ReportLab coordinate system)
     legend_y = MARGIN
@@ -193,8 +229,8 @@ def build_pdf(request: ExportRequest) -> bytes:
 
     _draw_title_block(c, request)
     _draw_canvas_image(c, request, image_area_y, image_area_h)
-    if unique_signs:
-        _draw_legend(c, unique_signs, legend_y, legend_h)
+    if has_legend:
+        _draw_legend(c, sign_counts, device_counts, legend_y, legend_h)
 
     c.save()
     return buf.getvalue()

@@ -5,13 +5,13 @@ import type { Context as KonvaContext } from 'konva/lib/Context';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
-  CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject,
+  CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
   SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, calcTaperLength, cloneObject } from './utils';
+import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isRoad, isMultiPointRoad, calcTaperLength, cloneObject } from './utils';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -477,6 +477,67 @@ function CurveRoad({ obj, isSelected }: CurveRoadProps) {
   );
 }
 
+interface CubicBezierRoadProps { obj: CubicBezierRoadObject; isSelected: boolean; }
+function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
+  const { points, width, lanes, roadType } = obj;
+  if (!points || points.length < 4) return null;
+  const [p0, p1, p2, p3] = points;
+
+  const spine = sampleCubicBezier(p0, p1, p2, p3, 32);
+  const flat = spine.flatMap((p) => [p.x, p.y]);
+  const hw = width / 2;
+  const laneMarkings = [];
+  const laneW = width / lanes;
+  for (let li = 1; li < lanes; li++) {
+    const off = -hw + li * laneW;
+    const isCenter = li === lanes / 2 && roadType !== "2lane";
+    for (let si = 0; si < spine.length - 1; si++) {
+      const { x: x1, y: y1 } = spine[si];
+      const { x: x2, y: y2 } = spine[si + 1];
+      const perp = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
+      const cx = Math.cos(perp), cy = Math.sin(perp);
+      if (isCenter) {
+        for (const d of [-2, 2]) {
+          laneMarkings.push(
+            <Line key={`c${li}_${si}_${d}`}
+              points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
+              stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
+          );
+        }
+      } else {
+        laneMarkings.push(
+          <Line key={`l${li}_${si}`}
+            points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
+            stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
+        );
+      }
+    }
+  }
+
+  return (
+    <Group listening={false}>
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      {laneMarkings}
+      {isSelected && (
+        <>
+          <Line points={flat} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />
+          {/* Tangent arms: p0→cp1 and cp2→p3 */}
+          <Line points={[p0.x, p0.y, p1.x, p1.y]} stroke="rgba(59,130,246,0.5)" strokeWidth={1} dash={[3, 3]} />
+          <Line points={[p2.x, p2.y, p3.x, p3.y]} stroke="rgba(59,130,246,0.5)" strokeWidth={1} dash={[3, 3]} />
+          {/* Endpoint handles (green circles) */}
+          <Circle x={p0.x} y={p0.y} radius={6} fill={COLORS.success} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Circle x={p3.x} y={p3.y} radius={6} fill={COLORS.success} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          {/* Control point handles (blue circles) */}
+          <Circle x={p1.x} y={p1.y} radius={5} fill={COLORS.info} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+          <Circle x={p2.x} y={p2.y} radius={5} fill={COLORS.info} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+        </>
+      )}
+    </Group>
+  );
+}
+
 interface SignShapeProps { obj: SignObject; isSelected: boolean; }
 function SignShape({ obj, isSelected }: SignShapeProps) {
   const { x, y, signData, rotation = 0, scale: sc = 1 } = obj;
@@ -700,7 +761,8 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
   switch (obj.type) {
     case "road":         return <RoadSegment obj={obj} isSelected={isSelected} />;
     case "polyline_road":return <PolylineRoad obj={obj} isSelected={isSelected} />;
-    case "curve_road":   return <CurveRoad obj={obj} isSelected={isSelected} />;
+    case "curve_road":         return <CurveRoad obj={obj} isSelected={isSelected} />;
+    case "cubic_bezier_road":  return <CubicBezierRoad obj={obj} isSelected={isSelected} />;
     case "sign":         return <SignShape obj={obj} isSelected={isSelected} />;
     case "device":       return <DeviceShape obj={obj} isSelected={isSelected} />;
     case "zone":         return <WorkZone obj={obj} isSelected={isSelected} />;
@@ -712,8 +774,8 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
   }
 }
 
-interface DrawingOverlaysProps { tool: string; roadDrawMode: string; drawStart: DrawStart | null; cursorPos: Point; snapIndicator: Point | null; polyPoints: Point[]; curvePoints: Point[]; }
-function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicator, polyPoints, curvePoints }: DrawingOverlaysProps) {
+interface DrawingOverlaysProps { tool: string; roadDrawMode: string; drawStart: DrawStart | null; cursorPos: Point; snapIndicator: Point | null; polyPoints: Point[]; curvePoints: Point[]; cubicPoints: Point[]; }
+function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicator, polyPoints, curvePoints, cubicPoints }: DrawingOverlaysProps) {
   const previewTarget = snapIndicator || cursorPos;
   const elements = [];
 
@@ -785,6 +847,55 @@ function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicat
     curvePoints.forEach((p, idx) => {
       elements.push(
         <Circle key={`curve-pt-${idx}`} x={p.x} y={p.y} radius={5}
+          fill={idx === 0 ? COLORS.success : COLORS.info}
+          stroke="rgba(255,255,255,0.6)" strokeWidth={1} listening={false} />
+      );
+    });
+  }
+
+  // Cubic bezier in-progress
+  if (tool === "road" && roadDrawMode === "cubic" && cubicPoints.length > 0) {
+    const [q0, q1, q2] = cubicPoints;
+    if (cubicPoints.length === 1) {
+      // Step 1: line from p0 to cursor
+      elements.push(
+        <Line key="cubic-preview-1"
+          points={[q0.x, q0.y, previewTarget.x, previewTarget.y]}
+          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} listening={false} />
+      );
+    } else if (cubicPoints.length === 2) {
+      // Step 2: cp1 placed, collapse cp2+p3 to cursor for preview
+      const spine = sampleCubicBezier(q0, q1, previewTarget, previewTarget, 20);
+      elements.push(
+        <Line key="cubic-preview-2" points={spine.flatMap((p) => [p.x, p.y])}
+          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
+      );
+      elements.push(
+        <Line key="cubic-tangent-1"
+          points={[q0.x, q0.y, q1.x, q1.y]}
+          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
+      );
+    } else {
+      // Step 3: cp1 + cp2 placed, preview p3 at cursor
+      const spine = sampleCubicBezier(q0, q1, q2, previewTarget, 20);
+      elements.push(
+        <Line key="cubic-preview-3" points={spine.flatMap((p) => [p.x, p.y])}
+          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
+      );
+      elements.push(
+        <Line key="cubic-tangent-1"
+          points={[q0.x, q0.y, q1.x, q1.y]}
+          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
+      );
+      elements.push(
+        <Line key="cubic-tangent-2"
+          points={[q2.x, q2.y, previewTarget.x, previewTarget.y]}
+          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
+      );
+    }
+    cubicPoints.forEach((p, idx) => {
+      elements.push(
+        <Circle key={`cubic-pt-${idx}`} x={p.x} y={p.y} radius={5}
           fill={idx === 0 ? COLORS.success : COLORS.info}
           stroke="rgba(255,255,255,0.6)" strokeWidth={1} listening={false} />
       );
@@ -945,52 +1056,93 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   );
 }
 
-// ─── LEGEND BOX ──────────────────────────────────────────────────────────────
+// ─── SIGN ICON SVG ────────────────────────────────────────────────────────────
 
-const LEGEND_PAD  = 10;
-const LEGEND_LINE = 16;
-const LEGEND_W    = 172;
-
-interface LegendBoxProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; visible: boolean; }
-function LegendBox({ objects, canvasSize, visible }: LegendBoxProps) {
-  if (!visible) return null;
-
-  const signCounts:   Record<string, number> = {};
-  const deviceCounts: Record<string, number> = {};
-  for (const obj of objects) {
-    if (obj.type === 'sign')        signCounts[obj.signData.label]    = (signCounts[obj.signData.label]    ?? 0) + 1;
-    else if (obj.type === 'device') deviceCounts[obj.deviceData.label] = (deviceCounts[obj.deviceData.label] ?? 0) + 1;
+function SignIconSvg({ signData, size = 22 }: { signData: SignData; size?: number }) {
+  const cx = size / 2, cy = size / 2, r = size * 0.42;
+  const { shape, color, textColor, label } = signData;
+  let shapeEl: React.ReactElement;
+  if (shape === "octagon") {
+    const pts = Array.from({ length: 8 }, (_, i) => {
+      const a = Math.PI / 8 + (i * Math.PI) / 4;
+      return `${cx + Math.cos(a) * r},${cy + Math.sin(a) * r}`;
+    }).join(" ");
+    shapeEl = <polygon points={pts} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "diamond") {
+    shapeEl = <polygon points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`} fill={color} stroke="#111" strokeWidth="1.5" />;
+  } else if (shape === "triangle") {
+    shapeEl = <polygon points={`${cx},${cy - r} ${cx + r},${cy + r * 0.7} ${cx - r},${cy + r * 0.7}`} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "circle") {
+    shapeEl = <circle cx={cx} cy={cy} r={r} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else if (shape === "shield") {
+    shapeEl = <polygon points={`${cx - r * 0.7},${cy - r} ${cx + r * 0.7},${cy - r} ${cx + r * 0.8},${cy - r * 0.3} ${cx},${cy + r} ${cx - r * 0.8},${cy - r * 0.3}`} fill={color} stroke="#fff" strokeWidth="1.5" />;
+  } else {
+    shapeEl = <rect x={cx - r} y={cy - r * 0.65} width={r * 2} height={r * 1.3} fill={color} stroke={signData.border || "#333"} strokeWidth="1.5" />;
   }
+  const shortLabel = label.length > 5 ? label.slice(0, 4) + "\u2026" : label;
+  const fontSize = label.length <= 3 ? 6 : label.length <= 5 ? 5 : 4;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }} aria-hidden="true">
+      {shapeEl}
+      <text x={cx} y={shape === "triangle" ? cy + r * 0.3 : cy + 1.5} textAnchor="middle" dominantBaseline="middle"
+        fontSize={fontSize} fontWeight="bold" fill={textColor || "#fff"} fontFamily="'JetBrains Mono',monospace">
+        {shortLabel}
+      </text>
+    </svg>
+  );
+}
 
-  const rows: Array<{ icon: string; label: string; count: number }> = [
-    ...Object.entries(signCounts).map(([label, count]) => ({ icon: '⬡', label, count })),
-    ...Object.entries(deviceCounts).map(([label, count]) => ({ icon: '▲', label, count })),
-  ].sort((a, b) => a.icon === b.icon ? a.label.localeCompare(b.label) : a.icon.localeCompare(b.icon));
-  if (rows.length === 0) return null;
+// ─── LEGEND BOX ───────────────────────────────────────────────────────────────
 
-  const titleH = 18;
-  const sepH   = 6;
-  const totalH = LEGEND_PAD * 2 + titleH + sepH + rows.length * LEGEND_LINE;
-  const x = 12;
-  const y = canvasSize.h - STATUS_BAR_H - totalH - 12;
+interface LegendBoxProps { objects: CanvasObject[]; visible: boolean; }
+function LegendBox({ objects, visible }: LegendBoxProps) {
+  const { signEntries, deviceEntries } = useMemo(() => {
+    const signMap: Record<string, { signData: SignData; count: number }> = {};
+    const deviceMap: Record<string, { id: string; icon: string; label: string; count: number }> = {};
+    for (const obj of objects) {
+      if (obj.type === "sign") {
+        const key = obj.signData.id;
+        if (!signMap[key]) signMap[key] = { signData: obj.signData, count: 0 };
+        signMap[key].count++;
+      } else if (obj.type === "device") {
+        const key = obj.deviceData.id;
+        if (!deviceMap[key]) deviceMap[key] = { id: key, icon: obj.deviceData.icon, label: obj.deviceData.label, count: 0 };
+        deviceMap[key].count++;
+      }
+    }
+    return {
+      signEntries: Object.values(signMap),
+      deviceEntries: Object.values(deviceMap),
+    };
+  }, [objects]);
+
+  if (!visible || (signEntries.length === 0 && deviceEntries.length === 0)) return null;
 
   return (
-    <Group x={x} y={y} listening={false}>
-      <Rect width={LEGEND_W} height={totalH} fill="rgba(26,29,39,0.9)" stroke={COLORS.panelBorder} strokeWidth={1} cornerRadius={4} />
-      <KonvaText x={LEGEND_PAD} y={LEGEND_PAD} text="LEGEND" fontSize={9} fill={COLORS.textDim} fontFamily="'JetBrains Mono',monospace" letterSpacing={1.5} />
-      <Line points={[LEGEND_PAD, LEGEND_PAD + titleH, LEGEND_W - LEGEND_PAD, LEGEND_PAD + titleH]} stroke={COLORS.panelBorder} strokeWidth={1} />
-      {rows.map((row, i) => {
-        const label = row.label.length > 16 ? row.label.slice(0, 15) + '…' : row.label;
-        return (
-          <KonvaText key={row.icon + row.label}
-            x={LEGEND_PAD} y={LEGEND_PAD + titleH + sepH + i * LEGEND_LINE}
-            text={`${row.icon} ${label}  ×${row.count}`}
-            fontSize={9} fill={COLORS.textMuted} fontFamily="'JetBrains Mono',monospace"
-            width={LEGEND_W - LEGEND_PAD * 2}
-          />
-        );
-      })}
-    </Group>
+    <div data-testid="legend-box" style={{
+      position: "absolute", bottom: STATUS_BAR_H + 8, left: 12,
+      background: "rgba(26,29,39,0.92)", border: `1px solid ${COLORS.panelBorder}`,
+      borderRadius: 6, padding: "6px 8px", pointerEvents: "none", zIndex: 10,
+      minWidth: 130, maxWidth: 200,
+    }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 5 }}>
+        Legend
+      </div>
+      {signEntries.map(({ signData, count }) => (
+        <div key={signData.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <SignIconSvg signData={signData} size={20} />
+          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{signData.label}</span>
+          <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
+        </div>
+      ))}
+      {deviceEntries.map(({ id, label, icon, count }) => (
+        <div key={id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+          <span style={{ width: 20, textAlign: "center", fontSize: 13, flexShrink: 0 }} aria-hidden="true">{icon}</span>
+          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -1072,7 +1224,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         nextSignCounts[obj.signData.label] = (nextSignCounts[obj.signData.label] ?? 0) + 1;
       } else if (obj.type === "device") {
         nextDeviceCounts[obj.deviceData.label] = (nextDeviceCounts[obj.deviceData.label] ?? 0) + 1;
-      } else if (obj.type === "road" || obj.type === "polyline_road" || obj.type === "curve_road") {
+      } else if (isRoad(obj)) {
         roadsCount++;
       } else if (obj.type === "taper") {
         tapersCount++;
@@ -1143,8 +1295,8 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
 
 // ─── PROPERTY PANEL ──────────────────────────────────────────────────────────
 
-interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
-function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpdateMeta }: PropertyPanelProps) {
+interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; onReorder: (id: string, dir: "front" | "forward" | "backward" | "back") => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
+function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta }: PropertyPanelProps) {
   if (!selected) {
     return (
       <div style={{ padding: 12 }}>
@@ -1170,7 +1322,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Curve Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -1281,11 +1433,13 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
         </div>
       )}
 
-      {(obj.type === "polyline_road" || obj.type === "curve_road") && (
+      {isMultiPointRoad(obj) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
             {obj.type === "polyline_road"
               ? `Polyline — ${obj.points.length} points`
+              : obj.type === "cubic_bezier_road"
+              ? "Cubic Bézier curve — drag handles to reshape"
               : "Quadratic Bézier curve"}
           </div>
           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
@@ -1294,10 +1448,66 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
         </div>
       )}
 
+      {/* ── Position inputs ────────────────────────────────────────── */}
+      {isPointObject(obj) && (
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {(["x", "y"] as const).map((axis) => (
+            <label key={axis} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+              {axis.toUpperCase()}
+              <input type="number" step="any" value={obj[axis]}
+                onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [axis]: v }); }}
+                style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+            </label>
+          ))}
+        </div>
+      )}
+      {isLineObject(obj) && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["x1", "y1"] as const).map((k) => (
+              <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+                {k.toUpperCase()}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["x2", "y2"] as const).map((k) => (
+              <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
+                {k.toUpperCase()}
+                <input type="number" step="any" value={obj[k]}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (isFinite(v)) onUpdate(obj.id, { [k]: v }); }}
+                  style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", width: "100%", outline: "none" }} />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Z-ordering ─────────────────────────────────────────────── */}
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 10, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Layer order</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([
+            ["▲▲", "front", "Bring to Front"],
+            ["▲",  "forward",  "Bring Forward"],
+            ["▼",  "backward", "Send Backward"],
+            ["▼▼", "back",   "Send to Back"],
+          ] as [string, "front" | "forward" | "backward" | "back", string][]).map(([icon, dir, title]) => (
+            <button key={dir} title={title} aria-label={title} onClick={() => onReorder(obj.id, dir)}
+              style={{ flex: 1, padding: "4px 0", background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.textMuted, borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+              {icon}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button
         onClick={() => onDelete(obj.id)}
         style={{
-          marginTop: 12, width: "100%", padding: "6px 0",
+          marginTop: 10, width: "100%", padding: "6px 0",
           background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
           color: COLORS.danger, borderRadius: 6, cursor: "pointer",
           fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
@@ -1309,12 +1519,60 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, planMeta, onUpda
   );
 }
 
+// ─── MERCATOR HELPERS ─────────────────────────────────────────────────────────
+
+function latLonToPixel(lat: number, lon: number, zoom: number): { x: number; y: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const x = ((lon + 180) / 360) * scale;
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+  const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
+  return { x, y };
+}
+
+function pixelToLatLon(px: number, py: number, zoom: number): { lat: number; lon: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const lon = (px / scale) * 360 - 180;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * py / scale))) * 180 / Math.PI;
+  return { lat, lon };
+}
+
 // ─── MINI MAP ─────────────────────────────────────────────────────────────────
 
-interface MiniMapProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; zoom: number; offset: Point; }
-function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
+interface MiniMapProps { objects: CanvasObject[]; canvasSize: { w: number; h: number }; zoom: number; offset: Point; mapCenter: MapCenter | null; }
+function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const mmW = 160, mmH = 100;
+  const tileCache = useRef<Record<string, HTMLImageElement>>({});
+  const [tileTick, setTileTick] = useState(0);
+
+  // Overview zoom: 5 levels above the working zoom gives a useful neighbourhood view
+  const ovZoom = mapCenter ? Math.max(8, Math.min(11, mapCenter.zoom - 4)) : null;
+
+  // Clear tile cache when overview zoom level changes to avoid stale tiles
+  useEffect(() => { tileCache.current = {}; }, [ovZoom]);
+
+  // Fetch overview tiles whenever mapCenter changes
+  useEffect(() => {
+    if (!mapCenter || ovZoom === null) return;
+    const TILE = 256;
+    const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
+    const left = cx - mmW / 2, top = cy - mmH / 2;
+    const maxT = Math.pow(2, ovZoom);
+    const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
+    const tyStart = Math.floor(top / TILE), tyEnd = Math.floor((top + mmH) / TILE);
+    for (let tx = txStart; tx <= txEnd; tx++) {
+      for (let ty = tyStart; ty <= tyEnd; ty++) {
+        if (ty < 0 || ty >= maxT) continue;
+        const wx = ((tx % maxT) + maxT) % maxT;
+        const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+        if (tileCache.current[url]) continue;
+        const img = new Image(); img.crossOrigin = "anonymous";
+        img.onload = () => setTileTick(t => t + 1);
+        img.src = url;
+        tileCache.current[url] = img;
+      }
+    }
+  }, [mapCenter, ovZoom]);
 
   useEffect(() => {
     const cvs = ref.current;
@@ -1322,50 +1580,91 @@ function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
     const ctx = cvs.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, mmW, mmH);
-
-    const worldW = 4000, worldH = 3000;
-    const s = Math.min(mmW / worldW, mmH / worldH);
-
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, mmW, mmH);
 
-    objects.forEach((obj) => {
-      if (obj.type === "road") {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo((obj.x1 + 2000) * s, (obj.y1 + 1500) * s);
-        ctx.lineTo((obj.x2 + 2000) * s, (obj.y2 + 1500) * s);
-        ctx.stroke();
-      } else if (obj.type === "polyline_road" && obj.points?.length >= 2) {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        obj.points.forEach((p, i) => {
-          const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
-          if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
-        });
-        ctx.stroke();
-      } else if (obj.type === "curve_road" && obj.points?.length === 3) {
-        ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
-        ctx.quadraticCurveTo(
-          (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
-          (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
-        );
-        ctx.stroke();
-      } else if (isPointObject(obj)) {
-        ctx.fillStyle = COLORS.accent;
-        ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
+    if (mapCenter && ovZoom !== null) {
+      // ── Draw overview tiles ──────────────────────────────────────────────
+      const TILE = 256;
+      const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, ovZoom);
+      const left = cx - mmW / 2, top = cy - mmH / 2;
+      const maxT = Math.pow(2, ovZoom);
+      const txStart = Math.floor(left / TILE), txEnd = Math.floor((left + mmW) / TILE);
+      const tyStart = Math.floor(top / TILE), tyEnd = Math.floor((top + mmH) / TILE);
+      for (let tx = txStart; tx <= txEnd; tx++) {
+        for (let ty = tyStart; ty <= tyEnd; ty++) {
+          if (ty < 0 || ty >= maxT) continue;
+          const wx = ((tx % maxT) + maxT) % maxT;
+          const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+          const img = tileCache.current[url];
+          if (!img?.complete || !img.naturalWidth) continue;
+          ctx.drawImage(img, tx * TILE - left, ty * TILE - top, TILE, TILE);
+        }
       }
-    });
+      // Slight dark overlay for contrast with the accent viewport rect
+      ctx.fillStyle = "rgba(15,17,23,0.25)";
+      ctx.fillRect(0, 0, mmW, mmH);
 
-    const vx = (-offset.x / zoom + 2000) * s;
-    const vy = (-offset.y / zoom + 1500) * s;
-    const vw = (canvasSize.w / zoom) * s;
-    const vh = (canvasSize.h / zoom) * s;
-    ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
-    ctx.strokeRect(vx, vy, vw, vh);
-  }, [objects, canvasSize, zoom, offset]);
+      // ── Viewport rect ───────────────────────────────────────────────────
+      // mapCenter tracks the geographic center of the canvas view (updated on pan),
+      // so the viewport is always centred in the minimap.
+      const vpScale = Math.pow(2, ovZoom - mapCenter.zoom);
+      const vw = Math.max(2, Math.min(mmW, canvasSize.w * vpScale));
+      const vh = Math.max(2, Math.min(mmH, canvasSize.h * vpScale));
+      ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1.5;
+      ctx.strokeRect(mmW / 2 - vw / 2, mmH / 2 - vh / 2, vw, vh);
+    } else {
+      // ── No map: draw canvas objects on a fixed world grid ───────────────
+      const worldW = 4000, worldH = 3000;
+      const s = Math.min(mmW / worldW, mmH / worldH);
+      objects.forEach((obj) => {
+        if (obj.type === "road") {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.x1 + 2000) * s, (obj.y1 + 1500) * s);
+          ctx.lineTo((obj.x2 + 2000) * s, (obj.y2 + 1500) * s);
+          ctx.stroke();
+        } else if (obj.type === "polyline_road" && obj.points?.length >= 2) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          obj.points.forEach((p, i) => {
+            const mx = (p.x + 2000) * s, my = (p.y + 1500) * s;
+            if (i === 0) { ctx.moveTo(mx, my); } else { ctx.lineTo(mx, my); }
+          });
+          ctx.stroke();
+        } else if (obj.type === "curve_road" && obj.points?.length === 3) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
+          ctx.quadraticCurveTo(
+            (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
+            (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s
+          );
+          ctx.stroke();
+        } else if (obj.type === "cubic_bezier_road" && obj.points?.length === 4) {
+          ctx.strokeStyle = COLORS.road; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo((obj.points[0].x + 2000) * s, (obj.points[0].y + 1500) * s);
+          ctx.bezierCurveTo(
+            (obj.points[1].x + 2000) * s, (obj.points[1].y + 1500) * s,
+            (obj.points[2].x + 2000) * s, (obj.points[2].y + 1500) * s,
+            (obj.points[3].x + 2000) * s, (obj.points[3].y + 1500) * s,
+          );
+          ctx.stroke();
+        } else if (isPointObject(obj)) {
+          ctx.fillStyle = COLORS.accent;
+          ctx.fillRect((obj.x + 2000) * s - 1, (obj.y + 1500) * s - 1, 3, 3);
+        }
+      });
+      // Viewport rect — clamped so it never escapes the minimap bounds
+      const vx = (-offset.x / zoom + 2000) * s;
+      const vy = (-offset.y / zoom + 1500) * s;
+      const vw = Math.min((canvasSize.w / zoom) * s, mmW);
+      const vh = Math.min((canvasSize.h / zoom) * s, mmH);
+      ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1;
+      ctx.strokeRect(Math.max(0, vx), Math.max(0, vy), Math.min(vw, mmW - Math.max(0, vx)), Math.min(vh, mmH - Math.max(0, vy)));
+    }
+  }, [objects, canvasSize, zoom, offset, mapCenter, ovZoom, tileTick]);
 
   return (
     <canvas ref={ref} width={mmW} height={mmH}
@@ -1431,6 +1730,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
   const [roadDrawMode, setRoadDrawMode] = useState("straight");
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
   const [curvePoints, setCurvePoints] = useState<Point[]>([]);
+  const [cubicPoints, setCubicPoints] = useState<Point[]>([]);
   const [snapIndicator, setSnapIndicator] = useState<Point | null>(null);
   const [signSubTab, setSignSubTab] = useState("library");
   const [customSigns, setCustomSigns] = useState<SignData[]>(() => {
@@ -1489,12 +1789,12 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     return () => ro.disconnect();
   }, []);
 
-  // Clear poly/curve in-progress when tool or draw mode changes
+  // Clear poly/curve/cubic in-progress when tool or draw mode changes
   useEffect(() => {
-    if (tool !== "road") { setPolyPoints([]); setCurvePoints([]); }
+    if (tool !== "road") { setPolyPoints([]); setCurvePoints([]); setCubicPoints([]); }
   }, [tool]);
   useEffect(() => {
-    setPolyPoints([]); setCurvePoints([]);
+    setPolyPoints([]); setCurvePoints([]); setCubicPoints([]);
   }, [roadDrawMode]);
 
   // Sync custom signs to localStorage
@@ -1549,6 +1849,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     setTool(newTool);
     setPolyPoints([]);
     setCurvePoints([]);
+    setCubicPoints([]);
   }, []);
 
   const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest") => {
@@ -1602,7 +1903,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       }
 
       if (key === "ESCAPE") {
-        setPolyPoints([]); setCurvePoints([]); setDrawStart(null); return;
+        setPolyPoints([]); setCurvePoints([]); setCubicPoints([]); setDrawStart(null); return;
       }
 
       if (key === "ENTER") {
@@ -1677,6 +1978,10 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
         const sampledPts = sampleBezier(o.points[0], o.points[1], o.points[2], 20);
         if (distToPolyline(wx, wy, sampledPts) < effectiveHalfWidth(o)) return o;
       }
+      if (o.type === "cubic_bezier_road" && o.points?.length === 4) {
+        const sampledPts = sampleCubicBezier(o.points[0], o.points[1], o.points[2], o.points[3], 20);
+        if (distToPolyline(wx, wy, sampledPts) < effectiveHalfWidth(o)) return o;
+      }
     }
     return null;
   }, [objects, mapCenter]);
@@ -1696,6 +2001,25 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     }
 
     if (tool === "select") {
+      // Check if click is near a handle of the currently selected cubic bezier road
+      if (selected) {
+        const selObj = objects.find((o) => o.id === selected);
+        if (selObj?.type === "cubic_bezier_road") {
+          const handleRadius = Math.min(10 / zoom, 20);
+          for (let i = 0; i < selObj.points.length; i++) {
+            const p = selObj.points[i];
+            if (dist(raw.x, raw.y, p.x, p.y) < handleRadius) {
+              setDrawStart({
+                x: raw.x, y: raw.y,
+                id: selObj.id,
+                handleIndex: i,
+                origPoints: selObj.points.map((pt) => ({ ...pt })),
+              });
+              return;
+            }
+          }
+        }
+      }
       const hit = hitTest(raw.x, raw.y);
       setSelected(hit ? hit.id : null);
       if (hit) {
@@ -1704,7 +2028,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           ox: isPointObject(hit) ? hit.x : isLineObject(hit) ? hit.x1 : 0,
           oy: isPointObject(hit) ? hit.y : isLineObject(hit) ? hit.y1 : 0,
           id: hit.id,
-          origPoints: (hit.type === "polyline_road" || hit.type === "curve_road") ? hit.points.map((p) => ({ ...p })) : null,
+          origPoints: isMultiPointRoad(hit) ? hit.points.map((p) => ({ ...p })) : null,
         });
       }
       return;
@@ -1785,12 +2109,24 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
         }
         return;
       }
+
+      if (roadDrawMode === "cubic") {
+        const newCubicPts = [...cubicPoints, { x, y }];
+        if (newCubicPts.length === 4) {
+          const newRoad: CubicBezierRoadObject = { id: uid(), type: "cubic_bezier_road", points: newCubicPts as [Point, Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
+          const newObjs = [...objects, newRoad];
+          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
+        } else {
+          setCubicPoints(newCubicPts);
+        }
+        return;
+      }
     }
 
     if (["zone", "arrow", "measure"].includes(tool)) {
       setDrawStart({ x: raw.x, y: raw.y });
     }
-  }, [tool, roadDrawMode, toWorld, trySnap, hitTest, offset, objects, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, pushHistory, zoom]);
+  }, [tool, roadDrawMode, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     const raw = toWorld();
@@ -1805,7 +2141,20 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
 
     if (isPanning && panStart) {
       const pos = stageRef.current?.getPointerPosition();
-      if (pos) setOffset({ x: pos.x - panStart.x, y: pos.y - panStart.y });
+      if (pos) {
+        const newOffset = { x: pos.x - panStart.x, y: pos.y - panStart.y };
+        const dox = newOffset.x - offset.x;
+        const doy = newOffset.y - offset.y;
+        setOffset(newOffset);
+        // Shift map tiles to follow the pan. Tiles live in screen space (Layer 1,
+        // no Konva transform), so 1 screen pixel == 1 tile pixel: shift mapCenter
+        // by (-dox, -doy) in tile pixel space and convert back to lat/lon.
+        if (mapCenter) {
+          const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, mapCenter.zoom);
+          const { lat: newLat, lon: newLon } = pixelToLatLon(cx - dox, cy - doy, mapCenter.zoom);
+          setMapCenter({ lat: newLat, lon: newLon, zoom: mapCenter.zoom });
+        }
+      }
       return;
     }
 
@@ -1813,6 +2162,17 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
       setObjects((prev) => prev.map((o) => {
         if (o.id !== drawStart.id) return o;
+        if (o.type === "cubic_bezier_road" && drawStart.origPoints) {
+          if (drawStart.handleIndex != null) {
+            // Drag a single handle
+            const newPoints = drawStart.origPoints.map((p, i) =>
+              i === drawStart.handleIndex ? { x: p.x + dx, y: p.y + dy } : { ...p }
+            ) as [Point, Point, Point, Point];
+            return { ...o, points: newPoints };
+          }
+          // Drag whole object
+          return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point, Point] };
+        }
         if ((o.type === "polyline_road" || o.type === "curve_road") && drawStart.origPoints) {
           return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
         }
@@ -1826,7 +2186,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
         return o;
       }));
     }
-  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom]);
+  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom, offset, mapCenter, setMapCenter]);
 
   const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (isPanning) { setIsPanning(false); setPanStart(null); return; }
@@ -1889,6 +2249,22 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
   const deleteObject = (id: string) => {
     const newObjs = objects.filter((o) => o.id !== id);
     setObjects(newObjs); pushHistory(newObjs); setSelected(null);
+  };
+
+  const reorderObject = (id: string, dir: "front" | "forward" | "backward" | "back") => {
+    const idx = objects.findIndex(o => o.id === id);
+    if (idx === -1) return;
+    // Short-circuit no-ops so we don't clone or push redundant history entries
+    if ((dir === "front" || dir === "forward") && idx === objects.length - 1) return;
+    if ((dir === "back"  || dir === "backward") && idx === 0) return;
+    const next = [...objects];
+    const [obj] = next.splice(idx, 1);
+    if (dir === "front")         next.push(obj);
+    else if (dir === "back")     next.unshift(obj);
+    else if (dir === "forward")  next.splice(idx + 1, 0, obj);
+    else                         next.splice(idx - 1, 0, obj);
+    setObjects(next);
+    pushHistory(next);
   };
 
   const clearAll = () => {
@@ -2043,6 +2419,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
 
   const polyInProgress = tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length > 0;
   const curveInProgress = tool === "road" && roadDrawMode === "curve" && curvePoints.length > 0;
+  const cubicInProgress = tool === "road" && roadDrawMode === "cubic" && cubicPoints.length > 0;
 
   // suppress mapRenderTick lint warning — used to trigger re-render when tiles load
   void mapRenderTick;
@@ -2173,7 +2550,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                 <div style={{ fontSize: 11, color: COLORS.textMuted }}>{objects.length} objects on canvas</div>
 
                 {sectionTitle("Mini Map")}
-                <MiniMap objects={objects} canvasSize={canvasSize} zoom={zoom} offset={offset} />
+                <MiniMap objects={objects} canvasSize={canvasSize} zoom={zoom} offset={offset} mapCenter={mapCenter} />
               </>
             )}
 
@@ -2287,7 +2664,8 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                     { id: "straight", label: "Straight", icon: "━" },
                     { id: "poly",     label: "Polyline", icon: "⌇" },
                     { id: "smooth",   label: "Smooth",   icon: "∿" },
-                    { id: "curve",    label: "Curve",    icon: "⌒" },
+                    { id: "curve",    label: "Quad",     icon: "⌒" },
+                    { id: "cubic",    label: "Cubic",    icon: "⌣" },
                   ].map((mode) => (
                     <button key={mode.id}
                       onClick={() => { setRoadDrawMode(mode.id); switchTool("road"); }}
@@ -2322,6 +2700,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                     {roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
                     {roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
                     {roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
+                    {roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
                   </div>
                 </div>
               </>
@@ -2374,12 +2753,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
               })}
             </Layer>
 
-            {/* Layer 3: Screen-space overlays — legend box, no world transform */}
-            <Layer>
-              <LegendBox objects={objects} canvasSize={canvasSize} visible={showLegend} />
-            </Layer>
-
-            {/* Layer 4: Drawing overlays — same world-space transform as Layer 2 */}
+            {/* Layer 3: Drawing overlays — same world-space transform as Layer 2 */}
             <Layer x={offset.x} y={offset.y} scaleX={zoom} scaleY={zoom}>
               <DrawingOverlays
                 tool={tool}
@@ -2389,11 +2763,13 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                 snapIndicator={snapIndicator}
                 polyPoints={polyPoints}
                 curvePoints={curvePoints}
+                cubicPoints={cubicPoints}
               />
             </Layer>
           </Stage>
 
           <NorthArrow visible={showNorthArrow} />
+          <LegendBox objects={objects} visible={showLegend} />
 
           {/* Status bar */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>
@@ -2410,7 +2786,12 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
               )}
               {curveInProgress && (
                 <span style={{ color: COLORS.info }}>
-                  Curve: {curvePoints.length === 1 ? "click control point" : "click end point"} · Esc cancel
+                  Quad: {curvePoints.length === 1 ? "click control point" : "click end point"} · Esc cancel
+                </span>
+              )}
+              {cubicInProgress && (
+                <span style={{ color: COLORS.info }}>
+                  Cubic: {cubicPoints.length === 1 ? "click cp1" : cubicPoints.length === 2 ? "click cp2" : "click end"} · Esc cancel
                 </span>
               )}
               <span data-testid="object-count">{objects.length} objects</span>
@@ -2444,7 +2825,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
-              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
               : <ManifestPanel objects={objects} />
             }
 
@@ -2458,7 +2839,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                   <div key={obj.id} onClick={() => setSelected(obj.id)}
                     style={{ padding: "5px 8px", borderRadius: 4, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, background: selected === obj.id ? COLORS.accentDim : "transparent", color: selected === obj.id ? COLORS.accent : COLORS.textMuted, border: selected === obj.id ? `1px solid rgba(245,158,11,0.2)` : "1px solid transparent" }}>
                     <span style={{ fontSize: 12 }}>
-                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : "📏"}
+                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : "📏"}
                     </span>
                     <span>
                       {obj.type === "sign" ? obj.signData.label :
@@ -2466,7 +2847,8 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                        obj.type === "text" ? `"${obj.text.slice(0, 12)}"` :
                        obj.type === "road" ? `${obj.roadType} road` :
                        obj.type === "polyline_road" ? `poly (${obj.points.length}pts)` :
-                       obj.type === "curve_road" ? "curve road" :
+                       obj.type === "curve_road" ? "quad road" :
+                       obj.type === "cubic_bezier_road" ? "cubic road" :
                        obj.type === "taper" ? `taper ${obj.speed}mph` :
                        obj.type}
                     </span>

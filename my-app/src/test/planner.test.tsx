@@ -474,3 +474,316 @@ describe('Auth props', () => {
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 })
+
+// ─── Position inputs ───────────────────────────────────────────────────────────
+describe('Position inputs', () => {
+  function placeSign() {
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+  }
+
+  it('renders X and Y inputs in properties panel when a sign is selected', () => {
+    setup()
+    placeSign()
+    const panel = screen.getByTestId('right-panel')
+    expect(within(panel).getByLabelText('X')).toBeInTheDocument()
+    expect(within(panel).getByLabelText('Y')).toBeInTheDocument()
+  })
+
+  it('X and Y inputs have step="any" to allow fractional coordinates', () => {
+    setup()
+    placeSign()
+    const panel = screen.getByTestId('right-panel')
+    expect(within(panel).getByLabelText('X')).toHaveAttribute('step', 'any')
+    expect(within(panel).getByLabelText('Y')).toHaveAttribute('step', 'any')
+  })
+
+  it('typing a valid number in the X input updates the displayed value', async () => {
+    const { user } = setup()
+    placeSign()
+    const xInput = within(screen.getByTestId('right-panel')).getByLabelText('X')
+    await user.clear(xInput)
+    await user.type(xInput, '42')
+    expect(xInput).toHaveValue(42)
+  })
+
+  it('clearing the X input (empty → NaN) does not crash or update the object', async () => {
+    const { user } = setup()
+    placeSign()
+    const panel = screen.getByTestId('right-panel')
+    const xInput = within(panel).getByLabelText('X')
+    await user.clear(xInput)
+    // Object must still exist — isFinite('') is false so update is skipped
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+})
+
+// ─── Z-order controls ─────────────────────────────────────────────────────────
+describe('Z-order controls', () => {
+  const AUTOSAVE_KEY = 'tcp_autosave'
+
+  function placeSign() {
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+  }
+
+  it('layer order buttons appear in properties panel when an object is selected', () => {
+    setup()
+    placeSign()
+    const panel = screen.getByTestId('right-panel')
+    expect(within(panel).getByRole('button', { name: 'Bring to Front' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Bring Forward' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Send Backward' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Send to Back' })).toBeInTheDocument()
+  })
+
+  it('z-order buttons have aria-label for screen-reader accessibility', () => {
+    setup()
+    placeSign()
+    const panel = screen.getByTestId('right-panel')
+    for (const label of ['Bring to Front', 'Bring Forward', 'Send Backward', 'Send to Back']) {
+      expect(within(panel).getByRole('button', { name: label })).toHaveAttribute('aria-label', label)
+    }
+  })
+
+  it('Bring to Front with one object is a no-op (object count unchanged, no crash)', async () => {
+    const { user } = setup()
+    placeSign()
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: 'Bring to Front' }))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('Send to Back with one object is a no-op (object count unchanged, no crash)', async () => {
+    const { user } = setup()
+    placeSign()
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: 'Send to Back' }))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('Send to Back reorders objects in autosave (top object moves to first position)', async () => {
+    const { user } = setup()
+    const canvas = screen.getByTestId('konva-stage')
+    // Place sign 1 then sign 2 — sign 2 ends up selected (top of stack, index 1)
+    placeSign()
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('2 objects')
+
+    const beforeSave = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) ?? 'null')
+    const beforeFirstId = beforeSave?.canvasState?.objects[0]?.id
+
+    // Send sign 2 to back → it should now be at index 0
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: 'Send to Back' }))
+
+    const afterSave = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) ?? 'null')
+    expect(afterSave?.canvasState?.objects).toHaveLength(2)
+    // The object that was first before should now be second
+    expect(afterSave?.canvasState?.objects[0]?.id).not.toBe(beforeFirstId)
+  })
+
+  it('reorder is undoable and restores the previous object order', async () => {
+    const { user } = setup()
+    const canvas = screen.getByTestId('konva-stage')
+    placeSign()
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('2 objects')
+
+    const beforeSave = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) ?? 'null')
+    const beforeOrder = beforeSave?.canvasState?.objects.map((o: { id: string }) => o.id)
+
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: 'Send to Back' }))
+    await user.click(screen.getByTestId('undo-button'))
+
+    const afterSave = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) ?? 'null')
+    const afterOrder = afterSave?.canvasState?.objects.map((o: { id: string }) => o.id)
+    expect(afterOrder).toEqual(beforeOrder)
+  })
+
+  it('no-op reorder does not add an extra undo step', async () => {
+    const { user } = setup()
+    placeSign()
+    // With 1 object, "Bring to Front" is a no-op — undo should still go to 0 objects
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: 'Bring to Front' }))
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+})
+
+// ─── Cubic Bézier road ────────────────────────────────────────────────────────
+describe('Cubic Bézier road', () => {
+  async function activateCubicMode(user: ReturnType<typeof userEvent.setup>) {
+    // Navigate to the Roads tab and click the Cubic mode button
+    await user.click(screen.getByRole('button', { name: /^roads$/i }))
+    await user.click(screen.getByRole('button', { name: /cubic/i }))
+  }
+
+  it('activating Cubic mode sets tool to ROAD (cubic)', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    expect(screen.getByTestId('object-count').closest('div')?.textContent).toContain('Tool: ROAD (cubic)')
+  })
+
+  it('4 canvas clicks place one cubic_bezier_road (object count 1)', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('3 clicks do not yet place an object', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('placing a cubic road shows Cubic Bézier Road in the properties panel', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(within(screen.getByTestId('right-panel')).getByText(/cubic bézier road/i)).toBeInTheDocument()
+  })
+
+  it('Escape mid-draw cancels without placing an object', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('Escape after three clicks cancels without placing an object', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)  // p0
+    fireEvent.mouseDown(canvas)  // cp1
+    fireEvent.mouseDown(canvas)  // cp2
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('placed cubic road is undoable', async () => {
+    const { user } = setup()
+    await activateCubicMode(user)
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+})
+
+// ─── Legend Box ───────────────────────────────────────────────────────────────
+describe('Legend Box', () => {
+  it('is not shown when canvas is empty', () => {
+    setup()
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
+
+  it('appears after placing a sign', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+  })
+
+  it('shows count of 1 after placing one sign', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('1')
+  })
+
+  it('updates count to 2 after placing a second identical sign', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('2')
+  })
+
+  it('disappears after deleting the only object', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Delete' })
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
+
+  it('toggle checkbox hides the legend box', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    await user.click(screen.getByTestId('legend-toggle'))
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
+
+  it('toggle checkbox shows the legend box again', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(screen.getByTestId('legend-toggle'))
+    await user.click(screen.getByTestId('legend-toggle'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+  })
+
+  it('does not appear after placing a taper (non-sign, non-device object)', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('appears after placing a device and shows count of 1', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('1')
+  })
+
+  it('increments device count when placing the same device twice', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'D' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts[0]).toHaveTextContent('2')
+  })
+
+  it('shows separate entries for a sign and a device', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const counts = screen.getAllByTestId('legend-count')
+    expect(counts).toHaveLength(2)
+    expect(counts[0]).toHaveTextContent('1')
+    expect(counts[1]).toHaveTextContent('1')
+  })
+})

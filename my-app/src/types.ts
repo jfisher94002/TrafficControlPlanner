@@ -75,6 +75,16 @@ export interface CurveRoadObject {
   roadType: string;
 }
 
+export interface CubicBezierRoadObject {
+  id: string;
+  type: 'cubic_bezier_road';
+  points: [Point, Point, Point, Point]; // [p0=start, cp1, cp2, p3=end]
+  width: number;
+  realWidth: number;
+  lanes: number;
+  roadType: string;
+}
+
 export interface SignObject {
   id: string;
   type: 'sign';
@@ -150,6 +160,7 @@ export type CanvasObject =
   | StraightRoadObject
   | PolylineRoadObject
   | CurveRoadObject
+  | CubicBezierRoadObject
   | SignObject
   | DeviceObject
   | ZoneObject
@@ -186,6 +197,7 @@ export interface DrawStart {
   oy?: number;
   id?: string;
   origPoints?: Point[] | null;
+  handleIndex?: number | null; // index of the handle being dragged (cubic bezier only)
 }
 
 export interface PanStart {

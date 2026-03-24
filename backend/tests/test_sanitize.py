@@ -3,8 +3,10 @@ from sanitize import sanitize_text
 
 
 def test_strips_script_tags():
-    assert "<script>" not in sanitize_text("<script>alert(1)</script>Hello")
-    assert "Hello" in sanitize_text("<script>alert(1)</script>Hello")
+    sanitized = sanitize_text("<script>alert(1)</script>Hello")
+    assert "<script>" not in sanitized
+    assert "</script>" not in sanitized
+    assert "Hello" in sanitized
 
 
 def test_strips_generic_html_tags():

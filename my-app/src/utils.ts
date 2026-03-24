@@ -1,7 +1,7 @@
 import type {
   CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
   SignObject, DeviceObject, ZoneObject, TextObject, TaperObject,
-  StraightRoadObject, ArrowObject, MeasureObject,
+  StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject,
 } from './types'
 
 // ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
@@ -19,7 +19,8 @@ export function cloneObject(obj: CanvasObject, dx = 20, dy = 20): CanvasObject {
   if (isPointObject(clone)) return { ...clone, id: newId, x: clone.x + dx, y: clone.y + dy }
   if (isLineObject(clone))  return { ...clone, id: newId, x1: clone.x1 + dx, y1: clone.y1 + dy, x2: clone.x2 + dx, y2: clone.y2 + dy }
   if (clone.type === 'polyline_road') return { ...clone, id: newId, points: clone.points.map(p => ({ x: p.x + dx, y: p.y + dy })) }
-  if (clone.type === 'curve_road')    return { ...clone, id: newId, points: clone.points.map(p => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point] }
+  if (clone.type === 'curve_road')         return { ...clone, id: newId, points: clone.points.map(p => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point] }
+  if (clone.type === 'cubic_bezier_road')  return { ...clone, id: newId, points: clone.points.map(p => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point, Point] }
   // Fallback: all current CanvasObject variants are handled above; this branch
   // exists only for forward-compatibility if new variants are added.
   return { ...(clone as Record<string, unknown>), id: newId } as CanvasObject
@@ -38,6 +39,18 @@ export const isLineObject = (
   o: CanvasObject,
 ): o is StraightRoadObject | ArrowObject | MeasureObject =>
   o.type === 'road' || o.type === 'arrow' || o.type === 'measure'
+
+/** Any road type (straight, polyline, curve, cubic). */
+export const isRoad = (
+  o: CanvasObject,
+): o is StraightRoadObject | PolylineRoadObject | CurveRoadObject | CubicBezierRoadObject =>
+  o.type === 'road' || o.type === 'polyline_road' || o.type === 'curve_road' || o.type === 'cubic_bezier_road'
+
+/** Roads defined by a points array (polyline, curve, cubic). */
+export const isMultiPointRoad = (
+  o: CanvasObject,
+): o is PolylineRoadObject | CurveRoadObject | CubicBezierRoadObject =>
+  o.type === 'polyline_road' || o.type === 'curve_road' || o.type === 'cubic_bezier_road'
 
 /**
  * MUTCD taper length formula.
@@ -96,7 +109,7 @@ export function snapToEndpoint(
       }
     }
     if (
-      (obj.type === 'polyline_road' || obj.type === 'curve_road') &&
+      (obj.type === 'polyline_road' || obj.type === 'curve_road' || obj.type === 'cubic_bezier_road') &&
       obj.points?.length
     ) {
       const eps = [obj.points[0], obj.points[obj.points.length - 1]]
@@ -106,6 +119,19 @@ export function snapToEndpoint(
     }
   }
   return { x: wx, y: wy, snapped: false }
+}
+
+export function sampleCubicBezier(p0: Point, p1: Point, p2: Point, p3: Point, n: number): Point[] {
+  if (n <= 0) return [{ ...p0 }, { ...p3 }]
+  const pts: Point[] = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, mt = 1 - t
+    pts.push({
+      x: mt**3 * p0.x + 3*mt**2*t * p1.x + 3*mt*t**2 * p2.x + t**3 * p3.x,
+      y: mt**3 * p0.y + 3*mt**2*t * p1.y + 3*mt*t**2 * p2.y + t**3 * p3.y,
+    })
+  }
+  return pts
 }
 
 export function sampleBezier(p0: Point, p1: Point, p2: Point, n: number): Point[] {

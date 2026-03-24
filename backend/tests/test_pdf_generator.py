@@ -5,7 +5,7 @@ import pytest
 from PIL import Image
 
 from models import ExportRequest, SignData
-from pdf_generator import build_pdf, _unique_signs
+from pdf_generator import build_pdf, _sign_counts
 from sign_renderer import draw_sign_icon
 
 
@@ -33,15 +33,15 @@ def test_build_pdf_with_canvas_image(sample_plan):
 
 def test_legend_deduplication(sample_plan):
     request = ExportRequest(**sample_plan)
-    unique = _unique_signs(request)
-    ids = [s.id for s in unique]
+    counts = _sign_counts(request)
+    ids = [s.id for s, _ in counts]
     assert len(ids) == len(set(ids)), "Duplicate sign IDs in legend"
 
 
 def test_legend_empty_when_no_signs(plan_no_signs):
     request = ExportRequest(**plan_no_signs)
-    unique = _unique_signs(request)
-    assert unique == []
+    counts = _sign_counts(request)
+    assert counts == []
     pdf = build_pdf(request)
     assert pdf[:4] == b"%PDF"
 

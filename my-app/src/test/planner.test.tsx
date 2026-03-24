@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
 import { stageStub, mockCanvas } from './konva-stub'
+import * as planStorage from '../planStorage'
 
 beforeEach(() => {
   localStorage.clear()
@@ -839,5 +840,98 @@ describe('Legend Box', () => {
     expect(counts).toHaveLength(2)
     expect(counts[0]).toHaveTextContent('1')
     expect(counts[1]).toHaveTextContent('1')
+  })
+})
+
+// ─── Cloud Save / Load ────────────────────────────────────────────────────────
+describe('Cloud Save / Load', () => {
+  it('☁ Save button is absent when no userId prop is given', () => {
+    render(<TrafficControlPlanner />)
+    expect(screen.queryByTestId('cloud-save-button')).not.toBeInTheDocument()
+  })
+
+  it('☁ Plans button is absent when no userId prop is given', () => {
+    render(<TrafficControlPlanner />)
+    expect(screen.queryByTestId('cloud-plans-button')).not.toBeInTheDocument()
+  })
+
+  it('☁ Save button is present when userId is provided', () => {
+    render(<TrafficControlPlanner userId="user-123" />)
+    expect(screen.getByTestId('cloud-save-button')).toBeInTheDocument()
+  })
+
+  it('☁ Plans button is present when userId is provided', () => {
+    render(<TrafficControlPlanner userId="user-123" />)
+    expect(screen.getByTestId('cloud-plans-button')).toBeInTheDocument()
+  })
+
+  it('clicking ☁ Save calls savePlanToCloud with correct userId and payload shape', async () => {
+    const saveSpy = vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledTimes(1)
+      const [userId, planId, payload] = saveSpy.mock.calls[0] as [string, string, Record<string, unknown>]
+      expect(userId).toBe('user-abc')
+      expect(typeof planId).toBe('string')
+      expect(planId.length).toBeGreaterThan(0)
+      expect(payload).toMatchObject({ id: planId, userId: 'user-abc' })
+      expect(payload.canvasState).toBeDefined()
+      expect(Array.isArray((payload.canvasState as { objects: unknown[] }).objects)).toBe(true)
+    })
+  })
+
+  it('shows "Saved ✓" in button after successful save', async () => {
+    vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+  })
+
+  it('shows error message in button when save fails', async () => {
+    vi.spyOn(planStorage, 'savePlanToCloud').mockRejectedValue(new Error('Network error'))
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Network error')
+    )
+  })
+
+  it('clears save status after 3 seconds', async () => {
+    vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+    let clearCallback: (() => void) | undefined
+    const origSetTimeout = globalThis.setTimeout
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: TimerHandler, delay?: number) => {
+      if (typeof fn === 'function' && delay === 3000) { clearCallback = fn as () => void; return 0 as unknown as ReturnType<typeof setTimeout> }
+      return origSetTimeout(fn, delay)
+    })
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+    act(() => { clearCallback?.() })
+    expect(screen.getByTestId('cloud-save-button')).not.toHaveTextContent('Saved ✓')
+  })
+
+  it('clicking ☁ Plans opens the plan dashboard', async () => {
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    expect(screen.getByTestId('plan-dashboard')).toBeInTheDocument()
+  })
+
+  it('closing the dashboard hides it', async () => {
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    await user.click(screen.getByTestId('dashboard-close'))
+    expect(screen.queryByTestId('plan-dashboard')).not.toBeInTheDocument()
   })
 })

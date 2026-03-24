@@ -93,6 +93,16 @@ def test_pdf_html_tags_stripped_from_name(sample_plan):
     assert res.content[:4] == b"%PDF"
 
 
+def test_pdf_name_empty_after_sanitization_uses_fallback_filename(sample_plan):
+    # Tags-only name: sanitize_text strips tags, leaving an empty string → fallback "plan"
+    sample_plan["name"] = "<b></b>"
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+    assert res.content[:4] == b"%PDF"
+    cd = res.headers.get("content-disposition", "")
+    assert 'filename="plan.pdf"' in cd
+
+
 def test_pdf_control_chars_stripped_from_name(sample_plan):
     sample_plan["name"] = "Plan\x00\x01\x1f Name"
     res = client.post("/export-pdf", json=sample_plan)
@@ -225,6 +235,29 @@ def test_pdf_sanitize_plan_meta_fields():
     assert "Client" in meta.client
     assert "Main St" in meta.location
     assert "Note" in meta.notes
+
+
+def test_pdf_sanitize_sign_data_label():
+    from models import SignData
+    sign = SignData(
+        id="s1", label="<b>STOP</b>\x00<script>x</script>",
+        shape="octagon", color="#ef4444", textColor="#fff",
+    )
+    assert "<" not in sign.label
+    assert ">" not in sign.label
+    assert "\x00" not in sign.label
+    assert "STOP" in sign.label
+
+
+def test_pdf_sign_data_label_too_long_rejected():
+    import pytest
+    from pydantic import ValidationError
+    from models import SignData
+    with pytest.raises(ValidationError):
+        SignData(
+            id="s1", label="L" * 51,
+            shape="octagon", color="#ef4444", textColor="#fff",
+        )
 
 
 def test_pdf_sanitize_export_request_name():

@@ -965,7 +965,7 @@ function LegendBox({ objects, canvasSize, visible }: LegendBoxProps) {
   const rows: Array<{ icon: string; label: string; count: number }> = [
     ...Object.entries(signCounts).map(([label, count]) => ({ icon: '⬡', label, count })),
     ...Object.entries(deviceCounts).map(([label, count]) => ({ icon: '▲', label, count })),
-  ];
+  ].sort((a, b) => a.icon === b.icon ? a.label.localeCompare(b.label) : a.icon.localeCompare(b.icon));
   if (rows.length === 0) return null;
 
   const titleH = 18;
@@ -1508,6 +1508,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
         id: planId, name: planTitle, createdAt: planCreatedAt,
         updatedAt: new Date().toISOString(),
+        userId: userId,
         canvasOffset: offset, canvasZoom: zoom,
         canvasState: { objects }, metadata: planMeta,
       }));

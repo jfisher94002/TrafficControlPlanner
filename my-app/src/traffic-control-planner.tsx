@@ -1374,7 +1374,12 @@ function MiniMap({ objects, canvasSize, zoom, offset }: MiniMapProps) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-export default function TrafficControlPlanner() {
+interface PlannerProps {
+  userId?: string | null;
+  onSignOut?: () => void;
+}
+
+export default function TrafficControlPlanner({ userId = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1921,7 +1926,7 @@ export default function TrafficControlPlanner() {
       name: planTitle,
       createdAt: planCreatedAt,
       updatedAt: new Date().toISOString(),
-      userId: null,
+      userId: userId,
       mapCenter: mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lon, zoom: mapCenter.zoom } : null,
       canvasOffset: offset,
       canvasZoom: zoom,
@@ -1957,7 +1962,7 @@ export default function TrafficControlPlanner() {
       name: planTitle,
       createdAt: planCreatedAt,
       updatedAt: new Date().toISOString(),
-      userId: null,
+      userId: userId,
       mapCenter: mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lon, zoom: mapCenter.zoom } : null,
       canvasOffset: offset,
       canvasZoom: zoom,
@@ -2063,6 +2068,9 @@ export default function TrafficControlPlanner() {
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
+          {onSignOut && (
+            <button onClick={onSignOut} data-testid="sign-out-button" style={{ ...panelBtnStyle(false), marginLeft: "auto" }} title={`Signed in as ${userId ?? 'unknown'}`}>Sign Out</button>
+          )}
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
           <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />

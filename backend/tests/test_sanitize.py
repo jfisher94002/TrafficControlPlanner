@@ -54,3 +54,19 @@ def test_noop_on_empty_string():
 def test_preserves_angle_brackets_without_closing():
     # "1 < 5" has no closing ">", so it's not a tag and should survive
     assert "1 < 5" in sanitize_text("value: 1 < 5")
+
+
+def test_idempotent():
+    dirty = "<b>hello</b> & <script>evil</script>\x00"
+    once = sanitize_text(dirty)
+    twice = sanitize_text(once)
+    assert once == twice
+
+
+def test_very_long_input_with_tags():
+    # Tens of thousands of chars including tags and control chars should not crash
+    chunk = "<div>text\x00</div>" * 3000  # ~54 000 chars
+    result = sanitize_text(chunk)
+    assert "<" not in result
+    assert "\x00" not in result
+    assert "text" in result

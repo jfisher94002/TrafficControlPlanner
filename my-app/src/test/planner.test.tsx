@@ -86,6 +86,27 @@ describe('Plan metadata', () => {
   })
 })
 
+// ─── Legend box ───────────────────────────────────────────────────────────────
+describe('Legend box', () => {
+  it('legend toggle checkbox is checked by default', () => {
+    setup()
+    expect(screen.getByTestId('legend-toggle')).toBeChecked()
+  })
+
+  it('unchecking legend toggle does not crash', async () => {
+    const { user } = setup()
+    await expect(user.click(screen.getByTestId('legend-toggle'))).resolves.not.toThrow()
+    expect(screen.getByTestId('legend-toggle')).not.toBeChecked()
+  })
+
+  it('legend toggle re-checks correctly', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('legend-toggle'))
+    await user.click(screen.getByTestId('legend-toggle'))
+    expect(screen.getByTestId('legend-toggle')).toBeChecked()
+  })
+})
+
 // ─── North arrow ──────────────────────────────────────────────────────────────
 describe('North arrow', () => {
   it('is visible by default and does not block canvas interactions', () => {
@@ -412,6 +433,45 @@ describe('localStorage auto-save', () => {
     const saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) ?? 'null')
     expect(saved?.name).toBe('Untitled Traffic Control Plan')
     expect(saved?.canvasState?.objects).toHaveLength(0)
+  })
+
+  it('autosave payload includes userId when provided', async () => {
+    const setItemSpy = vi.spyOn(window.localStorage, 'setItem')
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-42" />)
+    await user.type(screen.getByTestId('plan-title'), 'X')
+    const autosaveCalls = setItemSpy.mock.calls.filter(([k]) => k === AUTOSAVE_KEY)
+    expect(autosaveCalls.length).toBeGreaterThan(0)
+    const payload = JSON.parse(autosaveCalls[autosaveCalls.length - 1][1] as string)
+    expect(payload.userId).toBe('user-42')
+  })
+})
+
+// ─── Auth props (userId / onSignOut) ──────────────────────────────────────────
+describe('Auth props', () => {
+  it('sign-out button is not rendered when onSignOut is not provided', () => {
+    render(<TrafficControlPlanner userId={null} />)
+    expect(screen.queryByTestId('sign-out-button')).not.toBeInTheDocument()
+  })
+
+  it('sign-out button is rendered when onSignOut is provided', () => {
+    const onSignOut = vi.fn()
+    render(<TrafficControlPlanner userId="user-abc" onSignOut={onSignOut} />)
+    expect(screen.getByTestId('sign-out-button')).toBeInTheDocument()
+  })
+
+  it('sign-out button title includes the userId', () => {
+    render(<TrafficControlPlanner userId="alice@example.com" onSignOut={vi.fn()} />)
+    const btn = screen.getByTestId('sign-out-button')
+    expect(btn.title).toContain('alice@example.com')
+  })
+
+  it('clicking sign-out button calls onSignOut', async () => {
+    const onSignOut = vi.fn()
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" onSignOut={onSignOut} />)
+    await user.click(screen.getByTestId('sign-out-button'))
+    expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 })
 

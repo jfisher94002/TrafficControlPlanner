@@ -68,7 +68,7 @@ CanvasObject = Union[SignObject, DeviceObject, OtherCanvasObject]
 # ─── PLAN STRUCTURE ───────────────────────────────────────────────────────────
 
 class CanvasState(BaseModel):
-    objects: list[CanvasObject] = Field(..., max_length=1000)
+    objects: list[CanvasObject] = Field(default_factory=list, max_length=1000)
 
 
 class PlanMeta(BaseModel):

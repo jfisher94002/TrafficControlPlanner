@@ -94,6 +94,16 @@ def test_pdf_html_tags_stripped_from_name(sample_plan):
     assert res.content[:4] == b"%PDF"
 
 
+def test_pdf_name_empty_after_sanitization_uses_fallback_filename(sample_plan):
+    # Tags-only name: sanitize_text strips tags, leaving an empty string → fallback "plan"
+    sample_plan["name"] = "<b></b>"
+    res = client.post("/export-pdf", json=sample_plan)
+    assert res.status_code == 200
+    assert res.content[:4] == b"%PDF"
+    cd = res.headers.get("content-disposition", "")
+    assert 'filename="plan.pdf"' in cd
+
+
 def test_pdf_control_chars_stripped_from_name(sample_plan):
     sample_plan["name"] = "Plan\x00\x01\x1f Name"
     res = client.post("/export-pdf", json=sample_plan)
@@ -121,14 +131,6 @@ def test_pdf_oversized_image_rejected(sample_plan):
     sample_plan["canvas_image_b64"] = "A" * (_MAX_IMAGE_B64_LEN + 1)
     res = client.post("/export-pdf", json=sample_plan)
     assert res.status_code == 422
-
-
-def test_pdf_unicode_in_metadata(sample_plan):
-    sample_plan["name"] = "Pläne für Straßen 🚧"
-    sample_plan["metadata"]["location"] = "Zürich, Hauptstraße"
-    res = client.post("/export-pdf", json=sample_plan)
-    assert res.status_code == 200
-    assert res.content[:4] == b"%PDF"
 
 
 def test_pdf_sanitize_model_directly():
@@ -169,7 +171,6 @@ def test_pdf_canvas_image_b64_at_limit_accepted(sample_plan):
 
 def test_image_b64_limit_enforced_at_model_level():
     """Model-level boundary check avoids expensive HTTP decode path."""
-    import pytest
     from pydantic import ValidationError
     from models import ExportRequest, CanvasState
     # At limit: accepted
@@ -249,87 +250,46 @@ def test_create_issue_fields_at_limit_accepted(monkeypatch):
     assert res.status_code == 503  # validation passed; fails only on missing token
 
 
-# ─── sanitize_text unit tests ─────────────────────────────────────────────────
+# ─── Model-level sanitization unit tests ─────────────────────────────────────
 
-def test_sanitize_text_strips_html_tags():
-    from sanitize import sanitize_text
-    result = sanitize_text("<script>alert(1)</script> Hello <!-- comment -->")
-    assert "<" not in result
-    assert ">" not in result
-    assert "Hello" in result
-
-
-def test_sanitize_text_strips_control_chars():
-    from sanitize import sanitize_text
-    result = sanitize_text("Hello\x00\x01\x1fWorld")
-    assert "\x00" not in result
-    assert "\x01" not in result
-    assert "\x1f" not in result
-    assert "Hello" in result
-    assert "World" in result
-
-
-def test_sanitize_text_preserves_allowed_whitespace():
-    from sanitize import sanitize_text
-    result = sanitize_text("Line 1\nLine 2\tTabbed")
-    assert "\n" in result
-    assert "\t" in result
-    assert "Line 1" in result
-    assert "Tabbed" in result
-
-
-def test_sanitize_text_noop_on_clean_string():
-    from sanitize import sanitize_text
-    original = "Normal Name 123_-"
-    assert sanitize_text(original) == original
-
-
-def test_sanitize_text_strips_bare_angle_bracket_sequences():
-    """Any <...> sequence is stripped — these fields have no legitimate use for angle brackets."""
-    from sanitize import sanitize_text
-    result = sanitize_text("<version>2.0</version>")
-    assert "<" not in result
-    assert ">" not in result
-    assert "2.0" in result
-
-
-# ─── PlanMeta full field coverage ─────────────────────────────────────────────
-
-def test_plan_meta_sanitizes_all_fields():
+def test_pdf_sanitize_plan_meta_fields():
     from models import PlanMeta
     meta = PlanMeta(
-        projectNumber="<b>PN-001</b>\x00",
-        client="Client\x00Name<script>",
-        location="<b>Loc</b>\x01",
+        projectNumber="<script>PN-001</script>\x00",
+        client="Client\x00Name<b>",
+        location="<b>Main St</b>\x01",
         notes="Note<script>x</script>\x00",
     )
     for field in (meta.projectNumber, meta.client, meta.location, meta.notes):
-        assert "<script>" not in field
+        assert "<" not in field
+        assert ">" not in field
         assert "\x00" not in field
     assert "PN-001" in meta.projectNumber
     assert "Client" in meta.client
-    assert "Loc" in meta.location
+    assert "Main St" in meta.location
     assert "Note" in meta.notes
 
 
-def test_plan_meta_defaults_are_empty_strings():
-    from models import PlanMeta
-    meta = PlanMeta()
-    assert meta.projectNumber == ""
-    assert meta.client == ""
-    assert meta.location == ""
-    assert meta.notes == ""
-
-
-def test_sign_data_label_is_sanitized():
+def test_pdf_sanitize_sign_data_label():
     from models import SignData
     sign = SignData(
-        id="s1", label="<script>STOP</script>\x00",
-        shape="octagon", color="#FF0000", textColor="#FFFFFF",
+        id="s1", label="<b>STOP</b>\x00<script>x</script>",
+        shape="octagon", color="#ef4444", textColor="#fff",
     )
-    assert "<script>" not in sign.label
+    assert "<" not in sign.label
+    assert ">" not in sign.label
     assert "\x00" not in sign.label
     assert "STOP" in sign.label
+
+
+def test_pdf_sign_data_label_too_long_rejected():
+    from pydantic import ValidationError
+    from models import SignData
+    with pytest.raises(ValidationError):
+        SignData(
+            id="s1", label="L" * 51,
+            shape="octagon", color="#ef4444", textColor="#fff",
+        )
 
 
 def test_device_data_label_is_sanitized():

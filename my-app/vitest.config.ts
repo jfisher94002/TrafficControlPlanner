@@ -9,5 +9,6 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: { provider: 'v8', reporter: ['text', 'lcov'] },
+    env: { VITE_S3_BUCKET: 'test-bucket' },
   },
 })

@@ -11,7 +11,7 @@ import { uploadData, list, getUrl, remove } from 'aws-amplify/storage'
 export interface CloudPlanMeta {
   path: string
   planId: string
-  name: string        // derived from filename; overwritten by plan JSON when loaded
+  name: string        // derived from filename (planId); plan JSON title is not fetched at list time
   lastModified: string
   size: number
 }

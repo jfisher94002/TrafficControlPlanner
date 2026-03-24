@@ -1680,6 +1680,8 @@ interface PlannerProps {
   onSignOut?: () => void;
 }
 
+const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET);
+
 export default function TrafficControlPlanner({ userId = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -2328,7 +2330,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
         id: planId, name: planTitle, createdAt: planCreatedAt,
         updatedAt: new Date().toISOString(), userId,
         canvasState: { objects }, metadata: planMeta,
-        canvasOffset: offset, canvasZoom: zoom,
+        canvasOffset: offset, canvasZoom: zoom, mapCenter,
       };
       await savePlanToCloud(userId, planId, data);
       setCloudSaveStatus('Saved ✓');
@@ -2347,6 +2349,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     const newMeta = (data.metadata as PlanMeta | undefined) ?? { projectNumber: '', client: '', location: '', notes: '' };
     const newOffset = (data.canvasOffset as Point | undefined) ?? { x: 0, y: 0 };
     const newZoom = typeof data.canvasZoom === 'number' ? data.canvasZoom : 1;
+    const newMapCenter = (data.mapCenter as MapCenter | null | undefined) ?? null;
     setPlanId(newId);
     setPlanTitle(newTitle);
     setPlanCreatedAt(newCreatedAt);
@@ -2357,6 +2360,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     setSelected(null);
     setOffset(newOffset);
     setZoom(newZoom);
+    setMapCenter(newMapCenter);
     setShowDashboard(false);
   };
 
@@ -2490,7 +2494,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
-          {userId && (<>
+          {userId && CLOUD_ENABLED && (<>
             <button onClick={handleCloudSave} data-testid="cloud-save-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Save plan to cloud (S3)">☁ Save{cloudSaveStatus ? ` — ${cloudSaveStatus}` : ''}</button>
             <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
           </>)}
@@ -2913,7 +2917,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           </button>
         )}
       </div>
-      {showDashboard && userId && (
+      {showDashboard && userId && CLOUD_ENABLED && (
         <PlanDashboard
           userId={userId}
           onOpen={handleDashboardOpen}

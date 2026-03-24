@@ -72,6 +72,7 @@ export default function PlanDashboard({ userId, onOpen, onClose }: PlanDashboard
     setError(null)
     try {
       const data = await loadPlanFromCloud(plan.path)
+      setOpening(null)
       onOpen(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load plan')

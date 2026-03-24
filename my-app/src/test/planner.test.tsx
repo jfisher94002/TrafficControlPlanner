@@ -105,6 +105,49 @@ describe('Legend box', () => {
     await user.click(screen.getByTestId('legend-toggle'))
     expect(screen.getByTestId('legend-toggle')).toBeChecked()
   })
+
+  it('placing a sign shows its exact label in the legend', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const labels = screen.getAllByTestId('legend-item-label')
+    expect(labels.some(l => l.textContent === 'STOP')).toBe(true)
+  })
+
+  it('placing a device shows its exact label in the legend', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const labels = screen.getAllByTestId('legend-item-label')
+    expect(labels.some(l => l.textContent === 'Traffic Cone')).toBe(true)
+  })
+
+  it('legend count for the placed sign row shows the correct number', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    // Find the STOP label, then its sibling count in the same row
+    const stopLabel = screen.getAllByTestId('legend-item-label').find(l => l.textContent === 'STOP')!
+    const row = stopLabel.closest('div') as HTMLElement
+    expect(within(row).getByTestId('legend-count')).toHaveTextContent('3')
+  })
+
+  it('legend box is absent when canvas is empty', () => {
+    setup()
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
+
+  it('hiding toggle removes legend box from DOM', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('legend-box')).toBeInTheDocument()
+    await user.click(screen.getByTestId('legend-toggle'))
+    expect(screen.queryByTestId('legend-box')).not.toBeInTheDocument()
+  })
 })
 
 // ─── North arrow ──────────────────────────────────────────────────────────────
@@ -472,6 +515,17 @@ describe('Auth props', () => {
     render(<TrafficControlPlanner userId="user-abc" onSignOut={onSignOut} />)
     await user.click(screen.getByTestId('sign-out-button'))
     expect(onSignOut).toHaveBeenCalledTimes(1)
+  })
+
+  it('sign-out button appears after export buttons in the toolbar', () => {
+    render(<TrafficControlPlanner userId="user-abc" onSignOut={vi.fn()} />)
+    const toolbar = screen.getByTestId('toolbar')
+    const buttons = within(toolbar).getAllByRole('button')
+    const pngIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'export-png-button')
+    const pdfIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'export-pdf-button')
+    const signOutIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'sign-out-button')
+    expect(signOutIdx).toBeGreaterThan(pngIdx)
+    expect(signOutIdx).toBeGreaterThan(pdfIdx)
   })
 })
 

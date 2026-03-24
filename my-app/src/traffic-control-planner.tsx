@@ -1131,14 +1131,14 @@ function LegendBox({ objects, visible }: LegendBoxProps) {
       {signEntries.map(({ signData, count }) => (
         <div key={signData.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
           <SignIconSvg signData={signData} size={20} />
-          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{signData.label}</span>
+          <span data-testid="legend-item-label" style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{signData.label}</span>
           <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
         </div>
       ))}
       {deviceEntries.map(({ id, label, icon, count }) => (
         <div key={id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
           <span style={{ width: 20, textAlign: "center", fontSize: 13, flexShrink: 0 }} aria-hidden="true">{icon}</span>
-          <span style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          <span data-testid="legend-item-label" style={{ fontSize: 10, color: COLORS.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
           <span data-testid="legend-count" style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: COLORS.text, fontWeight: 600 }}>{count}</span>
         </div>
       ))}
@@ -2430,7 +2430,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
 
       {/* ─── TOP BAR ─── */}
       <div style={{ height: 48, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 20, color: COLORS.accent }}>◆</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, letterSpacing: 1 }}>TCP</span>
@@ -2446,13 +2446,13 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
-          {onSignOut && (
-            <button onClick={onSignOut} data-testid="sign-out-button" style={{ ...panelBtnStyle(false), marginLeft: "auto" }} title={`Signed in as ${userId ?? 'unknown'}`}>Sign Out</button>
-          )}
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
           <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
-          <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
+          <div style={{ flex: 1 }} />
           <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
+          {onSignOut && (
+            <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)} title={`Signed in as ${userId ?? 'unknown'}`}>Sign Out</button>
+          )}
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 

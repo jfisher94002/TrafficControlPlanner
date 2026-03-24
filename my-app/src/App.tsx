@@ -7,7 +7,8 @@ import awsExports from './aws-exports'
 Amplify.configure(awsExports)
 
 // If no Cognito User Pool is configured (local dev / CI), bypass auth entirely.
-const AUTH_ENABLED = Boolean(awsExports.aws_user_pools_id)
+// Both pool ID and client ID must be present — a partial config fails at runtime.
+const AUTH_ENABLED = Boolean(awsExports.aws_user_pools_id && awsExports.aws_user_pools_web_client_id)
 
 export default function App() {
   if (!AUTH_ENABLED) {

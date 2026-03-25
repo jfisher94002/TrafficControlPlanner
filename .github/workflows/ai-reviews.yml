@@ -56,6 +56,10 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$PROMPT")
 
+          echo "=== RAW RESPONSE (first 500 chars) ==="
+          echo "$RESPONSE" | head -c 500
+          echo ""
+
           REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "Gemini returned no content."')
           echo "review<<EOF" >> $GITHUB_OUTPUT
           echo "$REVIEW" >> $GITHUB_OUTPUT

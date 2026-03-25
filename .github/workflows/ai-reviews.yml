@@ -12,6 +12,8 @@ jobs:
                 runs-on: ubuntu-latest
                 steps:
                         - uses: actions/checkout@v4
+                          with:
+                                  fetch-depth: 0
                         - name: "Run Gemini Review"
                           uses: sshnaidm/gemini-code-review-action@v2
                           with:

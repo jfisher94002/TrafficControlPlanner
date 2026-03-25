@@ -56,6 +56,10 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$PROMPT")
 
+          echo "=== Available models ==="
+          curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" | jq -r '.models[].name' | head -20
+          echo ""
+
           echo "=== RAW RESPONSE (first 500 chars) ==="
           echo "$RESPONSE" | head -c 500
           echo ""

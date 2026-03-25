@@ -52,17 +52,9 @@ jobs:
           }')
 
           RESPONSE=$(curl -s \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=$GEMINI_API_KEY" \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
             -H "Content-Type: application/json" \
             -d "$PROMPT")
-
-          echo "=== Available models ==="
-          curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" | jq -r '.models[].name' | head -20
-          echo ""
-
-          echo "=== RAW RESPONSE (first 500 chars) ==="
-          echo "$RESPONSE" | head -c 500
-          echo ""
 
           REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "Gemini returned no content."')
           echo "review<<EOF" >> $GITHUB_OUTPUT

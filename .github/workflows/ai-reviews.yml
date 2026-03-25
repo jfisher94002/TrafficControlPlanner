@@ -15,19 +15,45 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: "Get PR diff"
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > /tmp/pr.diff
+          # Truncate to ~15 000 chars to stay within Gemini input limits
+          head -c 15000 /tmp/pr.diff > /tmp/pr_trimmed.diff
+          echo "diff_file=/tmp/pr_trimmed.diff" >> $GITHUB_OUTPUT
+
       - name: "Run Gemini Review"
-        uses: google-gemini/gemini-review-action@v1
-        with:
-          # Note: Use 'api-key' with a hyphen for the official action
-          api-key: ${{ secrets.GEMINI_API_KEY }}
-          model: "gemini-2.0-flash"
-          prompt: |
-            Act as a Senior Software Engineer and QA Manager.
-            Review the code for tcplanpro.com with a focus on:
-            - Objective analysis and technical accuracy.
-            - Identifying bugs, logic errors, or edge cases.
-            - Security issues (XSS, injection, exposed secrets).
-            - Non-idiomatic Python or performance bottlenecks.
-            - Ensuring clear logic without marketing style comments.
-            Be direct and concise. If the code is correct, say so briefly.
-            Only comment on things worth fixing — avoid nitpicks.
+        id: gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          DIFF=$(cat /tmp/pr_trimmed.diff | jq -Rs .)
+          PROMPT=$(jq -n --argjson diff "$DIFF" '{
+            contents: [{
+              parts: [{
+                text: ("Act as a Senior Software Engineer and QA Manager.\nReview the following code diff for tcplanpro.com with a focus on:\n- Objective analysis and technical accuracy.\n- Identifying bugs, logic errors, or edge cases.\n- Security issues (XSS, injection, exposed secrets).\n- Non-idiomatic Python or performance bottlenecks.\n- Ensuring clear logic without marketing-style comments.\nBe direct and concise. If the code is correct, say so briefly.\nOnly comment on things worth fixing — avoid nitpicks.\n\nDiff:\n" + $diff)
+              }]
+            }]
+          }')
+
+          RESPONSE=$(curl -s \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PROMPT")
+
+          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "Gemini returned no content."')
+          echo "review<<EOF" >> $GITHUB_OUTPUT
+          echo "$REVIEW" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: "Post review comment"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "## 🤖 Gemini Code Review
+
+          ${{ steps.gemini.outputs.review }}"

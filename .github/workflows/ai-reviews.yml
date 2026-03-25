@@ -2,6 +2,11 @@ name: "AI Code Review"
 on:
   pull_request:
     types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
 
 permissions:
   contents: read
@@ -53,7 +58,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} \
+          PR_NUM=${{ github.event.pull_request.number || inputs.pr_number }}
+          gh pr comment "$PR_NUM" \
             --body "## 🤖 Gemini Code Review
 
           ${{ steps.gemini.outputs.review }}"

@@ -1680,7 +1680,7 @@ interface PlannerProps {
   onSignOut?: () => void;
 }
 
-const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET);
+const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID);
 
 export default function TrafficControlPlanner({ userId = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);

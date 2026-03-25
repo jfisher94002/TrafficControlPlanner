@@ -25,7 +25,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git diff origin/${{ github.base_ref }}...HEAD > /tmp/pr.diff
+          # Resolve base branch: available on pull_request events; look it up for workflow_dispatch
+          if [ -n "${{ github.base_ref }}" ]; then
+            BASE_REF="${{ github.base_ref }}"
+          else
+            BASE_REF=$(gh pr view ${{ inputs.pr_number }} --json baseRefName -q .baseRefName)
+          fi
+          git fetch origin "$BASE_REF"
+          git diff "origin/$BASE_REF"...HEAD > /tmp/pr.diff
           # Truncate to ~15 000 chars to stay within Gemini input limits
           head -c 15000 /tmp/pr.diff > /tmp/pr_trimmed.diff
           echo "diff_file=/tmp/pr_trimmed.diff" >> $GITHUB_OUTPUT

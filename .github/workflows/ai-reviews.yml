@@ -1,79 +1,72 @@
 name: "AI Code Review"
 on:
-        pull_request:
-                types: [opened, synchronize]
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
 
 permissions:
-        contents: read
-        pull-requests: write
+  contents: read
+  pull-requests: write
 
 jobs:
-        review:
-                runs-on: ubuntu-latest
-                steps:
-                        - uses: actions/checkout@v4
-                          with:
-                                  fetch-depth: 0
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-                        - name: "Generate diff"
-                          id: diff
-                          run: |
-                                  git diff ${{ github.event.pull_request.base.sha }} ${{ github.sha }} > pr.diff
-                                  echo "lines=$(wc -l < pr.diff)" >> $GITHUB_OUTPUT
+      - name: "Get PR diff"
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Resolve base branch: available on pull_request events; look it up for workflow_dispatch
+          if [ -n "${{ github.base_ref }}" ]; then
+            BASE_REF="${{ github.base_ref }}"
+          else
+            BASE_REF=$(gh pr view ${{ inputs.pr_number }} --json baseRefName -q .baseRefName)
+          fi
+          git fetch origin "$BASE_REF"
+          git diff "origin/$BASE_REF"...HEAD > /tmp/pr.diff
+          # Truncate to ~15 000 chars to stay within Gemini input limits
+          head -c 15000 /tmp/pr.diff > /tmp/pr_trimmed.diff
+          echo "diff_file=/tmp/pr_trimmed.diff" >> $GITHUB_OUTPUT
 
-                        - name: "Run Gemini Review"
-                          if: steps.diff.outputs.lines != '0'
-                          env:
-                                  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-                                  PR_DIFF: pr.diff
-                                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                                  PR_NUMBER: ${{ github.event.pull_request.number }}
-                                  REPO: ${{ github.repository }}
-                          run: |
-                                  pip install -q google-genai
-                                  python3 - <<'PYEOF'
-                                  import os, sys
-                                  from google import genai
+      - name: "Run Gemini Review"
+        id: gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          DIFF=$(cat /tmp/pr_trimmed.diff | jq -Rs .)
+          PROMPT=$(jq -n --argjson diff "$DIFF" '{
+            contents: [{
+              parts: [{
+                text: ("Act as a Senior Software Engineer and QA Manager.\nReview the following code diff for tcplanpro.com with a focus on:\n- Objective analysis and technical accuracy.\n- Identifying bugs, logic errors, or edge cases.\n- Security issues (XSS, injection, exposed secrets).\n- Non-idiomatic Python or performance bottlenecks.\n- Ensuring clear logic without marketing-style comments.\nBe direct and concise. If the code is correct, say so briefly.\nOnly comment on things worth fixing — avoid nitpicks.\n\nDiff:\n" + $diff)
+              }]
+            }]
+          }')
 
-                                  diff = open(os.environ["PR_DIFF"]).read()
-                                  if not diff.strip():
-                                      print("Empty diff — nothing to review.")
-                                      sys.exit(0)
+          RESPONSE=$(curl -s \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PROMPT")
 
-                                  client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-                                  prompt = f"""Act as a Senior Software Engineer and QA Manager.
-                                  Review the following git diff for tcplanpro.com. Focus on:
-                                  - Bugs, logic errors, or edge cases
-                                  - Security issues (XSS, injection, exposed secrets)
-                                  - Missing or insufficient tests
-                                  - Non-idiomatic code or performance issues
-                                  Be direct and concise. If the code is correct, say so briefly.
-                                  Only comment on things worth fixing — avoid nitpicks.
+          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "Gemini returned no content."')
+          echo "review<<EOF" >> $GITHUB_OUTPUT
+          echo "$REVIEW" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-                                  ```diff
-                                  {diff[:30000]}
-                                  ```"""
+      - name: "Post review comment"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUM=${{ github.event.pull_request.number || inputs.pr_number }}
+          gh pr comment "$PR_NUM" \
+            --body "## 🤖 Gemini Code Review
 
-                                  response = client.models.generate_content(
-                                      model="gemini-2.0-flash-lite",
-                                      contents=prompt,
-                                  )
-                                  review = response.text
-                                  print(review)
-
-                                  import urllib.request, json
-                                  body = "## Gemini Code Review\n\n" + review
-                                  data = json.dumps({"body": body}).encode()
-                                  req = urllib.request.Request(
-                                      f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR_NUMBER']}/comments",
-                                      data=data,
-                                      headers={
-                                          "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                                          "Accept": "application/vnd.github+json",
-                                          "Content-Type": "application/json",
-                                      },
-                                      method="POST",
-                                  )
-                                  urllib.request.urlopen(req)
-                                  print("Review posted.")
-                                  PYEOF
+          ${{ steps.gemini.outputs.review }}"

@@ -10,70 +10,23 @@ permissions:
 jobs:
         review:
                 runs-on: ubuntu-latest
+                permissions:
+                        contents: read
+                        pull-requests: write
                 steps:
                         - uses: actions/checkout@v4
                           with:
                                   fetch-depth: 0
-
-                        - name: "Generate diff"
-                          id: diff
-                          run: |
-                                  git diff ${{ github.event.pull_request.base.sha }} ${{ github.sha }} > pr.diff
-                                  echo "lines=$(wc -l < pr.diff)" >> $GITHUB_OUTPUT
-
                         - name: "Run Gemini Review"
-                          if: steps.diff.outputs.lines != '0'
-                          env:
-                                  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-                                  PR_DIFF: pr.diff
-                                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                                  PR_NUMBER: ${{ github.event.pull_request.number }}
-                                  REPO: ${{ github.repository }}
-                          run: |
-                                  pip install -q google-genai
-                                  python3 - <<'PYEOF'
-                                  import os, sys
-                                  from google import genai
-
-                                  diff = open(os.environ["PR_DIFF"]).read()
-                                  if not diff.strip():
-                                      print("Empty diff — nothing to review.")
-                                      sys.exit(0)
-
-                                  client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-                                  prompt = f"""Act as a Senior Software Engineer and QA Manager.
-                                  Review the following git diff for tcplanpro.com. Focus on:
-                                  - Bugs, logic errors, or edge cases
-                                  - Security issues (XSS, injection, exposed secrets)
-                                  - Missing or insufficient tests
-                                  - Non-idiomatic code or performance issues
-                                  Be direct and concise. If the code is correct, say so briefly.
-                                  Only comment on things worth fixing — avoid nitpicks.
-
-                                  ```diff
-                                  {diff[:30000]}
-                                  ```"""
-
-                                  response = client.models.generate_content(
-                                      model="gemini-2.0-flash-lite",
-                                      contents=prompt,
-                                  )
-                                  review = response.text
-                                  print(review)
-
-                                  import urllib.request, json
-                                  body = "## Gemini Code Review\n\n" + review
-                                  data = json.dumps({"body": body}).encode()
-                                  req = urllib.request.Request(
-                                      f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR_NUMBER']}/comments",
-                                      data=data,
-                                      headers={
-                                          "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                                          "Accept": "application/vnd.github+json",
-                                          "Content-Type": "application/json",
-                                      },
-                                      method="POST",
-                                  )
-                                  urllib.request.urlopen(req)
-                                  print("Review posted.")
-                                  PYEOF
+                          uses: google-gemini/gemini-review-action@v1
+                          with:
+                                  # Note the hyphen in 'api-key' for the official action
+                                  api-key: ${{ secrets.GEMINI_API_KEY }}
+                                  model: "gemini-1.5-flash"
+                                  prompt: |
+                                          Act as a Senior Software Engineer and QA Manager.
+                                          Review the code for tcplanpro.com with a focus on:
+                                          - Objective analysis and technical accuracy.
+                                          - Identifying non-idiomatic Python or performance bottlenecks.
+                                          - Ensuring clear logic without marketing style comments.
+                                          Be direct and concise. If the code is correct, say so briefly.

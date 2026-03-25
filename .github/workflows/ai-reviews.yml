@@ -16,7 +16,7 @@ jobs:
                           uses: sshnaidm/gemini-code-review-action@v2
                           with:
                                   gemini-key: ${{ secrets.GEMINI_API_KEY }}
-                                  model: "gemini-2.0-flash-lite"
+                                  model: "gemini-1.5-flash"
                                   prompt: |
                                           Act as a Senior Software Engineer and QA Manager.
                                           Review the code for tcplanpro.com with a focus on:

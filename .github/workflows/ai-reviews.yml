@@ -1,8 +1,7 @@
 name: "AI Code Review"
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-  workflow_dispatch:
+    types: [opened, synchronize]
 
 permissions:
   contents: read
@@ -11,23 +10,24 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: "Run Gemini Review"
         uses: google-gemini/gemini-review-action@v1
         with:
-          # Note the hyphen in 'api-key' for the official action
+          # Note: Use 'api-key' with a hyphen for the official action
           api-key: ${{ secrets.GEMINI_API_KEY }}
           model: "gemini-2.0-flash"
           prompt: |
             Act as a Senior Software Engineer and QA Manager.
             Review the code for tcplanpro.com with a focus on:
             - Objective analysis and technical accuracy.
-            - Identifying non-idiomatic Python or performance bottlenecks.
+            - Identifying bugs, logic errors, or edge cases.
+            - Security issues (XSS, injection, exposed secrets).
+            - Non-idiomatic Python or performance bottlenecks.
             - Ensuring clear logic without marketing style comments.
             Be direct and concise. If the code is correct, say so briefly.
+            Only comment on things worth fixing — avoid nitpicks.

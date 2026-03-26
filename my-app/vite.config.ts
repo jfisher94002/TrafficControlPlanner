@@ -8,6 +8,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),  // landing page
+        app:  path.resolve(__dirname, 'app.html'),    // React SPA
+      },
+    },
+  },
   resolve: {
     alias: {
       react: path.resolve(__dirname, 'node_modules/react'),

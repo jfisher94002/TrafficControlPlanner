@@ -14,6 +14,7 @@ import type {
 import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isRoad, isMultiPointRoad, calcTaperLength, cloneObject } from './utils';
 import { savePlanToCloud } from './planStorage';
 import PlanDashboard from './PlanDashboard';
+import { runQCChecks, type QCIssue } from './qcRules';
 import { track } from './analytics';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
@@ -1297,6 +1298,37 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
   );
 }
 
+// ─── QC PANEL ────────────────────────────────────────────────────────────────
+
+function QCPanel({ issues }: { issues: QCIssue[] }) {
+  const SEV_COLOR = { error: "#ef4444", warning: "#f59e0b", info: "#64748b" } as const;
+  const SEV_ICON  = { error: "✕", warning: "⚠", info: "ℹ" } as const;
+  return (
+    <div data-testid="qc-panel" style={{ flex: 1, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      {issues.length === 0 ? (
+        <div style={{ textAlign: "center", color: "#22c55e", fontSize: 11, padding: "24px 0" }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>✓</div>
+          No issues found
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>
+            {issues.filter(i => i.severity === "error").length} error{issues.filter(i => i.severity === "error").length !== 1 ? "s" : ""},{" "}
+            {issues.filter(i => i.severity === "warning").length} warning{issues.filter(i => i.severity === "warning").length !== 1 ? "s" : ""}
+          </div>
+          {issues.map(issue => (
+            <div key={issue.id} data-testid={`qc-issue-${issue.severity}`}
+              style={{ padding: "8px 10px", borderRadius: 4, background: "rgba(255,255,255,0.03)", border: `1px solid ${SEV_COLOR[issue.severity]}33`, display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <span style={{ color: SEV_COLOR[issue.severity], fontSize: 12, flexShrink: 0, marginTop: 1 }}>{SEV_ICON[issue.severity]}</span>
+              <span style={{ fontSize: 10, color: "#cbd5e1", lineHeight: 1.4 }}>{issue.message}</span>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── PROPERTY PANEL ──────────────────────────────────────────────────────────
 
 interface PropertyPanelProps { selected: string | null; objects: CanvasObject[]; onUpdate: (id: string, updates: Record<string, unknown>) => void; onDelete: (id: string) => void; onReorder: (id: string, dir: "front" | "forward" | "backward" | "back") => void; planMeta: PlanMeta; onUpdateMeta: (meta: PlanMeta) => void; }
@@ -1714,9 +1746,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [signCategory, setSignCategory] = useState("regulatory");
   const [leftPanel, setLeftPanel] = useState("tools");
   const [rightPanel, setRightPanel] = useState(true);
-  const [rightTab, setRightTab] = useState<"properties" | "manifest">("properties");
+  const [rightTab, setRightTab] = useState<"properties" | "manifest" | "qc">("properties");
   const propertiesTabRef = useRef<HTMLButtonElement | null>(null);
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
+  const qcTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
@@ -1867,17 +1900,21 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setCubicPoints([]);
   }, []);
 
-  const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest") => {
-    const next: "properties" | "manifest" | null =
-      e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowUp"
-        ? current === "properties" ? "manifest" : "properties"
-        : e.key === "Home" ? "properties"
-        : e.key === "End"  ? "manifest"
-        : null;
+  const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
+
+  const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest" | "qc") => {
+    const tabs: Array<"properties" | "manifest" | "qc"> = ["properties", "manifest", "qc"];
+    const idx = tabs.indexOf(current);
+    const next: "properties" | "manifest" | "qc" | null =
+      e.key === "ArrowRight" || e.key === "ArrowDown" ? tabs[(idx + 1) % tabs.length]
+      : e.key === "ArrowLeft" || e.key === "ArrowUp" ? tabs[(idx - 1 + tabs.length) % tabs.length]
+      : e.key === "Home" ? "properties"
+      : e.key === "End"  ? "qc"
+      : null;
     if (next) {
       e.preventDefault();
       setRightTab(next);
-      (next === "properties" ? propertiesTabRef : manifestTabRef).current?.focus();
+      (next === "properties" ? propertiesTabRef : next === "manifest" ? manifestTabRef : qcTabRef).current?.focus();
     }
   }, []);
 
@@ -2906,11 +2943,19 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "manifest" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "manifest" ? COLORS.accent : COLORS.textDim, cursor: "pointer" }}>
                 Manifest
               </button>
+              <button type="button" role="tab" aria-selected={rightTab === "qc"} tabIndex={rightTab === "qc" ? 0 : -1}
+                ref={qcTabRef} data-testid="tab-qc"
+                onClick={() => setRightTab("qc")} onKeyDown={(e) => handleRightTabKeyDown(e, "qc")}
+                style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "qc" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "qc" ? COLORS.accent : COLORS.textDim, cursor: "pointer", position: "relative" }}>
+                QC{qcIssues.some(i => i.severity === "error") ? <span style={{ position: "absolute", top: 6, right: 2, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }} /> : qcIssues.some(i => i.severity === "warning") ? <span style={{ position: "absolute", top: 6, right: 2, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} /> : null}
+              </button>
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
               ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
-              : <ManifestPanel objects={objects} />
+              : rightTab === "manifest"
+              ? <ManifestPanel objects={objects} />
+              : <QCPanel issues={qcIssues} />
             }
 
             <div style={{ marginTop: "auto", borderTop: `1px solid ${COLORS.panelBorder}`, padding: 12 }}>

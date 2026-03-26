@@ -52,7 +52,23 @@ export default function App() {
 
   return (
     <ThemeProvider theme={authTheme} colorMode="dark">
-      <Authenticator loginMechanisms={['email']} components={{ Header: AuthHeader }}>
+      <Authenticator
+        loginMechanisms={['email']}
+        components={{ Header: AuthHeader }}
+        formFields={{
+          signUp: {
+            name: {
+              label: 'Full Name',
+              placeholder: 'Enter your full name',
+              isRequired: true,
+              order: 1,
+            },
+            email: { order: 2 },
+            password: { order: 3 },
+            confirm_password: { order: 4 },
+          },
+        }}
+      >
         {() => <AuthedApp />}
       </Authenticator>
     </ThemeProvider>

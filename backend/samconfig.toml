@@ -19,3 +19,21 @@ parameter_overrides = [
 ]
 # GitHubToken must be supplied at deploy time — do NOT commit it here:
 #   sam deploy --parameter-overrides "GitHubToken=github_pat_..."
+
+[staging.global.parameters]
+stack_name = "tcp-backend-staging"
+
+[staging.build.parameters]
+use_container = true
+
+[staging.deploy.parameters]
+capabilities      = "CAPABILITY_IAM"
+region            = "us-west-1"
+resolve_s3        = true
+confirm_changeset = true
+parameter_overrides = [
+  "Stage=staging",
+  "AllowedOrigins=https://staging.tcplanpro.com,https://staging.d1i0disr0t50m8.amplifyapp.com"
+]
+# GitHubToken must be supplied at deploy time:
+#   sam deploy --config-env staging --parameter-overrides "GitHubToken=github_pat_..."

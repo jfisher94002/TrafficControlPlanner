@@ -62,7 +62,7 @@ function checkTaperLength({ tapers }: ObjectCollections): QCIssue[] {
     if (t.taperLength < required) {
       return [{
         id: `taper-short-${t.id}`,
-        severity: 'error' as QCSeverity,
+        severity: 'error',
         message: `Taper is ${t.taperLength}ft but MUTCD requires ${required}ft at ${t.speed}mph (${t.laneWidth}ft × ${t.numLanes} lane${t.numLanes > 1 ? 's' : ''}).`,
         objectId: t.id,
       }]

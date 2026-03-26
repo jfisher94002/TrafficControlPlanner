@@ -61,6 +61,11 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "tcp-assets-${Stage}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
       CorsConfiguration:
         CorsRules:
           - AllowedOrigins: ["*"]

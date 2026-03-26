@@ -1301,9 +1301,18 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
 
 // ─── QC PANEL ────────────────────────────────────────────────────────────────
 
+function getQCBadgeColor(issues: QCIssue[]): string | null {
+  if (issues.some(i => i.severity === "error"))   return "#ef4444";
+  if (issues.some(i => i.severity === "warning")) return "#f59e0b";
+  return null;
+}
+
 function QCPanel({ issues }: { issues: QCIssue[] }) {
   const SEV_COLOR = { error: "#ef4444", warning: "#f59e0b", info: "#64748b" } as const;
   const SEV_ICON  = { error: "✕", warning: "⚠", info: "ℹ" } as const;
+  const errorCount   = issues.filter(i => i.severity === "error").length;
+  const warningCount = issues.filter(i => i.severity === "warning").length;
+  const infoCount    = issues.filter(i => i.severity === "info").length;
   return (
     <div data-testid="qc-panel" style={{ flex: 1, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
       {issues.length === 0 ? (
@@ -1314,8 +1323,9 @@ function QCPanel({ issues }: { issues: QCIssue[] }) {
       ) : (
         <>
           <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>
-            {issues.filter(i => i.severity === "error").length} error{issues.filter(i => i.severity === "error").length !== 1 ? "s" : ""},{" "}
-            {issues.filter(i => i.severity === "warning").length} warning{issues.filter(i => i.severity === "warning").length !== 1 ? "s" : ""}
+            {errorCount} error{errorCount !== 1 ? "s" : ""},{" "}
+            {warningCount} warning{warningCount !== 1 ? "s" : ""}
+            {infoCount > 0 && `, ${infoCount} info`}
           </div>
           {issues.map(issue => (
             <div key={issue.id} data-testid={`qc-issue-${issue.severity}`}
@@ -2973,7 +2983,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 ref={qcTabRef} data-testid="tab-qc"
                 onClick={() => setRightTab("qc")} onKeyDown={(e) => handleRightTabKeyDown(e, "qc")}
                 style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "qc" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "qc" ? COLORS.accent : COLORS.textDim, cursor: "pointer", position: "relative" }}>
-                QC{qcIssues.some(i => i.severity === "error") ? <span style={{ position: "absolute", top: 6, right: 2, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }} /> : qcIssues.some(i => i.severity === "warning") ? <span style={{ position: "absolute", top: 6, right: 2, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} /> : null}
+                QC{getQCBadgeColor(qcIssues) && <span style={{ position: "absolute", top: 6, right: 2, width: 6, height: 6, borderRadius: "50%", background: getQCBadgeColor(qcIssues)! }} />}
               </button>
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>

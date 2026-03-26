@@ -535,13 +535,12 @@ describe('Auth props', () => {
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 
-  it('sign-out button appears after export buttons in the toolbar', () => {
+  it('sign-out button is visible and appears after export buttons in the page', () => {
     render(<TrafficControlPlanner userId="user-abc" onSignOut={vi.fn()} />)
-    const toolbar = screen.getByTestId('toolbar')
-    const buttons = within(toolbar).getAllByRole('button')
-    const pngIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'export-png-button')
-    const pdfIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'export-pdf-button')
-    const signOutIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'sign-out-button')
+    const allButtons = screen.getAllByRole('button')
+    const pngIdx = allButtons.findIndex(b => b.getAttribute('data-testid') === 'export-png-button')
+    const pdfIdx = allButtons.findIndex(b => b.getAttribute('data-testid') === 'export-pdf-button')
+    const signOutIdx = allButtons.findIndex(b => b.getAttribute('data-testid') === 'sign-out-button')
     expect(signOutIdx).toBeGreaterThan(pngIdx)
     expect(signOutIdx).toBeGreaterThan(pdfIdx)
   })
@@ -569,9 +568,10 @@ describe('Pre-beta banner', () => {
     expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
   })
 
-  it('contact email link is present in the toolbar', () => {
+  it('contact email link is present in the pre-beta banner', () => {
     render(<TrafficControlPlanner />)
-    const link = screen.getByTestId('contact-email')
+    const banner = screen.getByTestId('prebeta-banner')
+    const link = within(banner).getByRole('link')
     expect(link).toBeInTheDocument()
     expect(link.getAttribute('href')).toMatch(/^mailto:/)
   })

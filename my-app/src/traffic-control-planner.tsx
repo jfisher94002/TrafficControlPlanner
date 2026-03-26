@@ -14,6 +14,7 @@ import type {
 import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isRoad, isMultiPointRoad, calcTaperLength, cloneObject } from './utils';
 import { savePlanToCloud } from './planStorage';
 import PlanDashboard from './PlanDashboard';
+import TemplatePicker from './TemplatePicker';
 import { track } from './analytics';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
@@ -1730,6 +1731,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<CanvasObject | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
@@ -2299,6 +2301,29 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setZoom(1);
   };
 
+  const handleTemplateApply = useCallback((templateObjects: CanvasObject[], mode: 'replace' | 'merge') => {
+    // Reset any in-progress draw state so partial roads don't persist after apply
+    setDrawStart(null);
+    setPolyPoints([]);
+    setCurvePoints([]);
+    setCubicPoints([]);
+    setSnapIndicator(null);
+    if (mode === 'replace') {
+      setObjects(templateObjects);
+      pushHistory(templateObjects);
+      setSelected(null);
+      setOffset({ x: 0, y: 0 });
+      setZoom(1);
+    } else {
+      const merged = [...objects, ...templateObjects];
+      setObjects(merged);
+      pushHistory(merged);
+      setSelected(null);
+    }
+    // track is a stable module-level import — intentionally omitted from deps
+    track('template_applied', { mode, object_count: templateObjects.length });
+  }, [objects, pushHistory]);
+
   const triggerDownload = (href: string, filename: string) => {
     const a = document.createElement("a");
     a.href = href;
@@ -2520,6 +2545,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
+          <button onClick={() => setShowTemplatePicker(true)} data-testid="templates-button" style={panelBtnStyle(false)} title="Start from a template">Templates</button>
           {userId && CLOUD_ENABLED && (<>
             <button onClick={handleCloudSave} data-testid="cloud-save-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Save plan to cloud (S3)">☁ Save{cloudSaveStatus ? ` — ${cloudSaveStatus}` : ''}</button>
             <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
@@ -2954,6 +2980,12 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           userId={userId}
           onOpen={handleDashboardOpen}
           onClose={() => setShowDashboard(false)}
+        />
+      )}
+      {showTemplatePicker && (
+        <TemplatePicker
+          onApply={handleTemplateApply}
+          onClose={() => setShowTemplatePicker(false)}
         />
       )}
     </div>

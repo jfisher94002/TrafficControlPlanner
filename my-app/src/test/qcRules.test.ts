@@ -12,12 +12,13 @@ const flagman: CanvasObject = { id: 'fm1', type: 'device', x: 200, y: 0, deviceD
 const roadworkSign: CanvasObject = { id: 's1', type: 'sign', x: 0, y: -50, signData: { id: 'roadwork', label: 'ROAD WORK', shape: 'diamond', color: '#f97316', textColor: '#111' }, rotation: 0, scale: 1 }
 const flaggerSign: CanvasObject  = { id: 's2', type: 'sign', x: 10, y: -50, signData: { id: 'flaggerahead', label: 'FLAGGER AHD', shape: 'diamond', color: '#f97316', textColor: '#111' }, rotation: 0, scale: 1 }
 const endworkSign: CanvasObject  = { id: 's3', type: 'sign', x: 400, y: -50, signData: { id: 'endwork', label: 'END ROAD WORK', shape: 'rect', color: '#f97316', textColor: '#111' }, rotation: 0, scale: 1 }
+const laneClosedSign: CanvasObject = { id: 's4', type: 'sign', x: 20, y: -50, signData: { id: 'laneclosed', label: 'LANE CLOSED', shape: 'rect', color: '#f97316', textColor: '#111' }, rotation: 0, scale: 1 }
 
 const zone: CanvasObject = { id: 'z1', type: 'zone', x: 100, y: -20, w: 200, h: 40 }
 
-const taper = (taperLength: number, manualLength = true): CanvasObject => ({
+const taper = (taperLength: number, manualLength = true, numLanes = 1): CanvasObject => ({
   id: 't1', type: 'taper', x: 80, y: 0, rotation: 0,
-  laneWidth: 12, speed: 25, taperLength, manualLength, numLanes: 1,
+  laneWidth: 12, speed: 25, taperLength, manualLength, numLanes,
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -25,15 +26,15 @@ const taper = (taperLength: number, manualLength = true): CanvasObject => ({
 describe('runQCChecks', () => {
   it('reports empty plan info when no objects', () => {
     const issues = runQCChecks([])
-    expect(issues.some(i => i.id === 'empty-plan')).toBe(true)
+    expect(issues).toHaveLength(1)
+    expect(issues[0].id).toBe('empty-plan')
   })
 
   it('no issues for a complete valid lane closure plan', () => {
     // road + auto-length taper + arrow board + cone + roadwork sign + end sign
     const objects: CanvasObject[] = [road, taper(125, false), arrowBoard, cone, roadworkSign, endworkSign]
     const issues = runQCChecks(objects)
-    const nonInfo = issues.filter(i => i.severity !== 'info')
-    expect(nonInfo).toHaveLength(0)
+    expect(issues).toHaveLength(0)
   })
 
   it('reports error when manual taper is shorter than MUTCD minimum', () => {
@@ -49,6 +50,23 @@ describe('runQCChecks', () => {
     expect(issues.some(i => i.id.startsWith('taper-short'))).toBe(false)
   })
 
+  it('accepts manual taper length equal to the calculated minimum (boundary)', () => {
+    // 25mph, 12ft lane, 1 lane → required = 125ft; length === required should be valid (uses <, not <=)
+    const objects: CanvasObject[] = [road, taper(125, true), arrowBoard, cone, roadworkSign, endworkSign]
+    const issues = runQCChecks(objects)
+    expect(issues).toHaveLength(0)
+  })
+
+  it('requires longer taper for multi-lane closure', () => {
+    // 1-lane closure: 125ft manual is acceptable
+    const single = runQCChecks([road, taper(125, true, 1), arrowBoard, cone, roadworkSign, endworkSign])
+    expect(single.some(i => i.id.startsWith('taper-short'))).toBe(false)
+
+    // 2-lane closure: same 125ft manual should now be too short (required = 2 × 125 = 250ft)
+    const dual = runQCChecks([road, taper(125, true, 2), arrowBoard, cone, roadworkSign, endworkSign])
+    expect(dual.some(i => i.id.startsWith('taper-short') && i.severity === 'error')).toBe(true)
+  })
+
   it('warns when work zone has no advance warning signs', () => {
     const objects: CanvasObject[] = [road, zone, cone]
     const issues = runQCChecks(objects)
@@ -57,6 +75,12 @@ describe('runQCChecks', () => {
 
   it('no advance warning issue when warning sign is present', () => {
     const objects: CanvasObject[] = [road, zone, cone, roadworkSign]
+    const issues = runQCChecks(objects)
+    expect(issues.some(i => i.id === 'no-advance-warning')).toBe(false)
+  })
+
+  it('no advance warning issue when work-zone sign (e.g. laneclosed) is present', () => {
+    const objects: CanvasObject[] = [road, zone, cone, laneClosedSign]
     const issues = runQCChecks(objects)
     expect(issues.some(i => i.id === 'no-advance-warning')).toBe(false)
   })
@@ -83,6 +107,12 @@ describe('runQCChecks', () => {
     const objects: CanvasObject[] = [road, zone, roadworkSign]
     const issues = runQCChecks(objects)
     expect(issues.some(i => i.id === 'zone-no-perimeter' && i.severity === 'warning')).toBe(true)
+  })
+
+  it('does not warn when zone has perimeter devices', () => {
+    const objects: CanvasObject[] = [road, zone, cone, roadworkSign]
+    const issues = runQCChecks(objects)
+    expect(issues.some(i => i.id === 'zone-no-perimeter')).toBe(false)
   })
 
   it('info when work zone signs but no END ROAD WORK sign', () => {

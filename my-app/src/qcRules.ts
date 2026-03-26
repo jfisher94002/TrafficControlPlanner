@@ -17,12 +17,21 @@ export interface QCIssue {
   objectId?: string    // canvas object this issue relates to (for future highlighting)
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Type aliases ─────────────────────────────────────────────────────────────
 
-const signs   = (objects: CanvasObject[]) => objects.filter(o => o.type === 'sign')   as Extract<CanvasObject, { type: 'sign' }>[]
-const devices = (objects: CanvasObject[]) => objects.filter(o => o.type === 'device') as Extract<CanvasObject, { type: 'device' }>[]
-const tapers  = (objects: CanvasObject[]) => objects.filter(o => o.type === 'taper')  as Extract<CanvasObject, { type: 'taper' }>[]
-const zones   = (objects: CanvasObject[]) => objects.filter(o => o.type === 'zone')   as Extract<CanvasObject, { type: 'zone' }>[]
+type SignObj   = Extract<CanvasObject, { type: 'sign' }>
+type DeviceObj = Extract<CanvasObject, { type: 'device' }>
+type TaperObj  = Extract<CanvasObject, { type: 'taper' }>
+type ZoneObj   = Extract<CanvasObject, { type: 'zone' }>
+
+interface ObjectCollections {
+  signs:   SignObj[]
+  devices: DeviceObj[]
+  tapers:  TaperObj[]
+  zones:   ZoneObj[]
+}
+
+// ─── Sign ID sets ─────────────────────────────────────────────────────────────
 
 const WARNING_SIGN_IDS = new Set([
   'roadwork','flagahead','merge','curve','narrow','bump','pedestrian','signal',
@@ -40,9 +49,14 @@ const WORKZONE_SIGN_IDS = new Set([
 
 const END_SIGN_IDS = new Set(['endwork', 'endworkahead'])
 
+// Combined set for advance-warning check: warning signs + work-zone signs (excluding end signs)
+const ADVANCE_WARNING_SIGN_IDS = new Set(
+  [...WARNING_SIGN_IDS, ...WORKZONE_SIGN_IDS].filter(id => !END_SIGN_IDS.has(id))
+)
+
 // ─── Rule 1: Taper length too short ──────────────────────────────────────────
-function checkTaperLength(objects: CanvasObject[]): QCIssue[] {
-  return tapers(objects).flatMap(t => {
+function checkTaperLength({ tapers }: ObjectCollections): QCIssue[] {
+  return tapers.flatMap(t => {
     if (!t.manualLength) return []
     const required = calcTaperLength(t.speed, t.laneWidth, t.numLanes)
     if (t.taperLength < required) {
@@ -58,10 +72,10 @@ function checkTaperLength(objects: CanvasObject[]): QCIssue[] {
 }
 
 // ─── Rule 2: No advance warning signs when work zone present ─────────────────
-function checkAdvanceWarning(objects: CanvasObject[]): QCIssue[] {
-  const hasWorkZone = tapers(objects).length > 0 || zones(objects).length > 0
+function checkAdvanceWarning({ signs, tapers, zones }: ObjectCollections): QCIssue[] {
+  const hasWorkZone = tapers.length > 0 || zones.length > 0
   if (!hasWorkZone) return []
-  const hasWarnSign = signs(objects).some(s => WARNING_SIGN_IDS.has(s.signData.id))
+  const hasWarnSign = signs.some(s => ADVANCE_WARNING_SIGN_IDS.has(s.signData.id))
   if (!hasWarnSign) {
     return [{
       id: 'no-advance-warning',
@@ -73,10 +87,10 @@ function checkAdvanceWarning(objects: CanvasObject[]): QCIssue[] {
 }
 
 // ─── Rule 3: Flagger sign without flagger device ──────────────────────────────
-function checkFlaggerDevice(objects: CanvasObject[]): QCIssue[] {
-  const hasFlaggerSign = signs(objects).some(s => s.signData.id === 'flaggerahead' || s.signData.id === 'flagahead')
+function checkFlaggerDevice({ signs, devices }: ObjectCollections): QCIssue[] {
+  const hasFlaggerSign = signs.some(s => s.signData.id === 'flaggerahead' || s.signData.id === 'flagahead')
   if (!hasFlaggerSign) return []
-  const hasFlaggerDevice = devices(objects).some(d => d.deviceData.id === 'flagman')
+  const hasFlaggerDevice = devices.some(d => d.deviceData.id === 'flagman')
   if (!hasFlaggerDevice) {
     return [{
       id: 'flagger-sign-no-device',
@@ -88,9 +102,9 @@ function checkFlaggerDevice(objects: CanvasObject[]): QCIssue[] {
 }
 
 // ─── Rule 4: Taper with no arrow board ───────────────────────────────────────
-function checkArrowBoard(objects: CanvasObject[]): QCIssue[] {
-  if (tapers(objects).length === 0) return []
-  const hasArrowBoard = devices(objects).some(d => d.deviceData.id === 'arrow_board')
+function checkArrowBoard({ tapers, devices }: ObjectCollections): QCIssue[] {
+  if (tapers.length === 0) return []
+  const hasArrowBoard = devices.some(d => d.deviceData.id === 'arrow_board')
   if (!hasArrowBoard) {
     return [{
       id: 'taper-no-arrow-board',
@@ -102,10 +116,10 @@ function checkArrowBoard(objects: CanvasObject[]): QCIssue[] {
 }
 
 // ─── Rule 5: Work zone with no perimeter devices ──────────────────────────────
-function checkPerimeterDevices(objects: CanvasObject[]): QCIssue[] {
-  if (zones(objects).length === 0) return []
+function checkPerimeterDevices({ zones, devices }: ObjectCollections): QCIssue[] {
+  if (zones.length === 0) return []
   const PERIMETER_IDS = new Set(['cone','barrel','barrier','delineator','water_barrel'])
-  const hasPerimeter = devices(objects).some(d => PERIMETER_IDS.has(d.deviceData.id))
+  const hasPerimeter = devices.some(d => PERIMETER_IDS.has(d.deviceData.id))
   if (!hasPerimeter) {
     return [{
       id: 'zone-no-perimeter',
@@ -117,10 +131,10 @@ function checkPerimeterDevices(objects: CanvasObject[]): QCIssue[] {
 }
 
 // ─── Rule 6: Missing END ROAD WORK sign ──────────────────────────────────────
-function checkEndSign(objects: CanvasObject[]): QCIssue[] {
-  const hasWorkSign = signs(objects).some(s => WORKZONE_SIGN_IDS.has(s.signData.id))
+function checkEndSign({ signs }: ObjectCollections): QCIssue[] {
+  const hasWorkSign = signs.some(s => WORKZONE_SIGN_IDS.has(s.signData.id))
   if (!hasWorkSign) return []
-  const hasEndSign = signs(objects).some(s => END_SIGN_IDS.has(s.signData.id))
+  const hasEndSign = signs.some(s => END_SIGN_IDS.has(s.signData.id))
   if (!hasEndSign) {
     return [{
       id: 'no-end-sign',
@@ -141,13 +155,19 @@ function checkEmptyPlan(objects: CanvasObject[]): QCIssue[] {
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 export function runQCChecks(objects: CanvasObject[]): QCIssue[] {
+  const collections: ObjectCollections = {
+    signs:   objects.filter(o => o.type === 'sign')   as SignObj[],
+    devices: objects.filter(o => o.type === 'device') as DeviceObj[],
+    tapers:  objects.filter(o => o.type === 'taper')  as TaperObj[],
+    zones:   objects.filter(o => o.type === 'zone')   as ZoneObj[],
+  }
   return [
     ...checkEmptyPlan(objects),
-    ...checkTaperLength(objects),
-    ...checkAdvanceWarning(objects),
-    ...checkFlaggerDevice(objects),
-    ...checkArrowBoard(objects),
-    ...checkPerimeterDevices(objects),
-    ...checkEndSign(objects),
+    ...checkTaperLength(collections),
+    ...checkAdvanceWarning(collections),
+    ...checkFlaggerDevice(collections),
+    ...checkArrowBoard(collections),
+    ...checkPerimeterDevices(collections),
+    ...checkEndSign(collections),
   ]
 }

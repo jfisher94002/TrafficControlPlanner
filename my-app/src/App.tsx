@@ -12,8 +12,8 @@ import { identifyUser, resetAnalytics } from './analytics'
 
 Amplify.configure(awsExports)
 
-// User Pool requires name.formatted (OIDC compound attribute).
-// Amplify UI only sends `name`, so we duplicate it to satisfy the schema.
+// Amplify UI doesn't always forward custom formFields to Cognito automatically.
+// This ensures `name` from the sign-up form is included in the signUp call.
 const authServices = {
   async handleSignUp(input: Parameters<typeof signUp>[0]) {
     const attrs = (input.options?.userAttributes ?? {}) as Record<string, string>
@@ -22,7 +22,7 @@ const authServices = {
       ...input,
       options: {
         ...input.options,
-        userAttributes: { ...attrs, name, 'name.formatted': name },
+        userAttributes: { ...attrs, name },
       },
     })
   },

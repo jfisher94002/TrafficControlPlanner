@@ -48,8 +48,10 @@ function AuthedApp() {
   const handleSignOut = async () => {
     try {
       await signOut()
-    } catch {
-      // ignore sign-out errors — redirect regardless
+    } catch (err) {
+      // Sign-out errors (e.g. expired token, network) don't block the redirect,
+      // but log them so we can catch server-side session issues in monitoring.
+      console.error('[Auth] signOut error:', err)
     }
     window.location.href = '/'
   }

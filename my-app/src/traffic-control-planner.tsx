@@ -2602,7 +2602,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 
-        {/* ─── USER AREA (right side, never collapses) ─── */}
+        {/* Right-side user controls — flexShrink:0 so toolbar overflow never pushes these off screen */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, borderLeft: `1px solid ${COLORS.panelBorder}`, paddingLeft: 12, marginLeft: 4 }}>
           <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
           {onSignOut && (<>

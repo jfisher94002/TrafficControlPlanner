@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Amplify } from 'aws-amplify'
+import { signUp } from 'aws-amplify/auth'
 import { Authenticator, ThemeProvider, useAuthenticator } from '@aws-amplify/ui-react'
 import '@aws-amplify/ui-react/styles.css'
 import TrafficControlPlanner from './traffic-control-planner'
@@ -10,6 +11,22 @@ import { useAutoSignOut } from './auth/useAutoSignOut'
 import { identifyUser, resetAnalytics } from './analytics'
 
 Amplify.configure(awsExports)
+
+// User Pool requires name.formatted (OIDC compound attribute).
+// Amplify UI only sends `name`, so we duplicate it to satisfy the schema.
+const authServices = {
+  async handleSignUp(input: Parameters<typeof signUp>[0]) {
+    const attrs = (input.options?.userAttributes ?? {}) as Record<string, string>
+    const name = attrs['name'] ?? ''
+    return signUp({
+      ...input,
+      options: {
+        ...input.options,
+        userAttributes: { ...attrs, name, 'name.formatted': name },
+      },
+    })
+  },
+}
 
 function AuthedApp() {
   const { signOut, user } = useAuthenticator((ctx) => [ctx.user])
@@ -55,6 +72,7 @@ export default function App() {
       <Authenticator
         loginMechanisms={['email']}
         components={{ Header: AuthHeader }}
+        services={authServices}
         formFields={{
           signUp: {
             name: {

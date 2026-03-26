@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import type { CanvasObject } from './types'
 import { TEMPLATES, type TemplateDef } from './templates'
 import { uid } from './utils'
@@ -18,6 +18,7 @@ const S: Record<string, React.CSSProperties> = {
     width: 600, maxWidth: '92vw', maxHeight: '80vh',
     display: 'flex', flexDirection: 'column',
     fontFamily: "'JetBrains Mono', monospace", color: '#e2e8f0',
+    outline: 'none',
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -73,21 +74,45 @@ function objectSummary(objects: CanvasObject[]): string {
   return parts.join(' · ')
 }
 
+// Deep-clone a CanvasObject so nested fields (signData, deviceData, points)
+// are independent copies — prevents template mutation across applies.
+function cloneTemplateObject(o: CanvasObject): CanvasObject {
+  const base = { ...o, id: uid() } as CanvasObject & Record<string, unknown>
+  if ('signData'   in o && o.signData)   base.signData   = { ...o.signData }
+  if ('deviceData' in o && o.deviceData) base.deviceData = { ...o.deviceData }
+  if ('points'     in o && Array.isArray(o.points)) base.points = o.points.map((p: { x: number; y: number }) => ({ ...p }))
+  return base as CanvasObject
+}
+
 export default function TemplatePicker({ onApply, onClose }: TemplatePickerProps) {
   const [mode, setMode] = useState<'replace' | 'merge'>('replace')
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    modalRef.current?.focus()
+  }, [])
 
   const handleUse = (tpl: TemplateDef) => {
-    const freshObjects = tpl.objects.map(o => ({ ...o, id: uid() }))
-    onApply(freshObjects, mode)
+    onApply(tpl.objects.map(cloneTemplateObject), mode)
     onClose()
   }
 
   return (
     <div data-testid="template-picker-overlay" style={S.overlay} onClick={onClose}>
-      <div data-testid="template-picker" style={S.modal} onClick={e => e.stopPropagation()}>
+      <div
+        data-testid="template-picker"
+        ref={modalRef}
+        style={S.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="template-picker-title"
+        tabIndex={-1}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }}
+      >
         <div style={S.header}>
-          <span style={S.title}>◆ TEMPLATES</span>
-          <button style={S.closeBtn} onClick={onClose} title="Close">✕</button>
+          <span id="template-picker-title" style={S.title}>◆ TEMPLATES</span>
+          <button style={S.closeBtn} onClick={onClose} title="Close" aria-label="Close template picker">✕</button>
         </div>
 
         <div style={S.body}>

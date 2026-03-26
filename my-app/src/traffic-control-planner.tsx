@@ -2302,6 +2302,12 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const handleTemplateApply = useCallback((templateObjects: CanvasObject[], mode: 'replace' | 'merge') => {
+    // Reset any in-progress draw state so partial roads don't persist after apply
+    setDrawStart(null);
+    setPolyPoints([]);
+    setCurvePoints([]);
+    setCubicPoints([]);
+    setSnapIndicator(null);
     if (mode === 'replace') {
       setObjects(templateObjects);
       pushHistory(templateObjects);
@@ -2314,6 +2320,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       pushHistory(merged);
       setSelected(null);
     }
+    // track is a stable module-level import — intentionally omitted from deps
     track('template_applied', { mode, object_count: templateObjects.length });
   }, [objects, pushHistory]);
 

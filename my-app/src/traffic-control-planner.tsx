@@ -15,6 +15,8 @@ import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, 
 import { savePlanToCloud } from './planStorage';
 import PlanDashboard from './PlanDashboard';
 import TemplatePicker from './TemplatePicker';
+import ExportPreviewModal from './ExportPreviewModal';
+import { runQCChecks, type QCIssue } from './qcRules';
 import { track } from './analytics';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
@@ -1732,6 +1734,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [clipboard, setClipboard] = useState<CanvasObject | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [exportPreview, setExportPreview] = useState<{ dataUrl: string; payload: Record<string, unknown> } | null>(null);
+  const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
@@ -2415,7 +2419,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     }, "image/png");
   };
 
-  const exportPDF = async () => {
+  const exportPDF = () => {
     const stage = stageRef.current;
     if (!stage) return;
     const canvas = stage.toCanvas({ pixelRatio: 2 });
@@ -2434,12 +2438,17 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       metadata: planMeta,
       canvas_image_b64: b64,
     };
+    setExportPreview({ dataUrl, payload });
+  };
+
+  const confirmExportPDF = async () => {
+    if (!exportPreview) return;
     const apiBase = (import.meta.env.VITE_EXPORT_API_BASE ?? "").replace(/\/$/, "");
     try {
       const res = await fetch(`${apiBase}/export-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(exportPreview.payload),
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const blob = await res.blob();
@@ -2986,6 +2995,17 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         <TemplatePicker
           onApply={handleTemplateApply}
           onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
+      {exportPreview && (
+        <ExportPreviewModal
+          canvasDataUrl={exportPreview.dataUrl}
+          planTitle={planTitle}
+          planMeta={planMeta}
+          planCreatedAt={planCreatedAt}
+          qcIssues={qcIssues}
+          onConfirm={confirmExportPDF}
+          onClose={() => setExportPreview(null)}
         />
       )}
     </div>

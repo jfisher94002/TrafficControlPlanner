@@ -105,8 +105,9 @@ const SIGN_CATEGORIES: Record<string, { label: string; color: string; signs: Sig
       { id: "rightcurve",     label: "RIGHT CURVE",  shape: "diamond", color: "#f97316", textColor: "#111" },
       { id: "leftcurve",      label: "LEFT CURVE",   shape: "diamond", color: "#f97316", textColor: "#111" },
       { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "hillgrade",      label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "workers",        label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "hillgrade",        label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "workers",          label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "trafficcontrols",  label: "TRAF CTRL",    shape: "diamond", color: "#f97316", textColor: "#111" },
     ],
   },
   temporary: {

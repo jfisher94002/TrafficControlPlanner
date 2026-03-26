@@ -15,14 +15,14 @@ test.describe('Sign In', () => {
 
   test('signs in with valid credentials and lands on app', async ({ page }) => {
     await page.getByLabel('Email').fill(E2E_EMAIL)
-    await page.getByLabel('Password').fill(E2E_PASSWORD)
+    await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByTestId('canvas-stage')).toBeVisible({ timeout: 20_000 })
   })
 
   test('shows error with wrong password', async ({ page }) => {
     await page.getByLabel('Email').fill(E2E_EMAIL)
-    await page.getByLabel('Password').fill('WrongPassword1!')
+    await page.getByRole('textbox', { name: 'Password' }).fill('WrongPassword1!')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByRole('alert')).toBeVisible()
   })
@@ -79,12 +79,12 @@ test.describe('Sign Out', () => {
     // Sign in first
     await page.goto('/app')
     await page.getByLabel('Email').fill(E2E_EMAIL)
-    await page.getByLabel('Password').fill(E2E_PASSWORD)
+    await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByTestId('canvas-stage')).toBeVisible({ timeout: 20_000 })
 
     // Sign out
-    await page.getByTestId('sign-out-btn').click()
+    await page.getByTestId('sign-out-button').click()
     await expect(page).toHaveURL('/')
   })
 })

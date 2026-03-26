@@ -20,7 +20,7 @@ setup('sign in as E2E test user', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'Sign In' })).toBeVisible({ timeout: 15_000 })
 
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
+  await page.getByRole('textbox', { name: 'Password' }).fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
 
   // Wait until the app canvas is visible — confirms successful sign-in

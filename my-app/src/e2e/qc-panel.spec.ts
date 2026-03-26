@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/app')
-  await expect(page.getByTestId('canvas-stage')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('konva-stage')).toBeVisible({ timeout: 20_000 })
 })
 
 test.describe('QC Panel', () => {

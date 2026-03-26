@@ -5,7 +5,9 @@
  */
 import { test as setup, expect } from '@playwright/test'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const AUTH_FILE = path.join(__dirname, '.auth/user.json')
 
 setup('sign in as E2E test user', async ({ page }) => {

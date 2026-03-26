@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
 import { stageStub, mockCanvas } from './konva-stub'
 import * as planStorage from '../planStorage'
+import * as analytics from '../analytics'
 
 beforeEach(() => {
   localStorage.clear()
@@ -321,6 +322,7 @@ describe('PNG export', () => {
     mockCanvas.toBlob.mockClear()
     ;(URL.createObjectURL as ReturnType<typeof vi.fn>).mockClear()
     ;(URL.revokeObjectURL as ReturnType<typeof vi.fn>).mockClear()
+    const trackSpy = vi.spyOn(analytics, 'track')
 
     const mockAnchor = { href: '', download: '', click: vi.fn() }
     const realCreateElement = document.createElement.bind(document)
@@ -337,6 +339,7 @@ describe('PNG export', () => {
     expect(mockAnchor.download).toMatch(/\.png$/)
     expect(mockAnchor.click).toHaveBeenCalled()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+    expect(trackSpy).toHaveBeenCalledWith('plan_exported_png', expect.objectContaining({ object_count: expect.any(Number) }))
 
     createElementSpy.mockRestore()
   })
@@ -896,12 +899,14 @@ describe('Cloud Save / Load', () => {
 
   it('shows "Saved ✓" in button after successful save', async () => {
     vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+    const trackSpy = vi.spyOn(analytics, 'track')
     const user = userEvent.setup()
     render(<TrafficControlPlanner userId="user-abc" />)
     await user.click(screen.getByTestId('cloud-save-button'))
     await waitFor(() =>
       expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
     )
+    expect(trackSpy).toHaveBeenCalledWith('plan_saved_cloud', expect.objectContaining({ object_count: expect.any(Number) }))
   })
 
   it('shows error message in button when save fails', async () => {

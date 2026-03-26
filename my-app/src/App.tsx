@@ -18,10 +18,15 @@ function AuthedApp() {
   const userId    = user?.username ?? null
   const userEmail = user?.signInDetails?.loginId ?? null
 
+  // Re-identify whenever the signed-in user changes
   useEffect(() => {
     if (userId) identifyUser(userId, userEmail)
-    return () => { resetAnalytics() }
   }, [userId, userEmail])
+
+  // Reset analytics only on unmount (sign-out / session end)
+  useEffect(() => {
+    return () => { resetAnalytics() }
+  }, [])
 
   return (
     <TrafficControlPlanner

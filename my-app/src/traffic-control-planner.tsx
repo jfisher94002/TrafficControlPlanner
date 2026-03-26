@@ -2329,6 +2329,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     if (!userId) return;
     setCloudSaveStatus('Saving…');
     try {
+      const objectCount = objects.length;
       const data = {
         id: planId, name: planTitle, createdAt: planCreatedAt,
         updatedAt: new Date().toISOString(), userId,
@@ -2337,7 +2338,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       };
       await savePlanToCloud(userId, planId, data);
       setCloudSaveStatus('Saved ✓');
-      track('plan_saved_cloud', { object_count: objects.length });
+      track('plan_saved_cloud', { object_count: objectCount });
     } catch (e) {
       setCloudSaveStatus(e instanceof Error ? e.message : 'Save failed');
     }

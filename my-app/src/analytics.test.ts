@@ -1,42 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import posthog from 'posthog-js'
 
-// Controlled env: key absent by default
-const env = vi.hoisted(() => ({ VITE_POSTHOG_KEY: undefined as string | undefined }))
-vi.mock('./analytics', async () => {
-  // Re-implement the module so it reads from our mutable env object
-  return {
-    initAnalytics: () => {
-      if (!env.VITE_POSTHOG_KEY) return
-      posthog.init(env.VITE_POSTHOG_KEY, {
-        api_host: 'https://us.i.posthog.com',
-        person_profiles: 'identified_only',
-        capture_pageview: true,
-        autocapture: false,
-      })
-    },
-    identifyUser: (userId: string, email: string | null) => {
-      if (!env.VITE_POSTHOG_KEY) return
-      posthog.identify(userId, { email: email ?? undefined })
-    },
-    resetAnalytics: () => {
-      if (!env.VITE_POSTHOG_KEY) return
-      posthog.reset()
-    },
-    track: (event: string, properties?: Record<string, unknown>) => {
-      if (!env.VITE_POSTHOG_KEY) return
-      posthog.capture(event, properties)
-    },
-  }
-})
+// posthog-js is globally mocked in test/setup.ts
+// Use vi.stubEnv to control VITE_POSTHOG_KEY between test groups
 
 import { initAnalytics, identifyUser, resetAnalytics, track } from './analytics'
 
 describe('analytics — key absent (dev/CI)', () => {
   beforeEach(() => {
-    env.VITE_POSTHOG_KEY = undefined
+    vi.stubEnv('VITE_POSTHOG_KEY', '')
     vi.clearAllMocks()
   })
+  afterEach(() => vi.unstubAllEnvs())
 
   it('initAnalytics does not call posthog.init', () => {
     initAnalytics()
@@ -61,9 +36,10 @@ describe('analytics — key absent (dev/CI)', () => {
 
 describe('analytics — key present', () => {
   beforeEach(() => {
-    env.VITE_POSTHOG_KEY = 'phc_testkey'
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phc_testkey')
     vi.clearAllMocks()
   })
+  afterEach(() => vi.unstubAllEnvs())
 
   it('initAnalytics calls posthog.init with the key', () => {
     initAnalytics()

@@ -1,13 +1,723 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TCP Planner</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCP Plan Pro — Traffic Control Plans Built for the Field</title>
+  <meta name="description" content="TCP Plan Pro replaces expensive desktop software with a modern web tool for traffic control companies, contractors, and flaggers. Free during pre-beta." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #1A6EFF;
+      --blue-light: #E6F1FB;
+      --blue-mid: #85B7EB;
+      --blue-dark: #185FA5;
+      --navy: #0F172A;
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-tertiary: #94A3B8;
+      --bg-primary: #ffffff;
+      --bg-secondary: #F8FAFC;
+      --bg-tertiary: #F1F5F9;
+      --border: rgba(15,23,42,0.1);
+      --border-md: rgba(15,23,42,0.2);
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { text-decoration: none; color: inherit; }
+
+    /* NAV */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: var(--bg-primary);
+      border-bottom: 0.5px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.3px;
+      color: var(--text-primary);
+    }
+
+    .logo-mark {
+      width: 28px;
+      height: 28px;
+      background: var(--blue);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .nav-links a:hover { color: var(--text-primary); }
+
+    .nav-cta {
+      background: var(--blue);
+      color: white !important;
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .nav-cta:hover { background: #155dd6; }
+
+    /* HERO */
+    .hero {
+      padding: 5rem 2rem 4rem;
+      max-width: 860px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .pre-badge {
+      display: inline-block;
+      background: var(--blue-light);
+      color: var(--blue-dark);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.3px;
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.8px;
+      margin-bottom: 1.25rem;
+      color: var(--text-primary);
+    }
+
+    .hero h1 span { color: var(--blue); }
+
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      max-width: 560px;
+      margin: 0 auto 2rem;
+      line-height: 1.65;
+    }
+
+    .cta-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: var(--blue);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: #155dd6; }
+
+    .btn-secondary {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: 0.5px solid var(--border-md);
+      padding: 12px 24px;
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-secondary:hover { background: var(--bg-secondary); }
+
+    .no-cc {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      margin-top: 0.75rem;
+    }
+
+    /* MOCKUP */
+    .mockup-wrap {
+      max-width: 900px;
+      margin: 3rem auto 0;
+      padding: 0 2rem;
+    }
+
+    .mockup-frame {
+      background: var(--bg-primary);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(15,23,42,0.08);
+    }
+
+    .mockup-topbar {
+      background: var(--navy);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-r { background: #FF6B6B; }
+    .dot-y { background: #FFD93D; }
+    .dot-g { background: #6BCB77; }
+
+    .mockup-url {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      font-family: 'DM Mono', monospace;
+      text-align: center;
+    }
+
+    .app-header {
+      background: var(--navy);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 0.5px solid rgba(255,255,255,0.08);
+    }
+
+    .app-logo { color: white; font-size: 14px; font-weight: 600; letter-spacing: -0.3px; }
+
+    .app-tabs { display: flex; gap: 4px; }
+
+    .app-tab {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .app-tab.active { background: var(--blue); color: white; }
+
+    .app-canvas {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: 320px;
+    }
+
+    .app-sidebar {
+      background: var(--navy);
+      padding: 16px;
+      border-right: 0.5px solid rgba(255,255,255,0.06);
+    }
+
+    .sidebar-section { margin-bottom: 1.25rem; }
+
+    .sidebar-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 2px;
+    }
+
+    .sidebar-item.active { background: rgba(26,110,255,0.2); color: #7AADFF; }
+
+    .sidebar-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    .app-main { background: #F8FAFC; padding: 16px; }
+
+    .road-map-area {
+      background: #E2E8F0;
+      border-radius: 8px;
+      height: 180px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .road-strip {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 48px;
+      transform: translateY(-50%);
+      background: #475569;
+    }
+
+    .road-center-line {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 2px;
+      transform: translateY(-50%);
+      background: repeating-linear-gradient(90deg, #FFD700 0, #FFD700 20px, transparent 20px, transparent 36px);
+    }
+
+    .zone-box {
+      position: absolute;
+      border: 2px dashed;
+      border-radius: 6px;
+      font-size: 9px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 0.5px;
+    }
+
+    .zone-taper  { top: 8px; left: 20px;  width: 90px;  height: 100px; border-color: #F59E0B; color: #D97706; background: rgba(245,158,11,0.08); }
+    .zone-work   { top: 8px; left: 130px; width: 160px; height: 100px; border-color: #EF4444; color: #DC2626; background: rgba(239,68,68,0.08); }
+    .zone-buffer { top: 8px; right: 20px; width: 90px;  height: 100px; border-color: #10B981; color: #059669; background: rgba(16,185,129,0.08); }
+
+    .device-marker {
+      position: absolute;
+      width: 12px; height: 12px;
+      background: var(--blue);
+      border-radius: 50%;
+      border: 2px solid white;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .map-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .map-stat {
+      background: white;
+      border: 0.5px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .map-stat-label { font-size: 10px; color: #64748B; margin-bottom: 3px; }
+    .map-stat-val   { font-size: 16px; font-weight: 600; color: var(--navy); }
+    .map-stat-sub   { font-size: 10px; color: #10B981; }
+
+    /* SECTIONS */
+    .section {
+      padding: 5rem 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .section-eyebrow {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--blue);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 600;
+      letter-spacing: -0.4px;
+      margin-bottom: 0.75rem;
+      color: var(--text-primary);
+    }
+
+    .section-sub {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      max-width: 540px;
+      margin-bottom: 3rem;
+      line-height: 1.65;
+    }
+
+    /* FEATURES */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--bg-primary);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+    }
+
+    .feature-icon {
+      width: 36px; height: 36px;
+      background: var(--blue-light);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .feature-title { font-size: 15px; font-weight: 500; margin-bottom: 0.4rem; color: var(--text-primary); }
+    .feature-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+    /* AUDIENCE */
+    .audience-section {
+      padding: 5rem 2rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 2.5rem;
+    }
+
+    .audience-card {
+      background: var(--bg-primary);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .audience-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .audience-title { font-size: 15px; font-weight: 500; margin-bottom: 0.4rem; color: var(--text-primary); }
+    .audience-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+    /* CTA SECTION */
+    .cta-section {
+      background: var(--navy);
+      padding: 5rem 2rem;
+      text-align: center;
+    }
+
+    .cta-inner { max-width: 560px; margin: 0 auto; }
+
+    .cta-section h2 {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 600;
+      color: white;
+      letter-spacing: -0.4px;
+      margin-bottom: 1rem;
+      line-height: 1.25;
+    }
+
+    .cta-section p {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.55);
+      margin-bottom: 2rem;
+      line-height: 1.65;
+    }
+
+    .cta-contact {
+      margin-top: 1.5rem;
+      font-size: 13px;
+      color: rgba(255,255,255,0.35);
+    }
+
+    .cta-contact a {
+      color: rgba(255,255,255,0.6);
+      border-bottom: 0.5px solid rgba(255,255,255,0.2);
+    }
+
+    .cta-contact a:hover { color: white; border-bottom-color: white; }
+
+    /* FOOTER */
+    .footer {
+      background: var(--bg-primary);
+      border-top: 0.5px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .footer a { color: var(--text-secondary); }
+    .footer a:hover { color: var(--text-primary); }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 700px) {
+      .nav-links { display: none; }
+      .app-canvas { grid-template-columns: 1fr; }
+      .app-sidebar { display: none; }
+      .map-controls { grid-template-columns: 1fr 1fr; }
+      .footer { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-logo">
+      <div class="logo-mark">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="7" width="12" height="2" fill="white" rx="1"/>
+          <rect x="6" y="3" width="4" height="10" fill="rgba(255,255,255,0.4)" rx="1"/>
+        </svg>
+      </div>
+      TCP Plan Pro
+    </div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#who">Who it's for</a>
+      <a href="mailto:jfisher@fisherconsulting.org">Contact</a>
+      <a href="/app" class="nav-cta">Try Pre-Beta Free</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="pre-badge">Pre-Beta — Free Access</div>
+    <h1>Traffic control plans.<br><span>Built for the field.</span></h1>
+    <p>TCP Plan Pro replaces expensive, clunky desktop software with a modern web tool designed for traffic control companies, contractors, and flaggers who need to move fast.</p>
+    <div class="cta-group">
+      <a href="/app"><button class="btn-primary">Try TCP Plan Pro Free</button></a>
+      <a href="#features"><button class="btn-secondary">See how it works</button></a>
+    </div>
+    <p class="no-cc">No credit card. No installation. Just a browser.</p>
+  </section>
+
+  <!-- APP MOCKUP -->
+  <div class="mockup-wrap">
+    <div class="mockup-frame">
+      <div class="mockup-topbar">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+        <div class="mockup-url">tcpplanpro.com</div>
+      </div>
+      <div class="app-header">
+        <div class="app-logo">TCP Plan Pro</div>
+        <div class="app-tabs">
+          <div class="app-tab active">Plan Editor</div>
+          <div class="app-tab">My Projects</div>
+          <div class="app-tab">Export</div>
+        </div>
+      </div>
+      <div class="app-canvas">
+        <div class="app-sidebar">
+          <div class="sidebar-section">
+            <div class="sidebar-label">Active Zones</div>
+            <div class="sidebar-item active">
+              <div class="sidebar-dot" style="background:#1A6EFF"></div>
+              Highway 101 — PM Peak
+            </div>
+            <div class="sidebar-item">
+              <div class="sidebar-dot" style="background:#F59E0B"></div>
+              Main St Utility Work
+            </div>
+            <div class="sidebar-item">
+              <div class="sidebar-dot" style="background:#10B981"></div>
+              Ramp Closure — SR 85
+            </div>
+          </div>
+          <div class="sidebar-section">
+            <div class="sidebar-label">Components</div>
+            <div class="sidebar-item">Work zone</div>
+            <div class="sidebar-item">Taper</div>
+            <div class="sidebar-item">Sign placement</div>
+            <div class="sidebar-item">Flagger position</div>
+          </div>
+        </div>
+        <div class="app-main">
+          <div class="road-map-area">
+            <div class="road-strip"></div>
+            <div class="road-center-line"></div>
+            <div class="zone-box zone-taper">TAPER</div>
+            <div class="zone-box zone-work">WORK ZONE</div>
+            <div class="zone-box zone-buffer">BUFFER</div>
+            <div class="device-marker" style="left:60px"></div>
+            <div class="device-marker" style="left:340px;background:#F59E0B"></div>
+          </div>
+          <div class="map-controls">
+            <div class="map-stat">
+              <div class="map-stat-label">Work Zone Length</div>
+              <div class="map-stat-val">1,200 ft</div>
+              <div class="map-stat-sub">Within limits</div>
+            </div>
+            <div class="map-stat">
+              <div class="map-stat-label">Taper Length</div>
+              <div class="map-stat-val">340 ft</div>
+              <div class="map-stat-sub">MUTCD compliant</div>
+            </div>
+            <div class="map-stat">
+              <div class="map-stat-label">Speed Limit</div>
+              <div class="map-stat-val">55 mph</div>
+              <div class="map-stat-sub">Posted</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section id="features" class="section">
+    <div class="section-eyebrow">What you get</div>
+    <div class="section-title">Professional plans without the professional price tag.</div>
+    <div class="section-sub">TCP Plan Pro runs in your browser, auto-calculates MUTCD taper and buffer distances, and exports permit-ready PDFs. No license dongles, no installs, no per-seat fees.</div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="8" width="14" height="2" fill="#1A6EFF" rx="1"/><rect x="7" y="3" width="4" height="12" fill="#85B7EB" rx="1"/></svg>
+        </div>
+        <div class="feature-title">MUTCD auto-calculations</div>
+        <div class="feature-desc">Speed limit and zone length go in, taper and buffer distances come out. No manual lookups.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="3" stroke="#1A6EFF" stroke-width="1.5"/><path d="M5 9h8M9 5v8" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feature-title">Drag-and-drop plan editor</div>
+        <div class="feature-desc">Place work zones, signs, flaggers, and barriers on a real map background in seconds.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="2" width="12" height="14" rx="2" stroke="#1A6EFF" stroke-width="1.5"/><path d="M6 6h6M6 9h4M6 12h5" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feature-title">PDF export for permits</div>
+        <div class="feature-desc">Export clean, labeled PDFs your permit office will accept. No markup, no watermarks.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="#1A6EFF" stroke-width="1.5"/><path d="M9 6v3l2 2" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feature-title">Works on any device</div>
+        <div class="feature-desc">Laptop in the office or tablet in the truck. Same app, no compromises.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9l3-4 3 4 3-4 3 4" stroke="#1A6EFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="feature-title">Reusable templates</div>
+        <div class="feature-desc">Save your common setups and drop them onto new jobs without starting from scratch.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2 5h5l-4 3 1.5 5L9 12l-4.5 3L6 10 2 7h5z" stroke="#1A6EFF" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="feature-title">Free during pre-beta</div>
+        <div class="feature-desc">Full access at no cost while we build. Your feedback directly shapes the product.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDIENCE -->
+  <section id="who" class="audience-section">
+    <div class="section-eyebrow">Who it's for</div>
+    <div class="section-title">Built for people in the field.</div>
+    <div class="audience-grid">
+      <div class="audience-card">
+        <div class="audience-icon" style="background:#E6F1FB;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="4" width="16" height="14" rx="2" stroke="#1A6EFF" stroke-width="1.5"/><path d="M7 8h8M7 12h5" stroke="#85B7EB" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="audience-title">Traffic Control Companies</div>
+        <div class="audience-desc">Plan multiple jobs simultaneously without paying per-seat license fees.</div>
+      </div>
+      <div class="audience-card">
+        <div class="audience-icon" style="background:#EAF3DE;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="8" r="3" stroke="#639922" stroke-width="1.5"/><path d="M5 18c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="#97C459" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="audience-title">Independent Contractors</div>
+        <div class="audience-desc">Get professional-grade plans without a professional-grade software budget.</div>
+      </div>
+      <div class="audience-card">
+        <div class="audience-icon" style="background:#FAEEDA;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="4" y="10" width="14" height="8" rx="1.5" stroke="#BA7517" stroke-width="1.5"/><path d="M8 10V7a3 3 0 016 0v3" stroke="#EF9F27" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="audience-title">General Contractors</div>
+        <div class="audience-desc">Handle TCP submissions in-house instead of subbing them out every job.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTOM CTA -->
+  <section class="cta-section">
+    <div class="cta-inner">
+      <h2>Try TCP Plan Pro free while it's in pre-beta.</h2>
+      <p>Full access, no credit card. Help us build the tool the industry actually needs.</p>
+      <a href="/app"><button class="btn-primary" style="font-size:16px;padding:14px 28px;">Get Started Free</button></a>
+      <p style="margin-top:1rem;font-size:12px;color:rgba(255,255,255,0.3);">No installation required. Works in any modern browser.</p>
+      <div class="cta-contact">Questions? Reach us at <a href="mailto:jfisher@fisherconsulting.org">jfisher@fisherconsulting.org</a></div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span>TCP Plan Pro · <a href="/app">tcpplanpro.com</a></span>
+    <div class="footer-right">
+      <a href="mailto:jfisher@fisherconsulting.org">jfisher@fisherconsulting.org</a>
+      <span>Pre-Beta © 2026</span>
+    </div>
+  </footer>
+
+</body>
 </html>

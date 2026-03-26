@@ -95,6 +95,16 @@ globalThis.prompt = vi.fn().mockReturnValue(null)
 globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
 globalThis.URL.revokeObjectURL = vi.fn()
 
+// ─── PostHog mock ─────────────────────────────────────────────────────────────
+vi.mock('posthog-js', () => ({
+  default: {
+    init: vi.fn(),
+    identify: vi.fn(),
+    reset: vi.fn(),
+    capture: vi.fn(),
+  },
+}))
+
 // ─── AWS Amplify Storage mock ─────────────────────────────────────────────────
 vi.mock('aws-amplify/storage', () => ({
   uploadData: vi.fn(() => ({ result: Promise.resolve() })),

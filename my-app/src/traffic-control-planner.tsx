@@ -14,6 +14,7 @@ import type {
 import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isRoad, isMultiPointRoad, calcTaperLength, cloneObject } from './utils';
 import { savePlanToCloud } from './planStorage';
 import PlanDashboard from './PlanDashboard';
+import { track } from './analytics';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -2321,12 +2322,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     const url = URL.createObjectURL(blob);
     triggerDownload(url, `${safePlanTitle}.tcp.json`);
     URL.revokeObjectURL(url);
+    track('plan_saved_local', { object_count: objects.length });
   };
 
   const handleCloudSave = async () => {
     if (!userId) return;
     setCloudSaveStatus('Saving…');
     try {
+      const objectCount = objects.length;
       const data = {
         id: planId, name: planTitle, createdAt: planCreatedAt,
         updatedAt: new Date().toISOString(), userId,
@@ -2335,6 +2338,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       };
       await savePlanToCloud(userId, planId, data);
       setCloudSaveStatus('Saved ✓');
+      track('plan_saved_cloud', { object_count: objectCount });
     } catch (e) {
       setCloudSaveStatus(e instanceof Error ? e.message : 'Save failed');
     }
@@ -2363,6 +2367,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setZoom(newZoom);
     setMapCenter(newMapCenter);
     setShowDashboard(false);
+    track('plan_loaded_cloud', { object_count: newObjects.length });
   };
 
   const exportPNG = () => {
@@ -2374,6 +2379,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const url = URL.createObjectURL(blob);
       triggerDownload(url, `${safePlanTitle}.png`);
       URL.revokeObjectURL(url);
+      track('plan_exported_png', { object_count: objects.length });
     }, "image/png");
   };
 
@@ -2408,6 +2414,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const url = URL.createObjectURL(blob);
       triggerDownload(url, `${safePlanTitle}.pdf`);
       URL.revokeObjectURL(url);
+      track('plan_exported_pdf', { object_count: objects.length });
     } catch (err) {
       console.error("PDF export failed:", err);
     }

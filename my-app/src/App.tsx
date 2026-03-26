@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Amplify } from 'aws-amplify'
 import { Authenticator, ThemeProvider, useAuthenticator } from '@aws-amplify/ui-react'
 import '@aws-amplify/ui-react/styles.css'
@@ -6,6 +7,7 @@ import awsExports from './aws-exports'
 import { authTheme } from './auth/theme'
 import { AuthHeader } from './auth/AuthHeader'
 import { useAutoSignOut } from './auth/useAutoSignOut'
+import { identifyUser, resetAnalytics } from './analytics'
 
 Amplify.configure(awsExports)
 
@@ -13,10 +15,23 @@ function AuthedApp() {
   const { signOut, user } = useAuthenticator((ctx) => [ctx.user])
   useAutoSignOut(signOut)
 
+  const userId    = user?.username ?? null
+  const userEmail = user?.signInDetails?.loginId ?? null
+
+  // Re-identify whenever the signed-in user changes
+  useEffect(() => {
+    if (userId) identifyUser(userId, userEmail)
+  }, [userId, userEmail])
+
+  // Reset analytics only on unmount (sign-out / session end)
+  useEffect(() => {
+    return () => { resetAnalytics() }
+  }, [])
+
   return (
     <TrafficControlPlanner
-      userId={user?.username ?? null}
-      userEmail={user?.signInDetails?.loginId ?? null}
+      userId={userId}
+      userEmail={userEmail}
       onSignOut={signOut}
     />
   )

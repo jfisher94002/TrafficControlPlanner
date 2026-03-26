@@ -568,10 +568,9 @@ describe('Pre-beta banner', () => {
     expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
   })
 
-  it('contact email link is present in the pre-beta banner', () => {
+  it('contact email link is present in the toolbar', () => {
     render(<TrafficControlPlanner />)
-    const banner = screen.getByTestId('prebeta-banner')
-    const link = within(banner).getByRole('link')
+    const link = screen.getByTestId('contact-email')
     expect(link).toBeInTheDocument()
     expect(link.getAttribute('href')).toMatch(/^mailto:/)
   })

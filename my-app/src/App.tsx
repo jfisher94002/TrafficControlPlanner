@@ -49,11 +49,11 @@ function AuthedApp() {
     try {
       await signOut()
     } catch (err) {
-      // Sign-out errors (e.g. expired token, network) don't block the redirect,
-      // but log them so we can catch server-side session issues in monitoring.
+      // Log so server-side session failures are visible in monitoring.
       console.error('[Auth] signOut error:', err)
+    } finally {
+      window.location.href = '/'
     }
-    window.location.href = '/'
   }
 
   return (

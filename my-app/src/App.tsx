@@ -28,11 +28,16 @@ function AuthedApp() {
     return () => { resetAnalytics() }
   }, [])
 
+  const handleSignOut = async () => {
+    await signOut()
+    window.location.href = '/'
+  }
+
   return (
     <TrafficControlPlanner
       userId={userId}
       userEmail={userEmail}
-      onSignOut={signOut}
+      onSignOut={handleSignOut}
     />
   )
 }

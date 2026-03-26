@@ -504,10 +504,22 @@ describe('Auth props', () => {
     expect(screen.getByTestId('sign-out-button')).toBeInTheDocument()
   })
 
-  it('sign-out button title includes the userId', () => {
+  it('user-identity label shows the userId when no email is provided', () => {
     render(<TrafficControlPlanner userId="alice@example.com" onSignOut={vi.fn()} />)
-    const btn = screen.getByTestId('sign-out-button')
-    expect(btn.title).toContain('alice@example.com')
+    expect(screen.getByTestId('user-identity').textContent).toContain('alice@example.com')
+  })
+
+  it('user-identity label prefers userEmail over userId', () => {
+    render(<TrafficControlPlanner userId="cognito-uuid" userEmail="alice@example.com" onSignOut={vi.fn()} />)
+    const el = screen.getByTestId('user-identity')
+    expect(el.textContent).toContain('alice@example.com')
+    expect(el.textContent).not.toContain('cognito-uuid')
+    expect(el.title).toBe('alice@example.com')
+  })
+
+  it('user-identity label is not rendered when neither userId nor userEmail is provided', () => {
+    render(<TrafficControlPlanner onSignOut={vi.fn()} />)
+    expect(screen.queryByTestId('user-identity')).not.toBeInTheDocument()
   })
 
   it('clicking sign-out button calls onSignOut', async () => {

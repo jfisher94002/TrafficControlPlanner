@@ -64,9 +64,8 @@ jobs:
       - name: "Post review comment"
         env:
           GH_TOKEN: ${{ github.token }}
+          REVIEW: ${{ steps.gemini.outputs.review }}
         run: |
           PR_NUM=${{ github.event.pull_request.number || inputs.pr_number }}
-          gh pr comment "$PR_NUM" \
-            --body "## 🤖 Gemini Code Review
-
-          ${{ steps.gemini.outputs.review }}"
+          printf '## 🤖 Gemini Code Review\n\n%s' "$REVIEW" > /tmp/review_body.md
+          gh pr comment "$PR_NUM" --body-file /tmp/review_body.md

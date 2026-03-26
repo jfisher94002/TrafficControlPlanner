@@ -324,13 +324,15 @@ describe('PNG export', () => {
     ;(URL.revokeObjectURL as ReturnType<typeof vi.fn>).mockClear()
     const trackSpy = vi.spyOn(analytics, 'track')
 
+    // Render first so React's <a> elements are created before the spy is set up
+    const { user } = setup()
+
     const mockAnchor = { href: '', download: '', click: vi.fn() }
     const realCreateElement = document.createElement.bind(document)
     const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) =>
       tag === 'a' ? (mockAnchor as unknown as HTMLElement) : realCreateElement(tag),
     )
 
-    const { user } = setup()
     await user.click(screen.getByTestId('export-png-button'))
 
     expect(stageStub.toCanvas).toHaveBeenCalledWith({ pixelRatio: 2 })
@@ -542,6 +544,36 @@ describe('Auth props', () => {
     const signOutIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'sign-out-button')
     expect(signOutIdx).toBeGreaterThan(pngIdx)
     expect(signOutIdx).toBeGreaterThan(pdfIdx)
+  })
+})
+
+// ─── Pre-beta banner ──────────────────────────────────────────────────────────
+describe('Pre-beta banner', () => {
+  beforeEach(() => sessionStorage.clear())
+
+  it('shows the banner by default', () => {
+    render(<TrafficControlPlanner />)
+    expect(screen.getByTestId('prebeta-banner')).toBeInTheDocument()
+  })
+
+  it('hides the banner after clicking dismiss', async () => {
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner />)
+    await user.click(screen.getByTestId('dismiss-banner'))
+    expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
+  })
+
+  it('does not show the banner if already dismissed this session', () => {
+    sessionStorage.setItem('tcp_prebeta_banner_dismissed', '1')
+    render(<TrafficControlPlanner />)
+    expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
+  })
+
+  it('contact email link is present in the toolbar', () => {
+    render(<TrafficControlPlanner />)
+    const link = screen.getByTestId('contact-email')
+    expect(link).toBeInTheDocument()
+    expect(link.getAttribute('href')).toMatch(/^mailto:/)
   })
 })
 

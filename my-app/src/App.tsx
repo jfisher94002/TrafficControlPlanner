@@ -28,8 +28,8 @@ function AuthedApp() {
     return () => { resetAnalytics() }
   }, [])
 
-  const handleSignOut = () => {
-    signOut()
+  const handleSignOut = async () => {
+    await signOut()
     window.location.href = '/'
   }
 

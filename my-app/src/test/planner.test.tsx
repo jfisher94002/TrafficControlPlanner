@@ -923,10 +923,10 @@ describe('Cloud Save / Load', () => {
     vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
     let clearCallback: (() => void) | undefined
     const origSetTimeout = globalThis.setTimeout
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: TimerHandler, delay?: number) => {
-      if (typeof fn === 'function' && delay === 3000) { clearCallback = fn as () => void; return 0 as unknown as ReturnType<typeof setTimeout> }
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: TimerHandler, delay?: number) => {
+      if (typeof fn === 'function' && delay === 3000) { clearCallback = fn as () => void; return 0 }
       return origSetTimeout(fn, delay)
-    })
+    }) as typeof setTimeout)
     const user = userEvent.setup()
     render(<TrafficControlPlanner userId="user-abc" />)
     await user.click(screen.getByTestId('cloud-save-button'))

@@ -1677,12 +1677,13 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 interface PlannerProps {
   userId?: string | null;
+  userEmail?: string | null;
   onSignOut?: () => void;
 }
 
 const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID);
 
-export default function TrafficControlPlanner({ userId = null, onSignOut }: PlannerProps = {}) {
+export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -2502,9 +2503,14 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
           <div style={{ flex: 1 }} />
           <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
-          {onSignOut && (
-            <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)} title={`Signed in as ${userId ?? 'unknown'}`}>Sign Out</button>
-          )}
+          {onSignOut && (<>
+            {(userEmail || userId) && (
+              <span data-testid="user-identity" style={{ fontSize: 10, color: COLORS.textMuted, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={userEmail ?? userId ?? ''}>
+                {userEmail ?? userId}
+              </span>
+            )}
+            <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)}>Sign Out</button>
+          </>)}
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 

@@ -46,7 +46,11 @@ function AuthedApp() {
   }, [])
 
   const handleSignOut = async () => {
-    await signOut()
+    try {
+      await signOut()
+    } catch {
+      // ignore sign-out errors — redirect regardless
+    }
     window.location.href = '/'
   }
 

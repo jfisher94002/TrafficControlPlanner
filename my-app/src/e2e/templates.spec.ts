@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/app')
-  await expect(page.getByTestId('konva-stage')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 })
 
 test.describe('Template Picker', () => {
@@ -43,6 +43,6 @@ test.describe('Template Picker', () => {
     await applyBtn.click()
 
     await expect(page.getByRole('dialog', { name: /templates/i })).not.toBeVisible()
-    await expect(page.getByTestId('konva-stage')).toBeVisible()
+    await expect(page.getByTestId('canvas-container')).toBeVisible()
   })
 })

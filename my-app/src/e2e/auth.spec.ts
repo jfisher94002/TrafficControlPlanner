@@ -17,7 +17,7 @@ test.describe('Sign In', () => {
     await page.getByLabel('Email').fill(E2E_EMAIL)
     await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByTestId('konva-stage')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
   })
 
   test('shows error with wrong password', async ({ page }) => {
@@ -81,7 +81,7 @@ test.describe('Sign Out', () => {
     await page.getByLabel('Email').fill(E2E_EMAIL)
     await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByTestId('konva-stage')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 
     // Sign out
     await page.getByTestId('sign-out-button').click()

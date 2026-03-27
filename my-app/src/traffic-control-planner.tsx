@@ -2869,7 +2869,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         </div>
 
         {/* ─── CANVAS (Konva Stage) ─── */}
-        <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <div ref={containerRef} data-testid="canvas-container" style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <Stage
             ref={stageRef}
             data-testid="konva-stage"

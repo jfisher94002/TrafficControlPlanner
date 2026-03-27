@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/app')
-  await expect(page.getByTestId('konva-stage')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 })
 
 test.describe('Plan Dashboard', () => {
@@ -20,7 +20,7 @@ test.describe('Plan Dashboard', () => {
     await expect(page.getByTestId('plan-dashboard')).toBeVisible({ timeout: 10_000 })
     await page.getByTestId('new-plan-btn').click()
     // Dashboard closes and canvas is ready
-    await expect(page.getByTestId('konva-stage')).toBeVisible()
+    await expect(page.getByTestId('canvas-container')).toBeVisible()
   })
 })
 

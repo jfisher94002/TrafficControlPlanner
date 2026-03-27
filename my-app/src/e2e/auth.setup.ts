@@ -24,7 +24,7 @@ setup('sign in as E2E test user', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in' }).click()
 
   // Wait until the app canvas is visible — confirms successful sign-in
-  await expect(page.getByTestId('konva-stage')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 
   await page.context().storageState({ path: AUTH_FILE })
 })

@@ -931,6 +931,8 @@ function ToolButton({ tool, active, onClick }: ToolButtonProps) {
     <button
       onClick={onClick}
       title={`${tool.label} (${tool.shortcut})`}
+      data-testid={`tool-${tool.id}`}
+      aria-pressed={active}
       style={{
         display: "flex", alignItems: "center", justifyContent: "center",
         width: 40, height: 40, borderRadius: 8,
@@ -2700,9 +2702,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {sectionTitle("Zoom")}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={zoomOut} style={panelBtnStyle(false)}>−</button>
-                  <div style={{ flex: 1, textAlign: "center", fontSize: 11, color: COLORS.text, lineHeight: "28px" }}>{(zoom * 100).toFixed(0)}%</div>
-                  <button onClick={zoomIn} style={panelBtnStyle(false)}>+</button>
+                  <button data-testid="zoom-out" onClick={zoomOut} style={panelBtnStyle(false)}>−</button>
+                  <div data-testid="zoom-level" style={{ flex: 1, textAlign: "center", fontSize: 11, color: COLORS.text, lineHeight: "28px" }}>{(zoom * 100).toFixed(0)}%</div>
+                  <button data-testid="zoom-in" onClick={zoomIn} style={panelBtnStyle(false)}>+</button>
                   <button onClick={zoomFit} style={panelBtnStyle(false)}>Fit</button>
                 </div>
 

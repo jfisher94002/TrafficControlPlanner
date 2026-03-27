@@ -1917,8 +1917,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setCubicPoints([]);
   }, []);
 
-  const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
-
   const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest" | "qc") => {
     const tabs: Array<"properties" | "manifest" | "qc"> = ["properties", "manifest", "qc"];
     const idx = tabs.indexOf(current);

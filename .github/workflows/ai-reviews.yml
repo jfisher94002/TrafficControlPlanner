@@ -22,7 +22,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          HEAD_REF=$(gh pr view ${{ inputs.pr_number }} --json headRefName -q .headRefName)
+          HEAD_REF=$(gh pr view ${{ inputs.pr_number }} --repo "${{ github.repository }}" --json headRefName -q .headRefName)
           if [ -z "$HEAD_REF" ]; then
             echo "::error::Could not resolve headRefName for PR ${{ inputs.pr_number }} — PR may be closed or missing."
             exit 1
@@ -43,7 +43,11 @@ jobs:
           if [ -n "${{ github.base_ref }}" ]; then
             BASE_REF="${{ github.base_ref }}"
           else
-            BASE_REF=$(gh pr view ${{ inputs.pr_number }} --json baseRefName -q .baseRefName)
+            BASE_REF=$(gh pr view ${{ inputs.pr_number }} --repo "${{ github.repository }}" --json baseRefName -q .baseRefName)
+            if [ -z "$BASE_REF" ]; then
+              echo "::error::Could not resolve baseRefName for PR ${{ inputs.pr_number }}"
+              exit 1
+            fi
           fi
           git fetch origin "$BASE_REF"
           git diff "origin/$BASE_REF"...HEAD > /tmp/pr.diff

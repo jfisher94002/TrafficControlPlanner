@@ -1978,6 +1978,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         }
         return;
       }
@@ -2114,6 +2115,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const newSign: SignObject = { id: uid(), type: "sign", x: raw.x, y: raw.y, signData: selectedSign, rotation: 0, scale: 1 };
       const newObjs = [...objects, newSign];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newSign.id);
+      if (selectedSign) {
+        const isCustom = selectedSign.id.startsWith('custom_');
+        track('sign_placed', {
+          sign_id: selectedSign.id,
+          sign_source: isCustom ? 'custom' : 'builtin',
+          ...(isCustom ? {} : { sign_label: selectedSign.label }),
+        });
+      }
       return;
     }
 
@@ -2159,6 +2168,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         } else {
           setPolyPoints((prev) => [...prev, { x, y }]);
         }
@@ -2171,6 +2181,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           const newRoad: CurveRoadObject = { id: uid(), type: "curve_road", points: newCurvePts as [Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCurvePoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'curve', point_count: 3 });
         } else {
           setCurvePoints(newCurvePts);
         }
@@ -2183,6 +2194,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           const newRoad: CubicBezierRoadObject = { id: uid(), type: "cubic_bezier_road", points: newCubicPts as [Point, Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'cubic', point_count: 4 });
         } else {
           setCubicPoints(newCubicPts);
         }
@@ -2270,6 +2282,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const newRoad: StraightRoadObject = { id: uid(), type: "road", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
       const newObjs = [...objects, newRoad];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id);
+      track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'straight' });
       setDrawStart(null);
       return;
     }

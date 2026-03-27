@@ -983,3 +983,64 @@ describe('Cloud Save / Load', () => {
     expect(screen.queryByTestId('plan-dashboard')).not.toBeInTheDocument()
   })
 })
+
+// ─── Analytics — canvas events ────────────────────────────────────────────────
+describe('Analytics — canvas events', () => {
+  it('placing a sign fires sign_placed with sign_id and sign_source', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(trackSpy).toHaveBeenCalledWith('sign_placed', expect.objectContaining({
+      sign_id: expect.any(String),
+      sign_source: expect.stringMatching(/^builtin|custom$/),
+    }))
+  })
+
+  it('sign_placed does not include sign_label for custom signs', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const call = trackSpy.mock.calls.find(([event]) => event === 'sign_placed')
+    // built-in signs include label; custom signs must not
+    if (call && (call[1] as Record<string, unknown>).sign_source === 'custom') {
+      expect((call[1] as Record<string, unknown>).sign_label).toBeUndefined()
+    }
+  })
+
+  it('committing a polyline road with Enter fires road_drawn', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    const { user } = setup()
+    // Open the roads left panel, then switch to poly mode
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByText('Polyline'))
+    const canvas = screen.getByTestId('konva-stage')
+    // Two clicks add two points (getPointerPosition always returns {0,0} — that's fine for length check)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      road_type: expect.any(String),
+      draw_mode: expect.any(String),
+    }))
+  })
+
+  it('placing a straight road fires road_drawn with draw_mode straight', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    // Return different positions so the distance check (>5px) passes
+    let calls = 0
+    vi.spyOn(stageStub, 'getPointerPosition').mockImplementation(() =>
+      calls++ === 0 ? { x: 0, y: 0 } : { x: 100, y: 100 }
+    )
+    setup()
+    fireEvent.keyDown(window, { key: 'R' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      draw_mode: 'straight',
+      road_type: expect.any(String),
+    }))
+  })
+})

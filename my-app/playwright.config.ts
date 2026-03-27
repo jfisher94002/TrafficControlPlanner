@@ -32,7 +32,7 @@ export default defineConfig({
         storageState: 'src/e2e/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: '**/auth.setup.ts',
+      testIgnore: ['**/auth.setup.ts', '**/auth.spec.ts'],
     },
     // Auth tests run without stored state (they test sign-in/up themselves)
     {

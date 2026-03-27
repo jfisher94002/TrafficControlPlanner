@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import React from 'react'
 
 // vi.mock is hoisted — use vi.hoisted() for variables referenced inside factories
-const { mockAwsExports, mockSignOut, mockHubUnsubscribe, mockUseAuthenticator } = vi.hoisted(() => ({
+const { mockAwsExports, mockSignOut, mockAmplifySignOut, mockHubUnsubscribe, mockUseAuthenticator } = vi.hoisted(() => ({
   mockAwsExports: {
     aws_user_pools_id: '',
     aws_user_pools_web_client_id: '',
@@ -12,11 +12,17 @@ const { mockAwsExports, mockSignOut, mockHubUnsubscribe, mockUseAuthenticator } 
     aws_user_files_s3_bucket: '',
   },
   mockSignOut: vi.fn(),
+  mockAmplifySignOut: vi.fn(),
   mockHubUnsubscribe: vi.fn(),
   mockUseAuthenticator: vi.fn(),
 }))
 
 vi.mock('aws-amplify', () => ({ Amplify: { configure: vi.fn() } }))
+
+vi.mock('aws-amplify/auth', () => ({
+  signUp: vi.fn(),
+  signOut: mockAmplifySignOut,
+}))
 
 vi.mock('aws-amplify/utils', () => ({
   Hub: { listen: vi.fn(() => mockHubUnsubscribe) },
@@ -94,7 +100,7 @@ describe('App — auth enabled', () => {
   it('passes signOut as onSignOut to the planner', async () => {
     render(<App />)
     await userEvent.click(screen.getByTestId('sign-out-btn'))
-    expect(mockSignOut).toHaveBeenCalledOnce()
+    expect(mockAmplifySignOut).toHaveBeenCalledWith({ global: true })
   })
 
   it('registers a Hub auth listener on mount', () => {

@@ -16,23 +16,28 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
+      - name: "Resolve PR head ref (workflow_dispatch only)"
+        id: pr_head
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HEAD_REF=$(gh pr view ${{ inputs.pr_number }} --json headRefName -q .headRefName)
+          if [ -z "$HEAD_REF" ]; then
+            echo "::error::Could not resolve headRefName for PR ${{ inputs.pr_number }} — PR may be closed or missing."
+            exit 1
+          fi
+          echo "head_ref=$HEAD_REF" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: "Checkout PR head (workflow_dispatch only)"
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          HEAD_REF=$(gh pr view ${{ inputs.pr_number }} --json headRefName -q .headRefName)
-          git fetch origin "$HEAD_REF"
-          git checkout "$HEAD_REF"
+          ref: ${{ github.event_name == 'workflow_dispatch' && steps.pr_head.outputs.head_ref || github.event.pull_request.head.ref || github.ref }}
 
       - name: "Get PR diff"
         id: diff
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Resolve base branch: available on pull_request events; look it up for workflow_dispatch
           if [ -n "${{ github.base_ref }}" ]; then
@@ -72,7 +77,7 @@ jobs:
 
       - name: "Post review comment"
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEW: ${{ steps.gemini.outputs.review }}
         run: |
           PR_NUM=${{ github.event.pull_request.number || inputs.pr_number }}
@@ -80,8 +85,8 @@ jobs:
           gh pr comment "$PR_NUM" --body-file /tmp/review_body.md
 
       - name: "Label PR"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUM=${{ github.event.pull_request.number || inputs.pr_number }}
           gh pr edit "$PR_NUM" --add-label "ai-reviewed"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

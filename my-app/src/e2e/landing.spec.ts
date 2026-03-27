@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Landing Page', () => {
   test('loads at /', async ({ page }) => {
     await page.goto('/')
-    await expect(page).toHaveTitle(/TCPlanPro/i)
+    await expect(page).toHaveTitle(/TCP Plan Pro/i)
     await expect(page.getByText(/Traffic Control/i).first()).toBeVisible()
   })
 

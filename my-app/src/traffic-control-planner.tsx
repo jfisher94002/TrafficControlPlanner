@@ -2115,7 +2115,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const newSign: SignObject = { id: uid(), type: "sign", x: raw.x, y: raw.y, signData: selectedSign, rotation: 0, scale: 1 };
       const newObjs = [...objects, newSign];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newSign.id);
-      track('sign_placed', { sign_id: selectedSign?.id, sign_label: selectedSign?.label });
+      if (selectedSign) {
+        const isCustom = selectedSign.id.startsWith('custom_');
+        track('sign_placed', {
+          sign_id: selectedSign.id,
+          sign_source: isCustom ? 'custom' : 'builtin',
+          ...(isCustom ? {} : { sign_label: selectedSign.label }),
+        });
+      }
       return;
     }
 

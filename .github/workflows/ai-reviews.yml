@@ -69,3 +69,8 @@ jobs:
           PR_NUM=${{ github.event.pull_request.number || inputs.pr_number }}
           printf '## 🤖 Gemini Code Review\n\n%s' "$REVIEW" > /tmp/review_body.md
           gh pr comment "$PR_NUM" --body-file /tmp/review_body.md
+
+      - name: "Label PR"
+        run: gh pr edit ${{ github.event.pull_request.number }} --add-label "ai-reviewed"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

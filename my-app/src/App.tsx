@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Amplify } from 'aws-amplify'
+import { signUp } from 'aws-amplify/auth'
 import { Authenticator, ThemeProvider, useAuthenticator } from '@aws-amplify/ui-react'
 import '@aws-amplify/ui-react/styles.css'
 import TrafficControlPlanner from './traffic-control-planner'
@@ -10,6 +11,22 @@ import { useAutoSignOut } from './auth/useAutoSignOut'
 import { identifyUser, resetAnalytics } from './analytics'
 
 Amplify.configure(awsExports)
+
+// Amplify UI doesn't always forward custom formFields to Cognito automatically.
+// This ensures `name` from the sign-up form is included in the signUp call.
+const authServices = {
+  async handleSignUp(input: Parameters<typeof signUp>[0]) {
+    const attrs = (input.options?.userAttributes ?? {}) as Record<string, string>
+    const name = attrs['name'] ?? ''
+    return signUp({
+      ...input,
+      options: {
+        ...input.options,
+        userAttributes: { ...attrs, name },
+      },
+    })
+  },
+}
 
 function AuthedApp() {
   const { signOut, user } = useAuthenticator((ctx) => [ctx.user])
@@ -52,7 +69,24 @@ export default function App() {
 
   return (
     <ThemeProvider theme={authTheme} colorMode="dark">
-      <Authenticator loginMechanisms={['email']} components={{ Header: AuthHeader }}>
+      <Authenticator
+        loginMechanisms={['email']}
+        components={{ Header: AuthHeader }}
+        services={authServices}
+        formFields={{
+          signUp: {
+            name: {
+              label: 'Full Name',
+              placeholder: 'Enter your full name',
+              isRequired: true,
+              order: 1,
+            },
+            email: { order: 2 },
+            password: { order: 3 },
+            confirm_password: { order: 4 },
+          },
+        }}
+      >
         {() => <AuthedApp />}
       </Authenticator>
     </ThemeProvider>

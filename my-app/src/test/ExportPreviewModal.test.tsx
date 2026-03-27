@@ -10,7 +10,7 @@ const defaultProps = {
   planMeta: { projectNumber: 'P-001', client: 'ACME', location: 'Main St', notes: '' },
   planCreatedAt: '2026-03-01T00:00:00.000Z',
   qcIssues: [] as QCIssue[],
-  onConfirm: vi.fn(),
+  onConfirm: vi.fn().mockResolvedValue(undefined),
   onClose: vi.fn(),
 }
 
@@ -25,6 +25,34 @@ describe('ExportPreviewModal', () => {
     expect(screen.getByText('ACME')).toBeInTheDocument()
     expect(screen.getByText('Main St')).toBeInTheDocument()
     expect(screen.getByText('P-001')).toBeInTheDocument()
+  })
+
+  it('falls back to default title when planTitle is empty', () => {
+    render(<ExportPreviewModal {...defaultProps} planTitle="" />)
+    expect(screen.getByText('Untitled Traffic Control Plan')).toBeInTheDocument()
+  })
+
+  it('falls back to em dash when plan metadata fields are empty', () => {
+    render(<ExportPreviewModal {...defaultProps} planMeta={{ projectNumber: '', client: '', location: '', notes: '' }} />)
+    const emDashes = screen.getAllByText('—')
+    expect(emDashes.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('renders formatted date in UTC when planCreatedAt is valid', () => {
+    render(<ExportPreviewModal {...defaultProps} planCreatedAt="2026-03-01T00:00:00.000Z" />)
+    expect(screen.getByText('Mar 1, 2026')).toBeInTheDocument()
+  })
+
+  it('falls back to em dash when planCreatedAt is empty', () => {
+    render(<ExportPreviewModal {...defaultProps} planCreatedAt="" />)
+    const emDashes = screen.getAllByText('—')
+    expect(emDashes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('falls back to em dash when planCreatedAt is invalid', () => {
+    render(<ExportPreviewModal {...defaultProps} planCreatedAt="not-a-date" />)
+    const emDashes = screen.getAllByText('—')
+    expect(emDashes.length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows canvas image preview', () => {

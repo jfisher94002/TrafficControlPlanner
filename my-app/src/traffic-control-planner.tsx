@@ -1734,7 +1734,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [clipboard, setClipboard] = useState<CanvasObject | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
-  const [exportPreview, setExportPreview] = useState<{ dataUrl: string; payload: Record<string, unknown> } | null>(null);
+  const [exportPreview, setExportPreview] = useState<Record<string, unknown> | null>(null);
   const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2423,8 +2423,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     const stage = stageRef.current;
     if (!stage) return;
     const canvas = stage.toCanvas({ pixelRatio: 2 });
-    const dataUrl: string = canvas.toDataURL("image/png");
-    const b64 = dataUrl.replace("data:image/png;base64,", "");
+    const b64 = canvas.toDataURL("image/png").replace("data:image/png;base64,", "");
     const payload = {
       id: planId,
       name: planTitle,
@@ -2438,7 +2437,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       metadata: planMeta,
       canvas_image_b64: b64,
     };
-    setExportPreview({ dataUrl, payload });
+    setExportPreview(payload);
   };
 
   const confirmExportPDF = async () => {
@@ -2448,7 +2447,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const res = await fetch(`${apiBase}/export-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(exportPreview.payload),
+        body: JSON.stringify(exportPreview),
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const blob = await res.blob();
@@ -2458,6 +2457,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       track('plan_exported_pdf', { object_count: objects.length });
     } catch (err) {
       console.error("PDF export failed:", err);
+      throw err; // re-throw so the modal stays open on failure
     }
   };
 
@@ -2999,7 +2999,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       )}
       {exportPreview && (
         <ExportPreviewModal
-          canvasDataUrl={exportPreview.dataUrl}
+          canvasDataUrl={`data:image/png;base64,${exportPreview.canvas_image_b64 as string}`}
           planTitle={planTitle}
           planMeta={planMeta}
           planCreatedAt={planCreatedAt}

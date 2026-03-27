@@ -8,7 +8,7 @@ interface ExportPreviewModalProps {
   planMeta: PlanMeta
   planCreatedAt: string
   qcIssues: QCIssue[]
-  onConfirm: () => void
+  onConfirm: () => Promise<void>
   onClose: () => void
 }
 
@@ -85,9 +85,11 @@ export default function ExportPreviewModal({
   const modalRef = useRef<HTMLDivElement>(null)
   useEffect(() => { modalRef.current?.focus() }, [])
 
-  const dateStr = planCreatedAt
-    ? new Date(planCreatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '—'
+  const dateStr = (() => {
+    if (!planCreatedAt) return '—'
+    const d = new Date(planCreatedAt)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+  })()
 
   const errors   = qcIssues.filter(i => i.severity === 'error')
   const warnings = qcIssues.filter(i => i.severity === 'warning')
@@ -180,7 +182,7 @@ export default function ExportPreviewModal({
           <button
             data-testid="export-preview-confirm"
             style={S.exportBtn}
-            onClick={() => { onConfirm(); onClose() }}
+            onClick={async () => { await onConfirm(); onClose() }}
           >
             Export PDF
           </button>

@@ -19,7 +19,7 @@ Parameters:
   Stage:
     Type: String
     Default: dev
-    AllowedValues: [dev, prod]
+    AllowedValues: [dev, staging, prod]
   AllowedOrigins:
     Type: String
     Default: "*"
@@ -61,6 +61,11 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "tcp-assets-${Stage}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
       CorsConfiguration:
         CorsRules:
           - AllowedOrigins: ["*"]

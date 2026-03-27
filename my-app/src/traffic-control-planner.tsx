@@ -932,6 +932,8 @@ function ToolButton({ tool, active, onClick }: ToolButtonProps) {
     <button
       onClick={onClick}
       title={`${tool.label} (${tool.shortcut})`}
+      data-testid={`tool-${tool.id}`}
+      aria-pressed={active}
       style={{
         display: "flex", alignItems: "center", justifyContent: "center",
         width: 40, height: 40, borderRadius: 8,
@@ -1295,6 +1297,47 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
           <span>Total</span>
           <span data-testid="manifest-count" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{objects.length}</span>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── QC PANEL ────────────────────────────────────────────────────────────────
+
+function getQCBadgeColor(issues: QCIssue[]): string | null {
+  if (issues.some(i => i.severity === "error"))   return "#ef4444";
+  if (issues.some(i => i.severity === "warning")) return "#f59e0b";
+  return null;
+}
+
+function QCPanel({ issues }: { issues: QCIssue[] }) {
+  const SEV_COLOR = { error: "#ef4444", warning: "#f59e0b", info: "#64748b" } as const;
+  const SEV_ICON  = { error: "✕", warning: "⚠", info: "ℹ" } as const;
+  const errorCount   = issues.filter(i => i.severity === "error").length;
+  const warningCount = issues.filter(i => i.severity === "warning").length;
+  const infoCount    = issues.filter(i => i.severity === "info").length;
+  return (
+    <div data-testid="qc-panel" style={{ flex: 1, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      {issues.length === 0 ? (
+        <div style={{ textAlign: "center", color: "#22c55e", fontSize: 11, padding: "24px 0" }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>✓</div>
+          No issues found
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>
+            {errorCount} error{errorCount !== 1 ? "s" : ""},{" "}
+            {warningCount} warning{warningCount !== 1 ? "s" : ""}
+            {infoCount > 0 && `, ${infoCount} info`}
+          </div>
+          {issues.map(issue => (
+            <div key={issue.id} data-testid={`qc-issue-${issue.severity}`}
+              style={{ padding: "8px 10px", borderRadius: 4, background: "rgba(255,255,255,0.03)", border: `1px solid ${SEV_COLOR[issue.severity]}33`, display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <span style={{ color: SEV_COLOR[issue.severity], fontSize: 12, flexShrink: 0, marginTop: 1 }}>{SEV_ICON[issue.severity]}</span>
+              <span style={{ fontSize: 10, color: "#cbd5e1", lineHeight: 1.4 }}>{issue.message}</span>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );
@@ -1717,9 +1760,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [signCategory, setSignCategory] = useState("regulatory");
   const [leftPanel, setLeftPanel] = useState("tools");
   const [rightPanel, setRightPanel] = useState(true);
-  const [rightTab, setRightTab] = useState<"properties" | "manifest">("properties");
+  const [rightTab, setRightTab] = useState<"properties" | "manifest" | "qc">("properties");
   const propertiesTabRef = useRef<HTMLButtonElement | null>(null);
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
+  const qcTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
@@ -1873,17 +1917,21 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setCubicPoints([]);
   }, []);
 
-  const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest") => {
-    const next: "properties" | "manifest" | null =
-      e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowUp"
-        ? current === "properties" ? "manifest" : "properties"
-        : e.key === "Home" ? "properties"
-        : e.key === "End"  ? "manifest"
-        : null;
+  const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
+
+  const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest" | "qc") => {
+    const tabs: Array<"properties" | "manifest" | "qc"> = ["properties", "manifest", "qc"];
+    const idx = tabs.indexOf(current);
+    const next: "properties" | "manifest" | "qc" | null =
+      e.key === "ArrowRight" || e.key === "ArrowDown" ? tabs[(idx + 1) % tabs.length]
+      : e.key === "ArrowLeft" || e.key === "ArrowUp" ? tabs[(idx - 1 + tabs.length) % tabs.length]
+      : e.key === "Home" ? "properties"
+      : e.key === "End"  ? "qc"
+      : null;
     if (next) {
       e.preventDefault();
       setRightTab(next);
-      (next === "properties" ? propertiesTabRef : manifestTabRef).current?.focus();
+      (next === "properties" ? propertiesTabRef : next === "manifest" ? manifestTabRef : qcTabRef).current?.focus();
     }
   }, []);
 
@@ -2537,8 +2585,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       )}
 
       {/* ─── TOP BAR ─── */}
-      <div style={{ height: 48, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
-        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+      <div style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
+        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, overflow: "hidden" }}>
           <a href="/" data-testid="home-link" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }} title="Back to home">
             <span style={{ fontSize: 20, color: COLORS.accent }}>◆</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, letterSpacing: 1 }}>TCP</span>
@@ -2561,9 +2609,13 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           </>)}
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
           <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
-          <div style={{ flex: 1 }} />
+          <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
+        </div>
+
+        {/* Right-side user controls — flexShrink:0 so toolbar overflow never pushes these off screen */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, borderLeft: `1px solid ${COLORS.panelBorder}`, paddingLeft: 12, marginLeft: 4 }}>
           <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
-          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap" }} title="Contact support">{CONTACT_EMAIL}</a>
+          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap" }} title="Email support">{CONTACT_EMAIL}</a>
           {onSignOut && (<>
             {(userEmail || userId) && (
               <span data-testid="user-identity" style={{ fontSize: 10, color: COLORS.textMuted, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={userEmail ?? userId ?? ''}>
@@ -2572,7 +2624,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             )}
             <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)}>Sign Out</button>
           </>)}
-          <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 
         <div style={{ position: "relative", flex: "0 1 420px" }}>
@@ -2659,9 +2710,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {sectionTitle("Zoom")}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={zoomOut} style={panelBtnStyle(false)}>−</button>
-                  <div style={{ flex: 1, textAlign: "center", fontSize: 11, color: COLORS.text, lineHeight: "28px" }}>{(zoom * 100).toFixed(0)}%</div>
-                  <button onClick={zoomIn} style={panelBtnStyle(false)}>+</button>
+                  <button data-testid="zoom-out" onClick={zoomOut} style={panelBtnStyle(false)}>−</button>
+                  <div data-testid="zoom-level" style={{ flex: 1, textAlign: "center", fontSize: 11, color: COLORS.text, lineHeight: "28px" }}>{(zoom * 100).toFixed(0)}%</div>
+                  <button data-testid="zoom-in" onClick={zoomIn} style={panelBtnStyle(false)}>+</button>
                   <button onClick={zoomFit} style={panelBtnStyle(false)}>Fit</button>
                 </div>
 
@@ -2828,7 +2879,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         </div>
 
         {/* ─── CANVAS (Konva Stage) ─── */}
-        <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <div ref={containerRef} data-testid="canvas-container" style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <Stage
             ref={stageRef}
             data-testid="konva-stage"
@@ -2941,11 +2992,19 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "manifest" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "manifest" ? COLORS.accent : COLORS.textDim, cursor: "pointer" }}>
                 Manifest
               </button>
+              <button type="button" role="tab" aria-selected={rightTab === "qc"} tabIndex={rightTab === "qc" ? 0 : -1}
+                ref={qcTabRef} data-testid="tab-qc"
+                onClick={() => setRightTab("qc")} onKeyDown={(e) => handleRightTabKeyDown(e, "qc")}
+                style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "qc" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "qc" ? COLORS.accent : COLORS.textDim, cursor: "pointer", position: "relative" }}>
+                QC{getQCBadgeColor(qcIssues) && <span style={{ position: "absolute", top: 6, right: 2, width: 6, height: 6, borderRadius: "50%", background: getQCBadgeColor(qcIssues)! }} />}
+              </button>
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
               ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
-              : <ManifestPanel objects={objects} />
+              : rightTab === "manifest"
+              ? <ManifestPanel objects={objects} />
+              : <QCPanel issues={qcIssues} />
             }
 
             <div style={{ marginTop: "auto", borderTop: `1px solid ${COLORS.panelBorder}`, padding: 12 }}>

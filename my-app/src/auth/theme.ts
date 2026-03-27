@@ -12,11 +12,13 @@ export const authTheme = createTheme({
         primary:    { value: '#e2e8f0' },
         secondary:  { value: '#94a3b8' },
         interactive:{ value: '#f59e0b' },
+        error:      { value: '#fca5a5' },  // red-300 — readable on dark background
       },
       border: {
         primary:   { value: '#2a2d3a' },
         secondary: { value: '#2a2d3a' },
         focus:     { value: '#f59e0b' },
+        error:     { value: '#f87171' },  // red-400 — visible but not harsh on dark bg
       },
       brand: {
         primary: {

@@ -46,8 +46,14 @@ function AuthedApp() {
   }, [])
 
   const handleSignOut = async () => {
-    await signOut()
-    window.location.href = '/'
+    try {
+      await signOut()
+    } catch (err) {
+      // Log so server-side session failures are visible in monitoring.
+      console.error('[Auth] signOut error:', err)
+    } finally {
+      window.location.href = '/'
+    }
   }
 
   return (

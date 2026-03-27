@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/app')
-  await expect(page.getByTestId('canvas-stage')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 })
 
 test.describe('Canvas — Tool Selection', () => {
@@ -31,15 +31,15 @@ test.describe('Canvas — Tool Selection', () => {
 test.describe('Canvas — Keyboard Shortcuts', () => {
   test('Ctrl+Z triggers undo (toolbar undo button becomes active)', async ({ page }) => {
     // Place something first so there's something to undo
-    await page.getByTestId('canvas-stage').click({ position: { x: 300, y: 300 } })
+    await page.getByTestId('canvas-container').click({ position: { x: 300, y: 300 } })
     await page.keyboard.press('Control+z')
     // Undo doesn't throw and page is still functional
-    await expect(page.getByTestId('canvas-stage')).toBeVisible()
+    await expect(page.getByTestId('canvas-container')).toBeVisible()
   })
 
   test('Escape deselects current tool', async ({ page }) => {
     await page.keyboard.press('Escape')
-    await expect(page.getByTestId('canvas-stage')).toBeVisible()
+    await expect(page.getByTestId('canvas-container')).toBeVisible()
   })
 })
 
@@ -60,11 +60,11 @@ test.describe('Canvas — Zoom', () => {
     const zoomOut = page.getByTestId('zoom-out')
     await expect(zoomOut).toBeVisible()
     await zoomOut.click()
-    await expect(page.getByTestId('canvas-stage')).toBeVisible()
+    await expect(page.getByTestId('canvas-container')).toBeVisible()
   })
 
   test('Ctrl+0 resets zoom', async ({ page }) => {
     await page.keyboard.press('Control+0')
-    await expect(page.getByTestId('canvas-stage')).toBeVisible()
+    await expect(page.getByTestId('canvas-container')).toBeVisible()
   })
 })

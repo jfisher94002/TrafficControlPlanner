@@ -169,6 +169,18 @@ export interface TaperObject {
   numLanes: number;     // lanes being closed, 1 or 2
 }
 
+export interface LaneMaskObject {
+  id: string;
+  type: 'lane_mask';
+  x1: number;   // start point world coords
+  y1: number;
+  x2: number;   // end point world coords
+  y2: number;
+  laneWidth: number;  // width of mask band, world px (default 20)
+  color: string;      // default "rgba(239,68,68,0.5)"
+  style: 'hatch' | 'solid'; // default 'hatch'
+}
+
 export type CanvasObject =
   | StraightRoadObject
   | PolylineRoadObject
@@ -180,7 +192,8 @@ export type CanvasObject =
   | ArrowObject
   | TextObject
   | MeasureObject
-  | TaperObject;
+  | TaperObject
+  | LaneMaskObject;
 
 // ─── PLAN METADATA ────────────────────────────────────────────────────────────
 

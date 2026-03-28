@@ -6,7 +6,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
-  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject,
+  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
@@ -230,10 +230,11 @@ const TOOLS: ToolDef[] = [
   { id: "device",  label: "Device",    icon: "▲", shortcut: "D" },
   { id: "zone",    label: "Work Zone", icon: "▨", shortcut: "Z" },
   { id: "text",    label: "Text",      icon: "T", shortcut: "T" },
-  { id: "measure", label: "Measure",   icon: "📏", shortcut: "M" },
+  { id: "measure", label: "Measure",   icon: "📏", shortcut: "U" },
   { id: "arrow",   label: "Arrow",     icon: "→", shortcut: "A" },
-  { id: "taper",   label: "Taper",     icon: "⋈", shortcut: "P" },
-  { id: "erase",   label: "Erase",     icon: "✕", shortcut: "X" },
+  { id: "taper",     label: "Taper",     icon: "⋈", shortcut: "P" },
+  { id: "lane_mask", label: "Lane Mask", icon: "▧", shortcut: "M" },
+  { id: "erase",     label: "Erase",     icon: "✕", shortcut: "X" },
 ];
 
 // ─── AUTOSAVE ────────────────────────────────────────────────────────────────
@@ -843,6 +844,101 @@ function TaperShape({ obj, isSelected }: TaperShapeProps) {
   );
 }
 
+interface LaneMaskShapeProps { obj: LaneMaskObject; isSelected: boolean; }
+function LaneMaskShape({ obj, isSelected }: LaneMaskShapeProps) {
+  const { x1, y1, x2, y2, laneWidth, color, style } = obj;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  // Perpendicular unit vector
+  const px = -dy / len;
+  const py = dx / len;
+  const hw = laneWidth / 2;
+
+  if (style === 'solid') {
+    return (
+      <Group listening={false}>
+        <Line
+          points={[x1, y1, x2, y2]}
+          stroke={color}
+          strokeWidth={laneWidth}
+          lineCap="butt"
+        />
+        {isSelected && (
+          <Line
+            points={[x1, y1, x2, y2]}
+            stroke="white"
+            strokeWidth={laneWidth + 4}
+            lineCap="butt"
+            dash={[8, 6]}
+            opacity={0.5}
+          />
+        )}
+      </Group>
+    );
+  }
+
+  // Hatch style: solid band + diagonal hatch lines clipped to band
+  const corners = [
+    x1 + px * hw, y1 + py * hw,
+    x2 + px * hw, y2 + py * hw,
+    x2 - px * hw, y2 - py * hw,
+    x1 - px * hw, y1 - py * hw,
+  ];
+
+  return (
+    <Group listening={false}>
+      {/* Selection outline — drawn first (behind) */}
+      {isSelected && (
+        <Line
+          points={[x1, y1, x2, y2]}
+          stroke="white"
+          strokeWidth={laneWidth + 4}
+          lineCap="butt"
+          dash={[8, 6]}
+          opacity={0.5}
+        />
+      )}
+      {/* Solid colored band */}
+      <Line points={corners} closed fill={color} stroke="none" strokeWidth={0} />
+      {/* Hatch overlay via sceneFunc */}
+      <Shape
+        listening={false}
+        sceneFunc={(ctx: KonvaContext) => {
+          // Build clip region (the band rectangle)
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(corners[0], corners[1]);
+          ctx.lineTo(corners[2], corners[3]);
+          ctx.lineTo(corners[4], corners[5]);
+          ctx.lineTo(corners[6], corners[7]);
+          ctx.closePath();
+          ctx.clip();
+
+          // Draw diagonal hatch lines across an extended bounding box
+          const minX = Math.min(corners[0], corners[2], corners[4], corners[6]);
+          const maxX = Math.max(corners[0], corners[2], corners[4], corners[6]);
+          const minY = Math.min(corners[1], corners[3], corners[5], corners[7]);
+          const maxY = Math.max(corners[1], corners[3], corners[5], corners[7]);
+          const ext = laneWidth + 20;
+          const spacing = 10;
+          const diagLen = (maxX - minX) + (maxY - minY) + ext * 2;
+
+          ctx.strokeStyle = "rgba(180,30,30,0.7)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          for (let i = -diagLen; i < diagLen * 2; i += spacing) {
+            ctx.moveTo(minX - ext + i, minY - ext);
+            ctx.lineTo(minX - ext + i + diagLen, minY - ext + diagLen);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }}
+      />
+    </Group>
+  );
+}
+
 interface ObjectShapeProps { obj: CanvasObject; isSelected: boolean; }
 function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
   switch (obj.type) {
@@ -857,6 +953,7 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
     case "text":         return <TextLabel obj={obj} isSelected={isSelected} />;
     case "measure":      return <MeasurementShape obj={obj} />;
     case "taper":        return <TaperShape obj={obj} isSelected={isSelected} />;
+    case "lane_mask":    return <LaneMaskShape obj={obj} isSelected={isSelected} />;
     default:             return null;
   }
 }
@@ -892,6 +989,20 @@ function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicat
         points={[drawStart.x, drawStart.y, cursorPos.x, cursorPos.y]}
         stroke="rgba(245,158,11,0.5)" strokeWidth={1} dash={[6, 4]} listening={false} />
     );
+  }
+
+  // Lane mask preview
+  if (drawStart && tool === "lane_mask") {
+    const previewMask: LaneMaskObject = {
+      id: "__preview__",
+      type: "lane_mask",
+      x1: drawStart.x, y1: drawStart.y,
+      x2: cursorPos.x, y2: cursorPos.y,
+      laneWidth: 20,
+      color: "rgba(239,68,68,0.5)",
+      style: "hatch",
+    };
+    elements.push(<LaneMaskShape key="lane-mask-preview" obj={previewMask} isSelected={false} />);
   }
 
   // Polyline / smooth in-progress
@@ -1301,6 +1412,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     arrows,
     texts,
     measures,
+    laneMasks,
     hasAny,
     otherCount,
   } = useMemo(() => {
@@ -1312,6 +1424,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     let arrowsCount = 0;
     let textsCount = 0;
     let measuresCount = 0;
+    let laneMasksCount = 0;
 
     for (const obj of objects) {
       if (obj.type === "sign") {
@@ -1330,12 +1443,14 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         textsCount++;
       } else if (obj.type === "measure") {
         measuresCount++;
+      } else if (obj.type === "lane_mask") {
+        laneMasksCount++;
       }
     }
 
     const hasAnyObjects = objects.length > 0;
     const otherCountTotal =
-      roadsCount + tapersCount + zonesCount + arrowsCount + textsCount + measuresCount;
+      roadsCount + tapersCount + zonesCount + arrowsCount + textsCount + measuresCount + laneMasksCount;
 
     return {
       signCounts: nextSignCounts,
@@ -1346,6 +1461,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
       arrows: arrowsCount,
       texts: textsCount,
       measures: measuresCount,
+      laneMasks: laneMasksCount,
       hasAny: hasAnyObjects,
       otherCount: otherCountTotal,
     };
@@ -1370,11 +1486,12 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
       {otherCount > 0 && (
         <>{sectionTitle("Other")}
           {roads   > 0 && <ManifestRow icon="━" label="Road segments" count={roads} />}
-          {tapers  > 0 && <ManifestRow icon="⋈" label="Tapers"        count={tapers} />}
-          {zones   > 0 && <ManifestRow icon="▨" label="Work zones"    count={zones} />}
-          {arrows  > 0 && <ManifestRow icon="→" label="Arrows"        count={arrows} />}
-          {texts   > 0 && <ManifestRow icon="T" label="Text labels"   count={texts} />}
-          {measures > 0 && <ManifestRow icon="📏" label="Measurements" count={measures} />}
+          {tapers    > 0 && <ManifestRow icon="⋈" label="Tapers"        count={tapers} />}
+          {laneMasks > 0 && <ManifestRow icon="▧" label="Lane Masks"   count={laneMasks} />}
+          {zones     > 0 && <ManifestRow icon="▨" label="Work zones"   count={zones} />}
+          {arrows    > 0 && <ManifestRow icon="→" label="Arrows"       count={arrows} />}
+          {texts     > 0 && <ManifestRow icon="T" label="Text labels"  count={texts} />}
+          {measures  > 0 && <ManifestRow icon="📏" label="Measurements" count={measures} />}
         </>
       )}
       {hasAny && (
@@ -1457,7 +1574,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type === "lane_mask" ? "Lane Mask" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -1623,6 +1740,52 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
           )}
         </div>
       )}
+
+      {obj.type === "lane_mask" && (() => {
+        const m = obj as LaneMaskObject;
+        // Convert rgba/hex color to a #rrggbb hex value for the color picker
+        const colorToHex = (c: string): string => {
+          const m2 = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (m2) {
+            return "#" + [m2[1], m2[2], m2[3]].map(n => parseInt(n).toString(16).padStart(2, "0")).join("");
+          }
+          return c.startsWith("#") ? c.slice(0, 7) : "#ef4444";
+        };
+        const hexToRgba = (hex: string, alpha = 0.5): string => {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        };
+        // Extract alpha from current color
+        const alphaMatch = m.color.match(/rgba?\(\d+,\s*\d+,\s*\d+,\s*([\d.]+)\)/);
+        const currentAlpha = alphaMatch ? parseFloat(alphaMatch[1]) : 0.5;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Lane Width: {m.laneWidth}px
+              <input type="range" min={10} max={60} step={1} value={m.laneWidth}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(m.id, { laneWidth: +e.target.value })} />
+            </label>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>Style</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["hatch", "solid"] as const).map((s) => (
+                <button key={s} onClick={() => onUpdate(m.id, { style: s })}
+                  style={{ ...panelBtnStyle(m.style === s), flex: 1, textTransform: "capitalize" }}>
+                  {s === "hatch" ? "▧ Hatch" : "█ Solid"}
+                </button>
+              ))}
+            </div>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Color
+              <input type="color" value={colorToHex(m.color)}
+                onChange={(e) => onUpdate(m.id, { color: hexToRgba(e.target.value, currentAlpha) })}
+                style={{ width: "100%", height: 24, cursor: "pointer", marginTop: 4 }} />
+            </label>
+          </div>
+        );
+      })()}
 
       {/* ── Position inputs ────────────────────────────────────────── */}
       {isPointObject(obj) && (
@@ -2167,6 +2330,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         const segLen = dist(o.x1, o.y1, o.x2, o.y2);
         if (d1 + d2 < segLen + effectiveHalfWidth(o)) return o;
       }
+      if (o.type === "lane_mask") {
+        const d1 = dist(wx, wy, o.x1, o.y1), d2 = dist(wx, wy, o.x2, o.y2);
+        const segLen = dist(o.x1, o.y1, o.x2, o.y2);
+        if (d1 + d2 < segLen + o.laneWidth / 2 + 6) return o;
+      }
       if (o.type === "polyline_road" && o.points?.length >= 2) {
         if (distToPolyline(wx, wy, o.points) < effectiveHalfWidth(o)) return o;
       }
@@ -2338,7 +2506,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       return;
     }
 
-    if (["zone", "arrow", "measure"].includes(tool)) {
+    if (["zone", "arrow", "measure", "lane_mask"].includes(tool)) {
       setDrawStart({ x: raw.x, y: raw.y });
     }
   }, [tool, roadDrawMode, intersectionType, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
@@ -2423,7 +2591,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       return;
     }
 
-    if (drawStart && ["zone", "arrow", "measure"].includes(tool)) {
+    if (drawStart && ["zone", "arrow", "measure", "lane_mask"].includes(tool)) {
       const { x, y } = toWorld();
       const d = dist(drawStart.x, drawStart.y, x, y);
       if (d < 5) { setDrawStart(null); return; }
@@ -2436,6 +2604,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         newObj = { id: uid(), type: "arrow", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, color: "#fff" };
       } else if (tool === "measure") {
         newObj = { id: uid(), type: "measure", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y };
+      } else if (tool === "lane_mask") {
+        newObj = { id: uid(), type: "lane_mask", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, laneWidth: 20, color: "rgba(239,68,68,0.5)", style: "hatch" };
       }
 
       if (newObj) {
@@ -3180,6 +3350,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   Cubic: {cubicPoints.length === 1 ? "click cp1" : cubicPoints.length === 2 ? "click cp2" : "click end"} · Esc cancel
                 </span>
               )}
+              {tool === "lane_mask" && !drawStart && (
+                <span style={{ color: COLORS.danger }}>Click and drag to draw a lane closure mask</span>
+              )}
               <span data-testid="object-count">{objects.length} objects</span>
               <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
@@ -3233,7 +3406,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   <div key={obj.id} onClick={() => setSelected(obj.id)}
                     style={{ padding: "5px 8px", borderRadius: 4, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, background: selected === obj.id ? COLORS.accentDim : "transparent", color: selected === obj.id ? COLORS.accent : COLORS.textMuted, border: selected === obj.id ? `1px solid rgba(245,158,11,0.2)` : "1px solid transparent" }}>
                     <span style={{ fontSize: 12 }}>
-                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : "📏"}
+                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : obj.type === "lane_mask" ? "▧" : "📏"}
                     </span>
                     <span>
                       {obj.type === "sign" ? obj.signData.label :
@@ -3244,6 +3417,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                        obj.type === "curve_road" ? "quad road" :
                        obj.type === "cubic_bezier_road" ? "cubic road" :
                        obj.type === "taper" ? `taper ${obj.speed}mph` :
+                       obj.type === "lane_mask" ? "lane mask" :
                        obj.type}
                     </span>
                   </div>

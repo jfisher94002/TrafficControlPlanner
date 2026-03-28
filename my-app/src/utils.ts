@@ -1,7 +1,7 @@
 import type {
   CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
   SignObject, DeviceObject, ZoneObject, TextObject, TaperObject,
-  StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject,
+  StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject, LaneMaskObject,
 } from './types'
 
 // ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
@@ -34,11 +34,11 @@ export const isPointObject = (
 ): o is SignObject | DeviceObject | ZoneObject | TextObject | TaperObject =>
   o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text' || o.type === 'taper'
 
-/** Objects with x1/y1–x2/y2 endpoints (straight road, arrow, measure). */
+/** Objects with x1/y1–x2/y2 endpoints (straight road, arrow, measure, lane_mask). */
 export const isLineObject = (
   o: CanvasObject,
-): o is StraightRoadObject | ArrowObject | MeasureObject =>
-  o.type === 'road' || o.type === 'arrow' || o.type === 'measure'
+): o is StraightRoadObject | ArrowObject | MeasureObject | LaneMaskObject =>
+  o.type === 'road' || o.type === 'arrow' || o.type === 'measure' || o.type === 'lane_mask'
 
 /** Any road type (straight, polyline, curve, cubic). */
 export const isRoad = (

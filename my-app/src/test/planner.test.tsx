@@ -1179,3 +1179,189 @@ describe('Sign Editor', () => {
     expect(screen.getByText('MY SIGN')).toBeInTheDocument()
   })
 })
+
+// ─── New Beta Tools — Lane Mask, Crosswalk, Turn Lane, Shoulders ───────────────
+describe('New Beta Tools — Lane Mask, Crosswalk, Turn Lane, Shoulders', () => {
+
+  /** Helper: mock getPointerPosition to return start pos on first call, end pos on subsequent calls */
+  function mockDragPositions() {
+    let calls = 0
+    vi.spyOn(stageStub, 'getPointerPosition').mockImplementation(() =>
+      calls++ === 0 ? { x: 0, y: 0 } : { x: 100, y: 100 }
+    )
+  }
+
+  // ── Lane Mask ────────────────────────────────────────────────────────────────
+
+  it('pressing M activates the lane mask tool', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'M' })
+    expect(screen.getByTestId('object-count').closest('div')?.textContent).toContain('Tool: LANE_MASK')
+  })
+
+  it('lane mask tool: mouseDown + mouseUp (drag) places a lane_mask object (count 0 → 1)', () => {
+    mockDragPositions()
+    setup()
+    fireEvent.keyDown(window, { key: 'M' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('lane mask: undo after placing removes it (count back to 0)', async () => {
+    mockDragPositions()
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'M' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('lane mask: manifest shows "Lane Masks" count of 1 after placing one', async () => {
+    mockDragPositions()
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'M' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    await user.click(screen.getByTestId('tab-manifest'))
+    const panel = screen.getByTestId('manifest-panel')
+    expect(within(panel).getByText('Lane Masks')).toBeInTheDocument()
+    const row = within(panel).getByText('Lane Masks').closest('div') as HTMLElement
+    expect(within(row).getByTestId('manifest-count')).toHaveTextContent('1')
+  })
+
+  it('lane mask: properties panel shows lane width range input when selected', () => {
+    mockDragPositions()
+    setup()
+    fireEvent.keyDown(window, { key: 'M' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    const panel = screen.getByTestId('right-panel')
+    // The Lane Mask properties section includes a lane width range slider
+    const laneWidthLabel = within(panel).getByText(/lane width/i)
+    expect(laneWidthLabel).toBeInTheDocument()
+    const rangeInput = laneWidthLabel.closest('label')?.querySelector('input[type="range"]')
+    expect(rangeInput).toBeInTheDocument()
+  })
+
+  // ── Crosswalk ────────────────────────────────────────────────────────────────
+
+  it('pressing C activates the crosswalk tool', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'C' })
+    expect(screen.getByTestId('object-count').closest('div')?.textContent).toContain('Tool: CROSSWALK')
+  })
+
+  it('crosswalk tool: mouseDown + mouseUp (drag) places a crosswalk (count 0 → 1)', () => {
+    mockDragPositions()
+    setup()
+    fireEvent.keyDown(window, { key: 'C' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('crosswalk: undo after placing removes it (count back to 0)', async () => {
+    mockDragPositions()
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'C' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('crosswalk: manifest shows "Crosswalks" count of 1 after placing one', async () => {
+    mockDragPositions()
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'C' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    await user.click(screen.getByTestId('tab-manifest'))
+    const panel = screen.getByTestId('manifest-panel')
+    expect(within(panel).getByText('Crosswalks')).toBeInTheDocument()
+    const row = within(panel).getByText('Crosswalks').closest('div') as HTMLElement
+    expect(within(row).getByTestId('manifest-count')).toHaveTextContent('1')
+  })
+
+  // ── Turn Lane ────────────────────────────────────────────────────────────────
+
+  it('pressing L activates the turn lane tool', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'L' })
+    expect(screen.getByTestId('object-count').closest('div')?.textContent).toContain('Tool: TURN_LANE')
+  })
+
+  it('turn lane tool: mouseDown (click-to-place) places a turn_lane (count 0 → 1)', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'L' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+  })
+
+  it('turn lane: undo after placing removes it (count back to 0)', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'L' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('turn lane: manifest shows "Turn Lanes" count of 1 after placing one', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'L' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(screen.getByTestId('tab-manifest'))
+    const panel = screen.getByTestId('manifest-panel')
+    expect(within(panel).getByText('Turn Lanes')).toBeInTheDocument()
+    const row = within(panel).getByText('Turn Lanes').closest('div') as HTMLElement
+    expect(within(row).getByTestId('manifest-count')).toHaveTextContent('1')
+  })
+
+  // ── Road Shoulders (issue #18) ────────────────────────────────────────────────
+
+  it('road shoulders: placing a straight road then selecting it shows Shoulder & Sidewalk section', () => {
+    // Return different positions so the distance check (>5px) passes
+    let calls = 0
+    vi.spyOn(stageStub, 'getPointerPosition').mockImplementation(() =>
+      calls++ === 0 ? { x: 0, y: 0 } : { x: 100, y: 100 }
+    )
+    setup()
+    fireEvent.keyDown(window, { key: 'R' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    // Road is auto-selected after placement
+    const panel = screen.getByTestId('right-panel')
+    expect(within(panel).getByText(/shoulder & sidewalk/i)).toBeInTheDocument()
+  })
+
+  it('road shoulders: shoulder width slider is present in properties when a road is selected', () => {
+    let calls = 0
+    vi.spyOn(stageStub, 'getPointerPosition').mockImplementation(() =>
+      calls++ === 0 ? { x: 0, y: 0 } : { x: 100, y: 100 }
+    )
+    setup()
+    fireEvent.keyDown(window, { key: 'R' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    const panel = screen.getByTestId('right-panel')
+    // The shoulder width range input should be present
+    const shoulderLabel = within(panel).getByText(/shoulder width/i)
+    expect(shoulderLabel).toBeInTheDocument()
+    const rangeInput = shoulderLabel.closest('label')?.querySelector('input[type="range"]')
+    expect(rangeInput).toBeInTheDocument()
+  })
+})

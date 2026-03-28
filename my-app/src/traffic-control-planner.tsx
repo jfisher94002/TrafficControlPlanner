@@ -980,8 +980,8 @@ function ToolButton({ tool, active, onClick }: ToolButtonProps) {
 
 // ─── SIGN EDITOR PANEL ───────────────────────────────────────────────────────
 
-interface SignEditorPanelProps { onUseSign: (signData: SignData) => void; onSaveToLibrary: (signData: SignData) => void; }
-function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
+interface SignEditorPanelProps { onUseSign: () => void; onSaveToLibrary: (signData: SignData) => void; onSignChange: (signData: SignData) => void; }
+function SignEditorPanel({ onUseSign, onSaveToLibrary, onSignChange }: SignEditorPanelProps) {
   const [shape, setShape] = useState<SignShape>("diamond");
   const [text, setText] = useState("CUSTOM");
   const [bgColor, setBgColor] = useState("#f97316");
@@ -989,13 +989,18 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   const signData = useMemo(() => ({
-    id: "custom_preview",
+    // Derive id from configuration so legend/analytics can distinguish different editor signs.
+    id: `custom_${shape}_${(text || " ").trim().toLowerCase().replace(/\s+/g, "_")}`,
     label: text || " ",
     shape,
     color: bgColor,
     textColor,
     border: "#333",
   }), [shape, text, bgColor, textColor]);
+
+  // Keep parent's selectedSign in sync so clicking the canvas always places
+  // the current editor sign (not whatever was last selected from the library).
+  useEffect(() => { onSignChange(signData) }, [signData, onSignChange]);
 
   useEffect(() => {
     const cvs = previewRef.current;
@@ -1066,7 +1071,7 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
 
       <div style={{ display: "flex", gap: 6 }}>
         <button
-          onClick={() => onUseSign({ ...signData, id: "custom_" + uid() })}
+          onClick={onUseSign}
           style={{
             flex: 1, padding: "8px 0", background: COLORS.accentDim,
             border: `1px solid ${COLORS.accent}`, borderRadius: 6,
@@ -2892,10 +2897,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {signSubTab === "editor" && (
                   <SignEditorPanel
-                    onUseSign={(signData) => {
-                      setSelectedSign(signData);
-                      switchTool("sign");
-                    }}
+                    onSignChange={setSelectedSign}
+                    onUseSign={() => switchTool("sign")}
                     onSaveToLibrary={(signData) => {
                       const existing = customSigns.find((s) =>
                         s.label === signData.label && s.shape === signData.shape &&

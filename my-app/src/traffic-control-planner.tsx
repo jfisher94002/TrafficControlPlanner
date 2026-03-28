@@ -62,118 +62,118 @@ const SIGN_CATEGORIES: Record<string, { label: string; color: string; signs: Sig
     label: "Regulatory",
     color: "#ef4444",
     signs: [
-      { id: "stop",          label: "STOP",         shape: "octagon",  color: "#ef4444", textColor: "#fff" },
-      { id: "yield",         label: "YIELD",        shape: "triangle", color: "#ef4444", textColor: "#fff" },
-      { id: "speed15",       label: "15 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed20",       label: "20 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed25",       label: "25 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed30",       label: "30 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed35",       label: "35 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed40",       label: "40 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed45",       label: "45 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed50",       label: "50 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed55",       label: "55 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed65",       label: "65 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "noentry",       label: "NO ENTRY",     shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "oneway",        label: "ONE WAY",      shape: "rect",     color: "#111",    textColor: "#fff" },
-      { id: "donotenter",    label: "DO NOT ENTER", shape: "rect",     color: "#ef4444", textColor: "#fff" },
-      { id: "noleftturn",    label: "NO LEFT TRN",  shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "norightturn",   label: "NO RIGHT TRN", shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "noparking",     label: "NO PARKING",   shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "nopassing",     label: "NO PASSING",   shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "wrongway",      label: "WRONG WAY",    shape: "rect",     color: "#ef4444", textColor: "#fff" },
+      { id: "stop",          label: "STOP",         shape: "octagon",  color: "#ef4444", textColor: "#fff", mutcd: "R1-1" },
+      { id: "yield",         label: "YIELD",        shape: "triangle", color: "#ef4444", textColor: "#fff", mutcd: "R1-2" },
+      { id: "speed15",       label: "15 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed20",       label: "20 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed25",       label: "25 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed30",       label: "30 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed35",       label: "35 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed40",       label: "40 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed45",       label: "45 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed50",       label: "50 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed55",       label: "55 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed65",       label: "65 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "noentry",       label: "NO ENTRY",     shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R5-1" },
+      { id: "oneway",        label: "ONE WAY",      shape: "rect",     color: "#111",    textColor: "#fff", mutcd: "R6-1" },
+      { id: "donotenter",    label: "DO NOT ENTER", shape: "rect",     color: "#ef4444", textColor: "#fff", mutcd: "R5-1" },
+      { id: "noleftturn",    label: "NO LEFT TRN",  shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R3-2" },
+      { id: "norightturn",   label: "NO RIGHT TRN", shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R3-1" },
+      { id: "noparking",     label: "NO PARKING",   shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R7-1" },
+      { id: "nopassing",     label: "NO PASSING",   shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R4-1" },
+      { id: "wrongway",      label: "WRONG WAY",    shape: "rect",     color: "#ef4444", textColor: "#fff", mutcd: "R5-1a" },
     ],
   },
   warning: {
     label: "Warning",
     color: "#f59e0b",
     signs: [
-      { id: "roadwork",       label: "ROAD WORK",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "flagahead",      label: "FLAGGER",      shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "merge",          label: "MERGE",        shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "curve",          label: "CURVE",        shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "narrow",         label: "NARROW",       shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "bump",           label: "BUMP",         shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "pedestrian",     label: "PED XING",     shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "signal",         label: "SIGNAL AHEAD", shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "schoolzone",     label: "SCHOOL ZONE",  shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "schoolxing",     label: "SCHOOL XING",  shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "bikexing",       label: "BIKE XING",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "deerxing",       label: "DEER XING",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "slippery",       label: "SLIPPERY",     shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "loosegravel",    label: "LOOSE GRAVEL", shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "dividedroad",    label: "DIVIDED RD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "endsdivided",    label: "ENDS DIVIDED", shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "lowclearance",   label: "LOW CLEAR",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "rightcurve",     label: "RIGHT CURVE",  shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "leftcurve",      label: "LEFT CURVE",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "hillgrade",        label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "workers",          label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "trafficcontrols",  label: "TRAF CTRL",    shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "roadwork",       label: "ROAD WORK",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "flagahead",      label: "FLAGGER",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
+      { id: "merge",          label: "MERGE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-2" },
+      { id: "curve",          label: "CURVE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2" },
+      { id: "narrow",         label: "NARROW",       shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-1" },
+      { id: "bump",           label: "BUMP",         shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-1" },
+      { id: "pedestrian",     label: "PED XING",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-2" },
+      { id: "signal",         label: "SIGNAL AHEAD", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W3-3" },
+      { id: "schoolzone",     label: "SCHOOL ZONE",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-2" },
+      { id: "schoolxing",     label: "SCHOOL XING",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "S1-1" },
+      { id: "bikexing",       label: "BIKE XING",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-15" },
+      { id: "deerxing",       label: "DEER XING",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-3" },
+      { id: "slippery",       label: "SLIPPERY",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-5" },
+      { id: "loosegravel",    label: "LOOSE GRAVEL", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-7" },
+      { id: "dividedroad",    label: "DIVIDED RD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W6-1" },
+      { id: "endsdivided",    label: "ENDS DIVIDED", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W6-2" },
+      { id: "lowclearance",   label: "LOW CLEAR",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W12-2" },
+      { id: "rightcurve",     label: "RIGHT CURVE",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2R" },
+      { id: "leftcurve",      label: "LEFT CURVE",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2L" },
+      { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-5" },
+      { id: "hillgrade",      label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W7-1" },
+      { id: "workers",        label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-1a" },
+      { id: "trafficcontrols",label: "TRAF CTRL",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7" },
     ],
   },
   temporary: {
     label: "Temp Traffic Control",
     color: "#f97316",
     signs: [
-      { id: "roadclosed",   label: "ROAD CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "detour",       label: "DETOUR",        shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "laneclosed",   label: "LANE CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "endwork",      label: "END ROAD WORK", shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "slowtraffic",  label: "SLOW TRAFFIC",  shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "workzone",     label: "WORK ZONE",     shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "workahead",    label: "WORK AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "preparestop",  label: "PREP TO STOP",  shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "onelane",      label: "ONE LANE RD",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "surveyors",    label: "SURVEYORS",     shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "rightlane",    label: "RIGHT LANE",    shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "leftlane",     label: "LEFT LANE",     shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "centerlane",   label: "CENTER LANE",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "flaggerahead", label: "FLAGGER AHD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "reducespeed",  label: "REDUCE SPEED",  shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "endworkahead", label: "END WORK AHD",  shape: "rect",    color: "#f97316", textColor: "#111" },
+      { id: "roadclosed",   label: "ROAD CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2" },
+      { id: "detour",       label: "DETOUR",        shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "M4-8" },
+      { id: "laneclosed",   label: "LANE CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2a" },
+      { id: "endwork",      label: "END ROAD WORK", shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
+      { id: "slowtraffic",  label: "SLOW TRAFFIC",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "workzone",     label: "WORK ZONE",     shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "workahead",    label: "WORK AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "preparestop",  label: "PREP TO STOP",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "onelane",      label: "ONE LANE RD",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4a" },
+      { id: "surveyors",    label: "SURVEYORS",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-5" },
+      { id: "rightlane",    label: "RIGHT LANE",    shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-1" },
+      { id: "leftlane",     label: "LEFT LANE",     shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-2" },
+      { id: "centerlane",   label: "CENTER LANE",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-3" },
+      { id: "flaggerahead", label: "FLAGGER AHD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
+      { id: "reducespeed",  label: "REDUCE SPEED",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "endworkahead", label: "END WORK AHD",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
     ],
   },
   guide: {
     label: "Guide & Info",
     color: "#22c55e",
     signs: [
-      { id: "parking",       label: "P",           shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "hospital",      label: "H",           shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "info",          label: "INFO",        shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "interstate",    label: "I-95",        shape: "shield", color: "#3b82f6", textColor: "#fff" },
-      { id: "exitramp",      label: "EXIT",        shape: "rect",   color: "#22c55e", textColor: "#fff" },
-      { id: "speedadvisory", label: "ADVISORY",    shape: "rect",   color: "#f59e0b", textColor: "#111" },
-      { id: "distanceahead", label: "1 MILE",      shape: "rect",   color: "#22c55e", textColor: "#fff" },
-      { id: "noparkingnorth",label: "NO PARKING",  shape: "rect",   color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "restarea",      label: "REST AREA",   shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "foodgas",       label: "FOOD/GAS",    shape: "rect",   color: "#3b82f6", textColor: "#fff" },
+      { id: "parking",       label: "P",           shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "D4-1" },
+      { id: "hospital",      label: "H",           shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "H-1" },
+      { id: "info",          label: "INFO",        shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "I-2" },
+      { id: "interstate",    label: "I-95",        shape: "shield", color: "#3b82f6", textColor: "#fff", mutcd: "M1-1" },
+      { id: "exitramp",      label: "EXIT",        shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "E5-1" },
+      { id: "speedadvisory", label: "ADVISORY",    shape: "rect",   color: "#f59e0b", textColor: "#111", mutcd: "R2-3" },
+      { id: "distanceahead", label: "1 MILE",      shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "W16-2" },
+      { id: "noparkingnorth",label: "NO PARKING",  shape: "rect",   color: "#fff",    textColor: "#111", border: "#111", mutcd: "R7-1" },
+      { id: "restarea",      label: "REST AREA",   shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "D5-1" },
+      { id: "foodgas",       label: "FOOD/GAS",    shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "I-2" },
     ],
   },
   school: {
     label: "School Zone",
     color: "#f59e0b",
     signs: [
-      { id: "school",       label: "SCHOOL",      shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "schoolspeed",  label: "15 SCHOOL",   shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "slowschool",   label: "SLOW SCHOOL", shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "schoolbus",    label: "SCHOOL BUS",  shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "schoolbusxing",label: "BUS XING",    shape: "diamond", color: "#f59e0b", textColor: "#111" },
-      { id: "crosswalk",    label: "CROSSWALK",   shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "pedxing",      label: "PED XING",    shape: "diamond", color: "#f59e0b", textColor: "#111" },
+      { id: "school",       label: "SCHOOL",      shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S4-3" },
+      { id: "schoolspeed",  label: "15 SCHOOL",   shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S5-1" },
+      { id: "slowschool",   label: "SLOW SCHOOL", shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S4-3a" },
+      { id: "schoolbus",    label: "SCHOOL BUS",  shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S3-1" },
+      { id: "schoolbusxing",label: "BUS XING",    shape: "diamond", color: "#f59e0b", textColor: "#111", mutcd: "S3-1" },
+      { id: "crosswalk",    label: "CROSSWALK",   shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "R7-9" },
+      { id: "pedxing",      label: "PED XING",    shape: "diamond", color: "#f59e0b", textColor: "#111", mutcd: "W11-2" },
     ],
   },
   bicycle: {
     label: "Bicycle & Pedestrian",
     color: "#22c55e",
     signs: [
-      { id: "bikeroute",   label: "BIKE ROUTE",  shape: "rect",    color: "#22c55e", textColor: "#fff" },
-      { id: "bikexingped", label: "BIKE XING",   shape: "diamond", color: "#22c55e", textColor: "#111" },
-      { id: "pedxingbike", label: "PED XING",    shape: "diamond", color: "#22c55e", textColor: "#111" },
-      { id: "sharedpath",  label: "SHARED PATH", shape: "rect",    color: "#22c55e", textColor: "#fff" },
-      { id: "hikerbiker",  label: "HIKE/BIKE",   shape: "rect",    color: "#22c55e", textColor: "#fff" },
-      { id: "bikepath",    label: "BIKE PATH",   shape: "rect",    color: "#22c55e", textColor: "#fff" },
+      { id: "bikeroute",   label: "BIKE ROUTE",  shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
+      { id: "bikexingped", label: "BIKE XING",   shape: "diamond", color: "#22c55e", textColor: "#111", mutcd: "W11-15" },
+      { id: "pedxingbike", label: "PED XING",    shape: "diamond", color: "#22c55e", textColor: "#111", mutcd: "W11-2" },
+      { id: "sharedpath",  label: "SHARED PATH", shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "R9-7" },
+      { id: "hikerbiker",  label: "HIKE/BIKE",   shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
+      { id: "bikepath",    label: "BIKE PATH",   shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
     ],
   },
 };
@@ -190,6 +190,11 @@ const DEVICES: DeviceData[] = [
   { id: "crashcush",   label: "Crash Cushion", icon: "⟐",  color: "#ef4444" },
   { id: "water_barrel",label: "Water Barrel",  icon: "⊚",  color: "#3b82f6" },
 ];
+
+/** Strips hyphens, spaces, and dots then lowercases — used for fuzzy MUTCD matching. */
+function normalizeForSearch(s: string): string {
+  return s.toLowerCase().replace(/[\s\-./]/g, '')
+}
 
 function createIntersectionRoads(
   cx: number, cy: number,
@@ -1821,6 +1826,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [cubicPoints, setCubicPoints] = useState<Point[]>([]);
   const [snapIndicator, setSnapIndicator] = useState<Point | null>(null);
   const [signSubTab, setSignSubTab] = useState("library");
+  const [signSearch, setSignSearch] = useState("");
   const [customSigns, setCustomSigns] = useState<SignData[]>(() => {
     try { return JSON.parse(localStorage.getItem("tcp_custom_signs") || "[]"); }
     catch { return []; }
@@ -2611,6 +2617,22 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   // suppress mapRenderTick lint warning — used to trigger re-render when tiles load
   void mapRenderTick;
 
+  // Pre-compute sign search results so JSX stays readable
+  const signSearchResults: { sign: SignData; catLabel: string; catColor: string }[] = (() => {
+    const q = signSearch.trim()
+    if (!q) return []
+    const nq = normalizeForSearch(q)
+    const builtIn = Object.entries(SIGN_CATEGORIES).flatMap(([, cat]) =>
+      cat.signs
+        .filter(s => normalizeForSearch(s.label).includes(nq) || (s.mutcd && normalizeForSearch(s.mutcd).includes(nq)))
+        .map(s => ({ sign: s, catLabel: cat.label, catColor: cat.color }))
+    )
+    const custom = customSigns
+      .filter(s => normalizeForSearch(s.label).includes(nq))
+      .map(s => ({ sign: s, catLabel: "Custom", catColor: COLORS.textMuted }))
+    return [...builtIn, ...custom]
+  })()
+
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -2779,6 +2801,43 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {signSubTab === "library" && (
                   <>
+                    {/* Search input */}
+                    <input
+                      type="text"
+                      aria-label="Search signs by name or MUTCD code"
+                      placeholder="Search by name or MUTCD code…"
+                      value={signSearch}
+                      onChange={e => setSignSearch(e.target.value)}
+                      style={{ width: "100%", boxSizing: "border-box", marginBottom: 8, padding: "5px 8px", fontSize: 11, background: "rgba(255,255,255,0.05)", border: `1px solid ${COLORS.panelBorder}`, borderRadius: 4, color: COLORS.text, outline: "none" }}
+                    />
+
+                    {signSearch.trim() ? (
+                      /* ── Search results ── */
+                      <>
+                        {signSearchResults.length === 0 ? (
+                          <div style={{ fontSize: 11, color: COLORS.textDim, textAlign: "center", padding: "16px 0" }}>No signs found</div>
+                        ) : (
+                          <>
+                            {sectionTitle(`${signSearchResults.length} result${signSearchResults.length !== 1 ? "s" : ""}`)}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+                              {signSearchResults.map(({ sign, catLabel, catColor }) => (
+                                <button key={sign.id} onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                                  style={{ padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                                  <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : sign.shape === "diamond" ? 0 : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none", transform: sign.shape === "diamond" ? "rotate(45deg)" : "none" }}>
+                                    <span style={{ transform: sign.shape === "diamond" ? "rotate(-45deg)" : "none", fontSize: 8 }}>{sign.label.slice(0, 3)}</span>
+                                  </div>
+                                  <span style={{ fontSize: 8, color: COLORS.textMuted, textAlign: "center" }}>{sign.label}</span>
+                                  {sign.mutcd && <span style={{ fontSize: 7, color: catColor, opacity: 0.8 }}>{sign.mutcd}</span>}
+                                  <span style={{ fontSize: 7, color: COLORS.textDim }}>{catLabel}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      /* ── Browse by category ── */
+                      <>
                     {sectionTitle("Sign Category")}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
                       {Object.entries(SIGN_CATEGORIES).map(([key, cat]) => (
@@ -2801,6 +2860,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                         </button>
                       ))}
                     </div>
+                      </>
+                    )}
                     {customSigns.length > 0 && (
                       <>
                         {sectionTitle("My Custom Signs")}

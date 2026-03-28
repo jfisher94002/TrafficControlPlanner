@@ -20,6 +20,7 @@ export interface SignData {
   color: string;
   textColor: string;
   border?: string;
+  mutcd?: string;  // MUTCD designation code (e.g. "R1-1", "W20-1")
 }
 
 export interface DeviceData {

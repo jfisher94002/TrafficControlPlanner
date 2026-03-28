@@ -68,7 +68,7 @@ jobs:
           PROMPT=$(jq -n --argjson diff "$DIFF" '{
             contents: [{
               parts: [{
-                text: ("Act as a Senior Software Engineer and QA Manager.\nReview the following code diff for tcplanpro.com with a focus on:\n- Objective analysis and technical accuracy.\n- Identifying bugs, logic errors, or edge cases.\n- Security issues (XSS, injection, exposed secrets).\n- Non-idiomatic Python or performance bottlenecks.\n- Ensuring clear logic without marketing-style comments.\nBe direct and concise. If the code is correct, say so briefly.\nOnly comment on things worth fixing — avoid nitpicks.\n\nDiff:\n" + $diff)
+                text: ("Act as a Senior Software Engineer and QA Manager.\nReview the following code diff for tcplanpro.com (TypeScript/React/Konva frontend, Python/SAM backend) with a focus on:\n- Objective analysis and technical accuracy.\n- Identifying bugs, logic errors, or edge cases.\n- Security issues (XSS, injection, exposed secrets).\n- Non-idiomatic TypeScript/React or performance bottlenecks.\n- Ensuring clear logic without marketing-style comments.\nBe direct and concise. If the code is correct, say so briefly.\nOnly comment on things worth fixing — avoid nitpicks.\n\nDiff:\n" + $diff)
               }]
             }]
           }')

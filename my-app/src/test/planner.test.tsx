@@ -1043,6 +1043,50 @@ describe('Analytics — canvas events', () => {
       road_type: expect.any(String),
     }))
   })
+
+  it('stamping an intersection fires road_drawn with intersection draw_mode', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    const { user } = setup()
+    // Open roads panel, then click the 4-Way intersection button to activate the tool
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /4-Way/i }))
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      draw_mode: expect.stringMatching(/intersection/),
+    }))
+  })
+
+  it('opening a plan from the dashboard fires plan_loaded_cloud', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([
+      { path: 'plans/user-abc/plan-1.tcp.json', planId: 'plan-1', name: 'plan-1', lastModified: '2026-01-01T00:00:00.000Z', size: 100 },
+    ])
+    vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue({
+      id: 'plan-1', name: 'Test Plan', canvasState: { objects: [] },
+    })
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    const openBtn = await screen.findByTestId('dashboard-open-btn')
+    await user.click(openBtn)
+    expect(trackSpy).toHaveBeenCalledWith('plan_loaded_cloud', expect.any(Object))
+  })
+
+  it('confirming the export modal fires plan_exported_pdf', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['%PDF'], { type: 'application/pdf' })),
+    }))
+    const { user } = setup()
+    // Click the PDF export button to open the preview modal
+    await user.click(screen.getByTestId('export-pdf-button'))
+    // Confirm the export in the modal
+    const confirmBtn = await screen.findByTestId('export-preview-confirm')
+    await user.click(confirmBtn)
+    expect(trackSpy).toHaveBeenCalledWith('plan_exported_pdf', expect.any(Object))
+  })
 })
 
 // ─── Sign search ──────────────────────────────────────────────────────────────

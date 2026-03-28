@@ -18,10 +18,9 @@ test.describe('Template Picker', () => {
     await page.getByTestId('templates-button').click()
     const dialog = page.getByRole('dialog', { name: /templates/i })
     await expect(dialog).toBeVisible({ timeout: 8_000 })
-    // Should show at least 5 templates
-    const cards = dialog.getByRole('button').filter({ hasText: /.+/ })
-    await expect(cards).toHaveCount(await cards.count())
-    expect(await cards.count()).toBeGreaterThanOrEqual(5)
+    // Should show exactly 5 starter templates
+    const cards = dialog.getByRole('button', { name: 'Use Template' })
+    await expect(cards).toHaveCount(5)
   })
 
   test('closes on Escape', async ({ page }) => {

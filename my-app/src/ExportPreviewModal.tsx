@@ -98,7 +98,7 @@ export default function ExportPreviewModal({
   const visibleIssues = qcIssues.filter(i => i.severity !== 'info')
 
   return (
-    <div data-testid="export-preview-overlay" style={S.overlay} onClick={onClose}>
+    <div data-testid="export-preview-overlay" style={S.overlay} onClick={isExporting ? undefined : onClose}>
       <div
         data-testid="export-preview-modal"
         ref={modalRef}
@@ -108,7 +108,7 @@ export default function ExportPreviewModal({
         aria-labelledby="export-preview-title"
         tabIndex={-1}
         onClick={e => e.stopPropagation()}
-        onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }}
+        onKeyDown={e => { if (e.key === 'Escape' && !isExporting) { e.stopPropagation(); onClose() } }}
       >
         <div style={S.header}>
           <span id="export-preview-title" style={S.title}>↓ PDF EXPORT PREVIEW</span>
@@ -185,7 +185,7 @@ export default function ExportPreviewModal({
               Plan has errors — review QC before exporting
             </span>
           )}
-          <button style={S.cancelBtn} onClick={onClose}>Cancel</button>
+          <button style={{ ...S.cancelBtn, opacity: isExporting ? 0.4 : 1, cursor: isExporting ? 'not-allowed' : 'pointer' }} disabled={isExporting} onClick={onClose}>Cancel</button>
           <button
             data-testid="export-preview-confirm"
             style={{ ...S.exportBtn, opacity: isExporting ? 0.6 : 1, cursor: isExporting ? 'not-allowed' : 'pointer' }}

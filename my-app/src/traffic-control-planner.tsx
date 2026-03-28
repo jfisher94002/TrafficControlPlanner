@@ -3025,7 +3025,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               <span data-testid="object-count">{objects.length} objects</span>
               <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
-              <span>{snapEnabled ? "Snap: endpoint" : "Snap OFF"}</span>
+              <span>{snapEnabled ? "Snap: segment" : "Snap OFF"}</span>
               {autosaveError
                 ? <span style={{ color: COLORS.danger }} title={`Auto-save failed: ${autosaveError}`}>⚠ Save failed</span>
                 : <span style={{ color: COLORS.success }} title="Auto-saved to browser storage">● Auto-saved</span>

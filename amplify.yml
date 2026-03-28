@@ -24,7 +24,9 @@ frontend:
 # To apply: commit this file and trigger an Amplify redeploy, or update the
 # rewrite rules directly in the Amplify console (App settings → Rewrites).
 customRules:
-  # API proxy — replace <API_GATEWAY_URL> after sam deploy
+  # API proxy — <API_GATEWAY_URL> is a placeholder; replace with the actual
+  # API Gateway URL from `sam deploy` outputs before these rules go live.
+  # Until replaced, /export-pdf, /create-issue, and /health will 404.
   - source: /export-pdf
     target: <API_GATEWAY_URL>/export-pdf
     status: "200"

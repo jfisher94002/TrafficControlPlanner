@@ -1,4 +1,8 @@
 name: "AI Code Review"
+# NOTE: This workflow sends PR diffs to the Gemini API for review.
+# This repo is public and contains no secrets in diffs (env vars are injected
+# at deploy time, never committed). Restrict to trusted contributors if the
+# repo ever becomes private or handles sensitive data in source.
 on:
   pull_request:
     types: [opened, synchronize]
@@ -51,8 +55,13 @@ jobs:
           fi
           git fetch origin "$BASE_REF"
           git diff "origin/$BASE_REF"...HEAD > /tmp/pr.diff
-          # Truncate to ~15 000 chars to stay within Gemini input limits
-          head -c 15000 /tmp/pr.diff > /tmp/pr_trimmed.diff
+          # Truncate to ~15 000 chars in a UTF-8-safe way (head -c can split multibyte chars)
+          python3 -c "
+import sys
+data = open('/tmp/pr.diff', 'rb').read()
+truncated = data[:15000].decode('utf-8', errors='ignore')
+open('/tmp/pr_trimmed.diff', 'w', encoding='utf-8').write(truncated)
+"
           echo "diff_file=/tmp/pr_trimmed.diff" >> $GITHUB_OUTPUT
 
       - name: "Run Gemini Review"

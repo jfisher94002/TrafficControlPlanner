@@ -266,7 +266,7 @@ const panelBtnStyle = (active: boolean): React.CSSProperties => ({
 // ─── DRAW SIGN (kept for SignEditorPanel preview canvas) ───────────────────────
 function drawSign(ctx: CanvasRenderingContext2D, sign: { x: number; y: number; signData: SignData; rotation: number; scale: number }, isSelected: boolean): void {
   const { x, y, signData, rotation = 0, scale = 1 } = sign;
-  const s = 28 * scale;
+  const s = 18 * scale;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate((rotation * Math.PI) / 180);
@@ -575,7 +575,7 @@ function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
 interface SignShapeProps { obj: SignObject; isSelected: boolean; }
 function SignShape({ obj, isSelected }: SignShapeProps) {
   const { x, y, signData, rotation = 0, scale: sc = 1 } = obj;
-  const s = 28 * sc;
+  const s = 18 * sc;
   return (
     <Shape
       x={x} y={y}
@@ -1010,7 +1010,7 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary, onSignChange }: SignEdito
     ctx.clearRect(0, 0, 100, 100);
     ctx.fillStyle = COLORS.canvas;
     ctx.fillRect(0, 0, 100, 100);
-    drawSign(ctx, { x: 50, y: 50, signData, rotation: 0, scale: 1.5 }, false);
+    drawSign(ctx, { x: 50, y: 50, signData, rotation: 0, scale: 2.2 }, false);
   }, [signData]);
 
   return (

@@ -191,6 +191,23 @@ const DEVICES: DeviceData[] = [
   { id: "water_barrel",label: "Water Barrel",  icon: "⊚",  color: "#3b82f6" },
 ];
 
+function createIntersectionRoads(
+  cx: number, cy: number,
+  type: 't' | '4way',
+  roadType: RoadType,
+): StraightRoadObject[] {
+  const L = roadType.width * 3
+  const base = { width: roadType.width, realWidth: roadType.realWidth, lanes: roadType.lanes, roadType: roadType.id }
+  if (type === '4way') return [
+    { id: uid(), type: 'road', x1: cx - L, y1: cy, x2: cx + L, y2: cy, ...base },
+    { id: uid(), type: 'road', x1: cx, y1: cy - L, x2: cx, y2: cy + L, ...base },
+  ]
+  return [
+    { id: uid(), type: 'road', x1: cx - L, y1: cy, x2: cx + L, y2: cy, ...base },
+    { id: uid(), type: 'road', x1: cx, y1: cy, x2: cx, y2: cy - L, ...base },
+  ]
+}
+
 // realWidth = diagram-scale meters (≈3× real-world so roads are wide enough to work with on screen)
 const ROAD_TYPES: RoadType[] = [
   { id: "2lane",   label: "2-Lane Road",     lanes: 2, width: 80,  realWidth: 22 },
@@ -2209,15 +2226,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     }
 
     if (tool === "intersection") {
-      const L = selectedRoadType.width * 3;
-      const roadProps = { width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
-      const roads: StraightRoadObject[] = intersectionType === '4way' ? [
-        { id: uid(), type: 'road', x1: x - L, y1: y, x2: x + L, y2: y, ...roadProps },
-        { id: uid(), type: 'road', x1: x, y1: y - L, x2: x, y2: y + L, ...roadProps },
-      ] : [
-        { id: uid(), type: 'road', x1: x - L, y1: y, x2: x + L, y2: y, ...roadProps },
-        { id: uid(), type: 'road', x1: x, y1: y, x2: x, y2: y - L, ...roadProps },
-      ];
+      const roads = createIntersectionRoads(x, y, intersectionType, selectedRoadType);
       const newObjs = [...objects, ...roads];
       setObjects(newObjs); pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
       track('road_drawn', { road_type: selectedRoadType.id, draw_mode: intersectionType === '4way' ? 'intersection_4way' : 'intersection_t' });
@@ -2443,7 +2452,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const handleCloudSave = async () => {
-    if (!userId) return;
+    if (!userId || cloudSaveStatus === 'Saving…') return;
     setCloudSaveStatus('Saving…');
     try {
       const objectCount = objects.length;

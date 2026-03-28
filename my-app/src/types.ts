@@ -181,6 +181,18 @@ export interface LaneMaskObject {
   style: 'hatch' | 'solid'; // default 'hatch'
 }
 
+export interface CrosswalkObject {
+  id: string;
+  type: 'crosswalk';
+  x1: number;        // one side of the crosswalk (drag start)
+  y1: number;
+  x2: number;        // other side (drag end)
+  y2: number;
+  depth: number;     // crosswalk depth along road direction, world px (default 24)
+  stripeCount: number;  // number of white stripes (default 6)
+  stripeColor: string;  // default "#ffffff"
+}
+
 export type CanvasObject =
   | StraightRoadObject
   | PolylineRoadObject
@@ -193,7 +205,8 @@ export type CanvasObject =
   | TextObject
   | MeasureObject
   | TaperObject
-  | LaneMaskObject;
+  | LaneMaskObject
+  | CrosswalkObject;
 
 // ─── PLAN METADATA ────────────────────────────────────────────────────────────
 

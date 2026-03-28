@@ -6,7 +6,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
-  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject,
+  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject, CrosswalkObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
@@ -234,6 +234,7 @@ const TOOLS: ToolDef[] = [
   { id: "arrow",   label: "Arrow",     icon: "→", shortcut: "A" },
   { id: "taper",     label: "Taper",     icon: "⋈", shortcut: "P" },
   { id: "lane_mask", label: "Lane Mask", icon: "▧", shortcut: "M" },
+  { id: "crosswalk", label: "Crosswalk", icon: "⊟", shortcut: "C" },
   { id: "erase",     label: "Erase",     icon: "✕", shortcut: "X" },
 ];
 
@@ -939,6 +940,54 @@ function LaneMaskShape({ obj, isSelected }: LaneMaskShapeProps) {
   );
 }
 
+interface CrosswalkShapeProps { obj: CrosswalkObject; isSelected: boolean; }
+function CrosswalkShape({ obj, isSelected }: CrosswalkShapeProps) {
+  const { x1, y1, x2, y2, depth, stripeCount, stripeColor } = obj;
+  return (
+    <Shape
+      listening={false}
+      sceneFunc={(ctx: KonvaContext) => {
+        const len = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        if (len < 2) return;
+        const dx = (x2 - x1) / len, dy = (y2 - y1) / len; // along crosswalk width
+        const px = -dy, py = dx;                             // perpendicular (road direction)
+        const sw = len / (2 * stripeCount - 1);              // stripe width
+
+        ctx.save();
+        ctx.translate(x1, y1);
+
+        // Draw stripeCount white rectangles
+        for (let i = 0; i < stripeCount; i++) {
+          const offset = i * 2 * sw;
+          ctx.fillStyle = stripeColor;
+          ctx.beginPath();
+          ctx.moveTo(dx * offset - px * depth / 2,         dy * offset - py * depth / 2);
+          ctx.lineTo(dx * (offset + sw) - px * depth / 2,  dy * (offset + sw) - py * depth / 2);
+          ctx.lineTo(dx * (offset + sw) + px * depth / 2,  dy * (offset + sw) + py * depth / 2);
+          ctx.lineTo(dx * offset + px * depth / 2,          dy * offset + py * depth / 2);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Outline around the whole crosswalk rectangle
+        ctx.strokeStyle = isSelected ? COLORS.selected : "rgba(0,0,0,0.6)";
+        ctx.lineWidth = isSelected ? 2 : 1;
+        ctx.setLineDash(isSelected ? [6, 4] : []);
+        ctx.beginPath();
+        ctx.moveTo(-px * depth / 2,              -py * depth / 2);
+        ctx.lineTo(dx * len - px * depth / 2,    dy * len - py * depth / 2);
+        ctx.lineTo(dx * len + px * depth / 2,    dy * len + py * depth / 2);
+        ctx.lineTo(px * depth / 2,               py * depth / 2);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.restore();
+      }}
+    />
+  );
+}
+
 interface ObjectShapeProps { obj: CanvasObject; isSelected: boolean; }
 function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
   switch (obj.type) {
@@ -954,6 +1003,7 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
     case "measure":      return <MeasurementShape obj={obj} />;
     case "taper":        return <TaperShape obj={obj} isSelected={isSelected} />;
     case "lane_mask":    return <LaneMaskShape obj={obj} isSelected={isSelected} />;
+    case "crosswalk":    return <CrosswalkShape obj={obj} isSelected={isSelected} />;
     default:             return null;
   }
 }
@@ -1003,6 +1053,20 @@ function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicat
       style: "hatch",
     };
     elements.push(<LaneMaskShape key="lane-mask-preview" obj={previewMask} isSelected={false} />);
+  }
+
+  // Crosswalk preview
+  if (drawStart && tool === "crosswalk") {
+    const previewCW: CrosswalkObject = {
+      id: "__preview__",
+      type: "crosswalk",
+      x1: drawStart.x, y1: drawStart.y,
+      x2: cursorPos.x, y2: cursorPos.y,
+      depth: 24,
+      stripeCount: 6,
+      stripeColor: "#ffffff",
+    };
+    elements.push(<CrosswalkShape key="crosswalk-preview" obj={previewCW} isSelected={false} />);
   }
 
   // Polyline / smooth in-progress
@@ -1413,6 +1477,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     texts,
     measures,
     laneMasks,
+    crosswalks,
     hasAny,
     otherCount,
   } = useMemo(() => {
@@ -1425,6 +1490,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     let textsCount = 0;
     let measuresCount = 0;
     let laneMasksCount = 0;
+    let crosswalksCount = 0;
 
     for (const obj of objects) {
       if (obj.type === "sign") {
@@ -1445,12 +1511,14 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         measuresCount++;
       } else if (obj.type === "lane_mask") {
         laneMasksCount++;
+      } else if (obj.type === "crosswalk") {
+        crosswalksCount++;
       }
     }
 
     const hasAnyObjects = objects.length > 0;
     const otherCountTotal =
-      roadsCount + tapersCount + zonesCount + arrowsCount + textsCount + measuresCount + laneMasksCount;
+      roadsCount + tapersCount + zonesCount + arrowsCount + textsCount + measuresCount + laneMasksCount + crosswalksCount;
 
     return {
       signCounts: nextSignCounts,
@@ -1462,6 +1530,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
       texts: textsCount,
       measures: measuresCount,
       laneMasks: laneMasksCount,
+      crosswalks: crosswalksCount,
       hasAny: hasAnyObjects,
       otherCount: otherCountTotal,
     };
@@ -1485,13 +1554,14 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
       )}
       {otherCount > 0 && (
         <>{sectionTitle("Other")}
-          {roads   > 0 && <ManifestRow icon="━" label="Road segments" count={roads} />}
-          {tapers    > 0 && <ManifestRow icon="⋈" label="Tapers"        count={tapers} />}
-          {laneMasks > 0 && <ManifestRow icon="▧" label="Lane Masks"   count={laneMasks} />}
-          {zones     > 0 && <ManifestRow icon="▨" label="Work zones"   count={zones} />}
-          {arrows    > 0 && <ManifestRow icon="→" label="Arrows"       count={arrows} />}
-          {texts     > 0 && <ManifestRow icon="T" label="Text labels"  count={texts} />}
-          {measures  > 0 && <ManifestRow icon="📏" label="Measurements" count={measures} />}
+          {roads      > 0 && <ManifestRow icon="━"  label="Road segments" count={roads} />}
+          {tapers     > 0 && <ManifestRow icon="⋈"  label="Tapers"        count={tapers} />}
+          {laneMasks  > 0 && <ManifestRow icon="▧"  label="Lane Masks"    count={laneMasks} />}
+          {crosswalks > 0 && <ManifestRow icon="⊟"  label="Crosswalks"    count={crosswalks} />}
+          {zones      > 0 && <ManifestRow icon="▨"  label="Work zones"    count={zones} />}
+          {arrows     > 0 && <ManifestRow icon="→"  label="Arrows"        count={arrows} />}
+          {texts      > 0 && <ManifestRow icon="T"  label="Text labels"   count={texts} />}
+          {measures   > 0 && <ManifestRow icon="📏" label="Measurements"  count={measures} />}
         </>
       )}
       {hasAny && (
@@ -1574,7 +1644,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type === "lane_mask" ? "Lane Mask" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type === "lane_mask" ? "Lane Mask" : obj.type === "crosswalk" ? "Crosswalk" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -1781,6 +1851,32 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
               Color
               <input type="color" value={colorToHex(m.color)}
                 onChange={(e) => onUpdate(m.id, { color: hexToRgba(e.target.value, currentAlpha) })}
+                style={{ width: "100%", height: 24, cursor: "pointer", marginTop: 4 }} />
+            </label>
+          </div>
+        );
+      })()}
+
+      {obj.type === "crosswalk" && (() => {
+        const cw = obj as CrosswalkObject;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Depth: {cw.depth}px
+              <input type="range" min={10} max={60} step={1} value={cw.depth}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(cw.id, { depth: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Stripes: {cw.stripeCount}
+              <input type="number" min={3} max={12} step={1} value={cw.stripeCount}
+                style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", outline: "none" }}
+                onChange={(e) => { const v = parseInt(e.target.value); if (v >= 3 && v <= 12) onUpdate(cw.id, { stripeCount: v }); }} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Stripe Color
+              <input type="color" value={cw.stripeColor}
+                onChange={(e) => onUpdate(cw.id, { stripeColor: e.target.value })}
                 style={{ width: "100%", height: 24, cursor: "pointer", marginTop: 4 }} />
             </label>
           </div>
@@ -2335,6 +2431,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         const segLen = dist(o.x1, o.y1, o.x2, o.y2);
         if (d1 + d2 < segLen + o.laneWidth / 2 + 6) return o;
       }
+      if (o.type === "crosswalk") {
+        // Distance from click to the crosswalk center axis (x1y1→x2y2)
+        const cwDx = o.x2 - o.x1, cwDy = o.y2 - o.y1;
+        const cwLenSq = cwDx * cwDx + cwDy * cwDy;
+        const cwT = cwLenSq === 0 ? 0 : Math.max(0, Math.min(1, ((wx - o.x1) * cwDx + (wy - o.y1) * cwDy) / cwLenSq));
+        const cwCx = o.x1 + cwT * cwDx, cwCy = o.y1 + cwT * cwDy;
+        if (dist(wx, wy, cwCx, cwCy) < o.depth / 2 + 5) return o;
+      }
       if (o.type === "polyline_road" && o.points?.length >= 2) {
         if (distToPolyline(wx, wy, o.points) < effectiveHalfWidth(o)) return o;
       }
@@ -2506,7 +2610,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       return;
     }
 
-    if (["zone", "arrow", "measure", "lane_mask"].includes(tool)) {
+    if (["zone", "arrow", "measure", "lane_mask", "crosswalk"].includes(tool)) {
       setDrawStart({ x: raw.x, y: raw.y });
     }
   }, [tool, roadDrawMode, intersectionType, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
@@ -2591,7 +2695,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       return;
     }
 
-    if (drawStart && ["zone", "arrow", "measure", "lane_mask"].includes(tool)) {
+    if (drawStart && ["zone", "arrow", "measure", "lane_mask", "crosswalk"].includes(tool)) {
       const { x, y } = toWorld();
       const d = dist(drawStart.x, drawStart.y, x, y);
       if (d < 5) { setDrawStart(null); return; }
@@ -2606,6 +2710,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         newObj = { id: uid(), type: "measure", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y };
       } else if (tool === "lane_mask") {
         newObj = { id: uid(), type: "lane_mask", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, laneWidth: 20, color: "rgba(239,68,68,0.5)", style: "hatch" };
+      } else if (tool === "crosswalk") {
+        newObj = { id: uid(), type: "crosswalk", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, depth: 24, stripeCount: 6, stripeColor: "#ffffff" };
       }
 
       if (newObj) {
@@ -3353,6 +3459,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               {tool === "lane_mask" && !drawStart && (
                 <span style={{ color: COLORS.danger }}>Click and drag to draw a lane closure mask</span>
               )}
+              {tool === "crosswalk" && !drawStart && (
+                <span style={{ color: COLORS.info }}>Click and drag across a road to place a crosswalk</span>
+              )}
               <span data-testid="object-count">{objects.length} objects</span>
               <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
@@ -3406,7 +3515,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   <div key={obj.id} onClick={() => setSelected(obj.id)}
                     style={{ padding: "5px 8px", borderRadius: 4, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, background: selected === obj.id ? COLORS.accentDim : "transparent", color: selected === obj.id ? COLORS.accent : COLORS.textMuted, border: selected === obj.id ? `1px solid rgba(245,158,11,0.2)` : "1px solid transparent" }}>
                     <span style={{ fontSize: 12 }}>
-                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : obj.type === "lane_mask" ? "▧" : "📏"}
+                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : obj.type === "lane_mask" ? "▧" : obj.type === "crosswalk" ? "⊟" : "📏"}
                     </span>
                     <span>
                       {obj.type === "sign" ? obj.signData.label :
@@ -3418,6 +3527,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                        obj.type === "cubic_bezier_road" ? "cubic road" :
                        obj.type === "taper" ? `taper ${obj.speed}mph` :
                        obj.type === "lane_mask" ? "lane mask" :
+                       obj.type === "crosswalk" ? "crosswalk" :
                        obj.type}
                     </span>
                   </div>

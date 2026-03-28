@@ -191,6 +191,11 @@ const DEVICES: DeviceData[] = [
   { id: "water_barrel",label: "Water Barrel",  icon: "⊚",  color: "#3b82f6" },
 ];
 
+/** Strips hyphens, spaces, and dots then lowercases — used for fuzzy MUTCD matching. */
+function normalizeForSearch(s: string): string {
+  return s.toLowerCase().replace(/[\s\-./]/g, '')
+}
+
 function createIntersectionRoads(
   cx: number, cy: number,
   type: 't' | '4way',
@@ -2612,6 +2617,22 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   // suppress mapRenderTick lint warning — used to trigger re-render when tiles load
   void mapRenderTick;
 
+  // Pre-compute sign search results so JSX stays readable
+  const signSearchResults: { sign: SignData; catLabel: string; catColor: string }[] = (() => {
+    const q = signSearch.trim()
+    if (!q) return []
+    const nq = normalizeForSearch(q)
+    const builtIn = Object.entries(SIGN_CATEGORIES).flatMap(([, cat]) =>
+      cat.signs
+        .filter(s => normalizeForSearch(s.label).includes(nq) || (s.mutcd && normalizeForSearch(s.mutcd).includes(nq)))
+        .map(s => ({ sign: s, catLabel: cat.label, catColor: cat.color }))
+    )
+    const custom = customSigns
+      .filter(s => normalizeForSearch(s.label).includes(nq))
+      .map(s => ({ sign: s, catLabel: "Custom", catColor: COLORS.textMuted }))
+    return [...builtIn, ...custom]
+  })()
+
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -2783,6 +2804,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                     {/* Search input */}
                     <input
                       type="text"
+                      aria-label="Search signs by name or MUTCD code"
                       placeholder="Search by name or MUTCD code…"
                       value={signSearch}
                       onChange={e => setSignSearch(e.target.value)}
@@ -2791,21 +2813,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                     {signSearch.trim() ? (
                       /* ── Search results ── */
-                      (() => {
-                        const q = signSearch.trim().toLowerCase()
-                        const results = Object.entries(SIGN_CATEGORIES).flatMap(([, cat]) =>
-                          cat.signs
-                            .filter(s => s.label.toLowerCase().includes(q) || s.mutcd?.toLowerCase().includes(q))
-                            .map(s => ({ sign: s, catLabel: cat.label, catColor: cat.color }))
-                        )
-                        if (results.length === 0) return (
+                      <>
+                        {signSearchResults.length === 0 ? (
                           <div style={{ fontSize: 11, color: COLORS.textDim, textAlign: "center", padding: "16px 0" }}>No signs found</div>
-                        )
-                        return (
+                        ) : (
                           <>
-                            {sectionTitle(`${results.length} result${results.length !== 1 ? "s" : ""}`)}
+                            {sectionTitle(`${signSearchResults.length} result${signSearchResults.length !== 1 ? "s" : ""}`)}
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
-                              {results.map(({ sign, catLabel, catColor }) => (
+                              {signSearchResults.map(({ sign, catLabel, catColor }) => (
                                 <button key={sign.id} onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
                                   style={{ padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                                   <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : sign.shape === "diamond" ? 0 : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none", transform: sign.shape === "diamond" ? "rotate(45deg)" : "none" }}>
@@ -2818,8 +2833,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                               ))}
                             </div>
                           </>
-                        )
-                      })()
+                        )}
+                      </>
                     ) : (
                       /* ── Browse by category ── */
                       <>

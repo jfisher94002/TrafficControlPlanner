@@ -1044,3 +1044,58 @@ describe('Analytics — canvas events', () => {
     }))
   })
 })
+
+// ─── Sign search ──────────────────────────────────────────────────────────────
+describe('Sign search', () => {
+  async function openSignLibrary(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /signs/i }))
+    // Library tab is active by default
+  }
+
+  it('shows search input in sign library panel', async () => {
+    const { user } = setup()
+    await openSignLibrary(user)
+    expect(screen.getByRole('textbox', { name: /search signs/i })).toBeInTheDocument()
+  })
+
+  it('searching by label filters signs', async () => {
+    const { user } = setup()
+    await openSignLibrary(user)
+    const input = screen.getByRole('textbox', { name: /search signs/i })
+    await user.type(input, 'stop')
+    // STOP sign should appear in results
+    expect(screen.getByText('STOP')).toBeInTheDocument()
+    // Category headers should be gone (browse mode hidden)
+    expect(screen.queryByText('Sign Category')).not.toBeInTheDocument()
+  })
+
+  it('searching by MUTCD code finds the correct sign', async () => {
+    const { user } = setup()
+    await openSignLibrary(user)
+    await user.type(screen.getByRole('textbox', { name: /search signs/i }), 'R1-1')
+    expect(screen.getByText('STOP')).toBeInTheDocument()
+  })
+
+  it('normalized MUTCD search (no hyphens) still matches', async () => {
+    const { user } = setup()
+    await openSignLibrary(user)
+    await user.type(screen.getByRole('textbox', { name: /search signs/i }), 'R11')
+    expect(screen.getByText('STOP')).toBeInTheDocument()
+  })
+
+  it('shows "No signs found" for a query with no matches', async () => {
+    const { user } = setup()
+    await openSignLibrary(user)
+    await user.type(screen.getByRole('textbox', { name: /search signs/i }), 'xyznotasign999')
+    expect(screen.getByText(/no signs found/i)).toBeInTheDocument()
+  })
+
+  it('clearing search restores the category browse UI', async () => {
+    const { user } = setup()
+    await openSignLibrary(user)
+    const input = screen.getByRole('textbox', { name: /search signs/i })
+    await user.type(input, 'stop')
+    await user.clear(input)
+    expect(screen.getByText('Sign Category')).toBeInTheDocument()
+  })
+})

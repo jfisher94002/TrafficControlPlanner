@@ -56,12 +56,7 @@ jobs:
           git fetch origin "$BASE_REF"
           git diff "origin/$BASE_REF"...HEAD > /tmp/pr.diff
           # Truncate to ~15 000 chars in a UTF-8-safe way (head -c can split multibyte chars)
-          python3 -c "
-import sys
-data = open('/tmp/pr.diff', 'rb').read()
-truncated = data[:15000].decode('utf-8', errors='ignore')
-open('/tmp/pr_trimmed.diff', 'w', encoding='utf-8').write(truncated)
-"
+          python3 -c "d=open('/tmp/pr.diff','rb').read(); open('/tmp/pr_trimmed.diff','w',encoding='utf-8').write(d[:15000].decode('utf-8',errors='ignore'))"
           echo "diff_file=/tmp/pr_trimmed.diff" >> $GITHUB_OUTPUT
 
       - name: "Run Gemini Review"

@@ -1099,3 +1099,79 @@ describe('Sign search', () => {
     expect(screen.getByText('Sign Category')).toBeInTheDocument()
   })
 })
+
+// ─── Sign Editor ───────────────────────────────────────────────────────────────
+describe('Sign Editor', () => {
+  async function openEditor(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /signs/i }))
+    await user.click(screen.getByRole('button', { name: /editor/i }))
+  }
+
+  // The text input in SignEditorPanel is the only one with placeholder "SIGN TEXT"
+  function getEditorTextInput() {
+    return screen.getByPlaceholderText('SIGN TEXT')
+  }
+
+  it('switching to the Editor tab shows shape picker and text input', async () => {
+    const { user } = setup()
+    await openEditor(user)
+    expect(screen.getByRole('button', { name: /diamond/i })).toBeInTheDocument()
+    expect(getEditorTextInput()).toBeInTheDocument()
+  })
+
+  it('clicking canvas without clicking Place places the editor sign (not library sign)', async () => {
+    const { user } = setup()
+    // Arm the sign tool via keyboard, place a STOP (library default) to establish baseline
+    await user.click(screen.getByRole('button', { name: /signs/i }))
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getAllByTestId('legend-item-label').some(l => l.textContent === 'STOP')).toBe(true)
+
+    // Switch to editor, change text — sign tool stays active via live-sync
+    await openEditor(user)
+    const textInput = getEditorTextInput()
+    await user.clear(textInput)
+    await user.type(textInput, 'ONE WAY')
+    // Click canvas WITHOUT clicking Place — editor's sign should be placed
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    const labels = screen.getAllByTestId('legend-item-label').map(l => l.textContent)
+    expect(labels).toContain('ONE WAY')
+  })
+
+  it('changing shape in editor updates the placed sign (verified via legend)', async () => {
+    const { user } = setup()
+    // Arm sign tool first
+    fireEvent.keyDown(window, { key: 'S' })
+    await openEditor(user)
+    // Select circle shape — editor label stays "CUSTOM"
+    await user.click(screen.getByRole('button', { name: /circle/i }))
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const labels = screen.getAllByTestId('legend-item-label').map(l => l.textContent)
+    expect(labels).toContain('CUSTOM')
+  })
+
+  it('Place button activates sign tool so next canvas click places the editor sign', async () => {
+    const { user } = setup()
+    await openEditor(user)
+    const textInput = getEditorTextInput()
+    await user.clear(textInput)
+    await user.type(textInput, 'DETOUR')
+    await user.click(screen.getByRole('button', { name: /✓ place/i }))
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const labels = screen.getAllByTestId('legend-item-label').map(l => l.textContent)
+    expect(labels).toContain('DETOUR')
+  })
+
+  it('Save button adds the sign to the custom signs section in Library', async () => {
+    const { user } = setup()
+    await openEditor(user)
+    const textInput = getEditorTextInput()
+    await user.clear(textInput)
+    await user.type(textInput, 'MY SIGN')
+    await user.click(screen.getByRole('button', { name: /\+ save/i }))
+    // Switch back to Library tab — the saved sign should appear under My Custom Signs
+    await user.click(screen.getByRole('button', { name: /library/i }))
+    expect(screen.getByText('MY SIGN')).toBeInTheDocument()
+  })
+})

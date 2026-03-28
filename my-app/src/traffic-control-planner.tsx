@@ -12,6 +12,12 @@ import type {
   GeocodeResult, SignShape,
 } from './types';
 import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isRoad, isMultiPointRoad, calcTaperLength, cloneObject } from './utils';
+import { savePlanToCloud } from './planStorage';
+import PlanDashboard from './PlanDashboard';
+import TemplatePicker from './TemplatePicker';
+import ExportPreviewModal from './ExportPreviewModal';
+import { runQCChecks, type QCIssue } from './qcRules';
+import { track } from './analytics';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -102,8 +108,9 @@ const SIGN_CATEGORIES: Record<string, { label: string; color: string; signs: Sig
       { id: "rightcurve",     label: "RIGHT CURVE",  shape: "diamond", color: "#f97316", textColor: "#111" },
       { id: "leftcurve",      label: "LEFT CURVE",   shape: "diamond", color: "#f97316", textColor: "#111" },
       { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "hillgrade",      label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "workers",        label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "hillgrade",        label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "workers",          label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "trafficcontrols",  label: "TRAF CTRL",    shape: "diamond", color: "#f97316", textColor: "#111" },
     ],
   },
   temporary: {
@@ -183,6 +190,23 @@ const DEVICES: DeviceData[] = [
   { id: "crashcush",   label: "Crash Cushion", icon: "⟐",  color: "#ef4444" },
   { id: "water_barrel",label: "Water Barrel",  icon: "⊚",  color: "#3b82f6" },
 ];
+
+function createIntersectionRoads(
+  cx: number, cy: number,
+  type: 't' | '4way',
+  roadType: RoadType,
+): StraightRoadObject[] {
+  const L = roadType.width * 3
+  const base = { width: roadType.width, realWidth: roadType.realWidth, lanes: roadType.lanes, roadType: roadType.id }
+  if (type === '4way') return [
+    { id: uid(), type: 'road', x1: cx - L, y1: cy, x2: cx + L, y2: cy, ...base },
+    { id: uid(), type: 'road', x1: cx, y1: cy - L, x2: cx, y2: cy + L, ...base },
+  ]
+  return [
+    { id: uid(), type: 'road', x1: cx - L, y1: cy, x2: cx + L, y2: cy, ...base },
+    { id: uid(), type: 'road', x1: cx, y1: cy, x2: cx, y2: cy - L, ...base },
+  ]
+}
 
 // realWidth = diagram-scale meters (≈3× real-world so roads are wide enough to work with on screen)
 const ROAD_TYPES: RoadType[] = [
@@ -355,6 +379,11 @@ function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
 
   return (
     <Group listening={false}>
+      {/* End-cap discs fill visual gaps at intersections where roads of different widths meet */}
+      <Circle x={x1} y={y1} radius={hw + 1} fill="#555" listening={false} />
+      <Circle x={x2} y={y2} radius={hw + 1} fill="#555" listening={false} />
+      <Circle x={x1} y={y1} radius={hw - 1} fill={COLORS.road} listening={false} />
+      <Circle x={x2} y={y2} radius={hw - 1} fill={COLORS.road} listening={false} />
       <Line points={roadPoly} closed fill={COLORS.road} stroke="#555" strokeWidth={2} />
       <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
       <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
@@ -409,9 +438,9 @@ function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -462,9 +491,9 @@ function CurveRoad({ obj, isSelected }: CurveRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -516,9 +545,9 @@ function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -925,6 +954,8 @@ function ToolButton({ tool, active, onClick }: ToolButtonProps) {
     <button
       onClick={onClick}
       title={`${tool.label} (${tool.shortcut})`}
+      data-testid={`tool-${tool.id}`}
+      aria-pressed={active}
       style={{
         display: "flex", alignItems: "center", justifyContent: "center",
         width: 40, height: 40, borderRadius: 8,
@@ -1288,6 +1319,47 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
           <span>Total</span>
           <span data-testid="manifest-count" style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.text, fontWeight: 600 }}>{objects.length}</span>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── QC PANEL ────────────────────────────────────────────────────────────────
+
+function getQCBadgeColor(issues: QCIssue[]): string | null {
+  if (issues.some(i => i.severity === "error"))   return "#ef4444";
+  if (issues.some(i => i.severity === "warning")) return "#f59e0b";
+  return null;
+}
+
+function QCPanel({ issues }: { issues: QCIssue[] }) {
+  const SEV_COLOR = { error: "#ef4444", warning: "#f59e0b", info: "#64748b" } as const;
+  const SEV_ICON  = { error: "✕", warning: "⚠", info: "ℹ" } as const;
+  const errorCount   = issues.filter(i => i.severity === "error").length;
+  const warningCount = issues.filter(i => i.severity === "warning").length;
+  const infoCount    = issues.filter(i => i.severity === "info").length;
+  return (
+    <div data-testid="qc-panel" style={{ flex: 1, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      {issues.length === 0 ? (
+        <div style={{ textAlign: "center", color: "#22c55e", fontSize: 11, padding: "24px 0" }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>✓</div>
+          No issues found
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>
+            {errorCount} error{errorCount !== 1 ? "s" : ""},{" "}
+            {warningCount} warning{warningCount !== 1 ? "s" : ""}
+            {infoCount > 0 && `, ${infoCount} info`}
+          </div>
+          {issues.map(issue => (
+            <div key={issue.id} data-testid={`qc-issue-${issue.severity}`}
+              style={{ padding: "8px 10px", borderRadius: 4, background: "rgba(255,255,255,0.03)", border: `1px solid ${SEV_COLOR[issue.severity]}33`, display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <span style={{ color: SEV_COLOR[issue.severity], fontSize: 12, flexShrink: 0, marginTop: 1 }}>{SEV_ICON[issue.severity]}</span>
+              <span style={{ fontSize: 10, color: "#cbd5e1", lineHeight: 1.4 }}>{issue.message}</span>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );
@@ -1675,15 +1747,24 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 interface PlannerProps {
   userId?: string | null;
+  userEmail?: string | null;
   onSignOut?: () => void;
 }
 
-export default function TrafficControlPlanner({ userId = null, onSignOut }: PlannerProps = {}) {
+const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID);
+const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) || 'jfisher@fisherconsulting.org';
+const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
+
+export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Read autosave once — reused by all useState initializers below
   const initialAutosave = useRef(readAutosave()).current;
+
+  const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem(BANNER_KEY) === '1');
+
+  const dismissBanner = () => { sessionStorage.setItem(BANNER_KEY, '1'); setBannerDismissed(true); };
 
   // Core state
   const [tool, setTool] = useState("select");
@@ -1701,9 +1782,10 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
   const [signCategory, setSignCategory] = useState("regulatory");
   const [leftPanel, setLeftPanel] = useState("tools");
   const [rightPanel, setRightPanel] = useState(true);
-  const [rightTab, setRightTab] = useState<"properties" | "manifest">("properties");
+  const [rightTab, setRightTab] = useState<"properties" | "manifest" | "qc">("properties");
   const propertiesTabRef = useRef<HTMLButtonElement | null>(null);
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
+  const qcTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
@@ -1716,6 +1798,11 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
   const [planMeta, setPlanMeta] = useState<PlanMeta>(() => initialAutosave?.metadata ?? { projectNumber: "", client: "", location: "", notes: "" });
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<CanvasObject | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [exportPreview, setExportPreview] = useState<Record<string, unknown> | null>(null);
+  const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
+  const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
@@ -1728,6 +1815,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
   const mapTileCacheRef = useRef<Record<string, MapTileEntry>>({});
 
   const [roadDrawMode, setRoadDrawMode] = useState("straight");
+  const [intersectionType, setIntersectionType] = useState<'t' | '4way'>('4way');
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
   const [curvePoints, setCurvePoints] = useState<Point[]>([]);
   const [cubicPoints, setCubicPoints] = useState<Point[]>([]);
@@ -1852,17 +1940,19 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     setCubicPoints([]);
   }, []);
 
-  const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest") => {
-    const next: "properties" | "manifest" | null =
-      e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowUp"
-        ? current === "properties" ? "manifest" : "properties"
-        : e.key === "Home" ? "properties"
-        : e.key === "End"  ? "manifest"
-        : null;
+  const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest" | "qc") => {
+    const tabs: Array<"properties" | "manifest" | "qc"> = ["properties", "manifest", "qc"];
+    const idx = tabs.indexOf(current);
+    const next: "properties" | "manifest" | "qc" | null =
+      e.key === "ArrowRight" || e.key === "ArrowDown" ? tabs[(idx + 1) % tabs.length]
+      : e.key === "ArrowLeft" || e.key === "ArrowUp" ? tabs[(idx - 1 + tabs.length) % tabs.length]
+      : e.key === "Home" ? "properties"
+      : e.key === "End"  ? "qc"
+      : null;
     if (next) {
       e.preventDefault();
       setRightTab(next);
-      (next === "properties" ? propertiesTabRef : manifestTabRef).current?.focus();
+      (next === "properties" ? propertiesTabRef : next === "manifest" ? manifestTabRef : qcTabRef).current?.focus();
     }
   }, []);
 
@@ -1911,6 +2001,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         }
         return;
       }
@@ -2047,6 +2138,14 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       const newSign: SignObject = { id: uid(), type: "sign", x: raw.x, y: raw.y, signData: selectedSign, rotation: 0, scale: 1 };
       const newObjs = [...objects, newSign];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newSign.id);
+      if (selectedSign) {
+        const isCustom = selectedSign.id.startsWith('custom_');
+        track('sign_placed', {
+          sign_id: selectedSign.id,
+          sign_source: isCustom ? 'custom' : 'builtin',
+          ...(isCustom ? {} : { sign_label: selectedSign.label }),
+        });
+      }
       return;
     }
 
@@ -2092,6 +2191,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         } else {
           setPolyPoints((prev) => [...prev, { x, y }]);
         }
@@ -2104,6 +2204,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           const newRoad: CurveRoadObject = { id: uid(), type: "curve_road", points: newCurvePts as [Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCurvePoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'curve', point_count: 3 });
         } else {
           setCurvePoints(newCurvePts);
         }
@@ -2116,6 +2217,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           const newRoad: CubicBezierRoadObject = { id: uid(), type: "cubic_bezier_road", points: newCubicPts as [Point, Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
           setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
+          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'cubic', point_count: 4 });
         } else {
           setCubicPoints(newCubicPts);
         }
@@ -2123,16 +2225,24 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       }
     }
 
+    if (tool === "intersection") {
+      const roads = createIntersectionRoads(x, y, intersectionType, selectedRoadType);
+      const newObjs = [...objects, ...roads];
+      setObjects(newObjs); pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
+      track('road_drawn', { road_type: selectedRoadType.id, draw_mode: intersectionType === '4way' ? 'intersection_4way' : 'intersection_t' });
+      return;
+    }
+
     if (["zone", "arrow", "measure"].includes(tool)) {
       setDrawStart({ x: raw.x, y: raw.y });
     }
-  }, [tool, roadDrawMode, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
+  }, [tool, roadDrawMode, intersectionType, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     const raw = toWorld();
     setCursorPos(raw);
 
-    if (tool === "road" && snapEnabled) {
+    if ((tool === "road" || tool === "intersection") && snapEnabled) {
       const { x, y, snapped } = snapToEndpoint(raw.x, raw.y, objects, SNAP_RADIUS, zoom);
       setSnapIndicator(snapped ? { x, y } : null);
     } else {
@@ -2203,6 +2313,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       const newRoad: StraightRoadObject = { id: uid(), type: "road", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
       const newObjs = [...objects, newRoad];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id);
+      track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'straight' });
       setDrawStart(null);
       return;
     }
@@ -2284,6 +2395,29 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     setZoom(1);
   };
 
+  const handleTemplateApply = useCallback((templateObjects: CanvasObject[], mode: 'replace' | 'merge') => {
+    // Reset any in-progress draw state so partial roads don't persist after apply
+    setDrawStart(null);
+    setPolyPoints([]);
+    setCurvePoints([]);
+    setCubicPoints([]);
+    setSnapIndicator(null);
+    if (mode === 'replace') {
+      setObjects(templateObjects);
+      pushHistory(templateObjects);
+      setSelected(null);
+      setOffset({ x: 0, y: 0 });
+      setZoom(1);
+    } else {
+      const merged = [...objects, ...templateObjects];
+      setObjects(merged);
+      pushHistory(merged);
+      setSelected(null);
+    }
+    // track is a stable module-level import — intentionally omitted from deps
+    track('template_applied', { mode, object_count: templateObjects.length });
+  }, [objects, pushHistory]);
+
   const triggerDownload = (href: string, filename: string) => {
     const a = document.createElement("a");
     a.href = href;
@@ -2314,6 +2448,52 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     const url = URL.createObjectURL(blob);
     triggerDownload(url, `${safePlanTitle}.tcp.json`);
     URL.revokeObjectURL(url);
+    track('plan_saved_local', { object_count: objects.length });
+  };
+
+  const handleCloudSave = async () => {
+    if (!userId || cloudSaveStatus === 'Saving…') return;
+    setCloudSaveStatus('Saving…');
+    try {
+      const objectCount = objects.length;
+      const data = {
+        id: planId, name: planTitle, createdAt: planCreatedAt,
+        updatedAt: new Date().toISOString(), userId,
+        canvasState: { objects }, metadata: planMeta,
+        canvasOffset: offset, canvasZoom: zoom, mapCenter,
+      };
+      await savePlanToCloud(userId, planId, data);
+      setCloudSaveStatus('Saved ✓');
+      track('plan_saved_cloud', { object_count: objectCount });
+    } catch (e) {
+      setCloudSaveStatus(e instanceof Error ? e.message : 'Save failed');
+    }
+    setTimeout(() => setCloudSaveStatus(null), 3000);
+  };
+
+  const handleDashboardOpen = (data: Record<string, unknown>) => {
+    const cs = data.canvasState as { objects?: CanvasObject[] } | undefined;
+    const newObjects = cs?.objects ?? [];
+    const newId = (data.id as string | undefined) ?? uid();
+    const newTitle = (data.name as string | undefined) ?? 'Untitled Traffic Control Plan';
+    const newCreatedAt = (data.createdAt as string | undefined) ?? new Date().toISOString();
+    const newMeta = (data.metadata as PlanMeta | undefined) ?? { projectNumber: '', client: '', location: '', notes: '' };
+    const newOffset = (data.canvasOffset as Point | undefined) ?? { x: 0, y: 0 };
+    const newZoom = typeof data.canvasZoom === 'number' ? data.canvasZoom : 1;
+    const newMapCenter = (data.mapCenter as MapCenter | null | undefined) ?? null;
+    setPlanId(newId);
+    setPlanTitle(newTitle);
+    setPlanCreatedAt(newCreatedAt);
+    setPlanMeta(newMeta);
+    setObjects(newObjects);
+    setHistory([newObjects]);
+    setHistoryIndex(0);
+    setSelected(null);
+    setOffset(newOffset);
+    setZoom(newZoom);
+    setMapCenter(newMapCenter);
+    setShowDashboard(false);
+    track('plan_loaded_cloud', { object_count: newObjects.length });
   };
 
   const exportPNG = () => {
@@ -2325,15 +2505,15 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       const url = URL.createObjectURL(blob);
       triggerDownload(url, `${safePlanTitle}.png`);
       URL.revokeObjectURL(url);
+      track('plan_exported_png', { object_count: objects.length });
     }, "image/png");
   };
 
-  const exportPDF = async () => {
+  const exportPDF = () => {
     const stage = stageRef.current;
     if (!stage) return;
     const canvas = stage.toCanvas({ pixelRatio: 2 });
-    const dataUrl: string = canvas.toDataURL("image/png");
-    const b64 = dataUrl.replace("data:image/png;base64,", "");
+    const b64 = canvas.toDataURL("image/png").replace("data:image/png;base64,", "");
     const payload = {
       id: planId,
       name: planTitle,
@@ -2347,20 +2527,27 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
       metadata: planMeta,
       canvas_image_b64: b64,
     };
+    setExportPreview(payload);
+  };
+
+  const confirmExportPDF = async () => {
+    if (!exportPreview) return;
     const apiBase = (import.meta.env.VITE_EXPORT_API_BASE ?? "").replace(/\/$/, "");
     try {
       const res = await fetch(`${apiBase}/export-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(exportPreview),
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       triggerDownload(url, `${safePlanTitle}.pdf`);
       URL.revokeObjectURL(url);
+      track('plan_exported_pdf', { object_count: objects.length });
     } catch (err) {
       console.error("PDF export failed:", err);
+      throw err; // re-throw so the modal stays open on failure
     }
   };
 
@@ -2428,13 +2615,24 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
+      {/* ─── PRE-BETA BANNER ─── */}
+      {!bannerDismissed && (
+        <div data-testid="prebeta-banner" style={{ background: "rgba(245,158,11,0.15)", borderBottom: `1px solid rgba(245,158,11,0.35)`, padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: COLORS.accent }}>
+            🚧 <strong>Pre-Beta</strong> — expect bugs and breaking changes. &nbsp;
+            <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: COLORS.accent, textDecoration: "underline" }}>Report an issue</a>
+          </span>
+          <button onClick={dismissBanner} data-testid="dismiss-banner" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 4px" }} title="Dismiss">✕</button>
+        </div>
+      )}
+
       {/* ─── TOP BAR ─── */}
-      <div style={{ height: 48, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
-        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
+        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, overflow: "hidden" }}>
+          <a href="/" data-testid="home-link" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }} title="Back to home">
             <span style={{ fontSize: 20, color: COLORS.accent }}>◆</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, letterSpacing: 1 }}>TCP</span>
-          </div>
+          </a>
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
           <input
             data-testid="plan-title"
@@ -2446,14 +2644,28 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
+          <button onClick={() => setShowTemplatePicker(true)} data-testid="templates-button" style={panelBtnStyle(false)} title="Start from a template">Templates</button>
+          {userId && CLOUD_ENABLED && (<>
+            <button onClick={handleCloudSave} data-testid="cloud-save-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Save plan to cloud (S3)">☁ Save{cloudSaveStatus ? ` — ${cloudSaveStatus}` : ''}</button>
+            <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
+          </>)}
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
           <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
-          <div style={{ flex: 1 }} />
-          <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
-          {onSignOut && (
-            <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)} title={`Signed in as ${userId ?? 'unknown'}`}>Sign Out</button>
-          )}
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
+        </div>
+
+        {/* Right-side user controls — flexShrink:0 so toolbar overflow never pushes these off screen */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, borderLeft: `1px solid ${COLORS.panelBorder}`, paddingLeft: 12, marginLeft: 4 }}>
+          <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
+          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap" }} title="Email support">{CONTACT_EMAIL}</a>
+          {onSignOut && (<>
+            {(userEmail || userId) && (
+              <span data-testid="user-identity" style={{ fontSize: 10, color: COLORS.textMuted, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={userEmail ?? userId ?? ''}>
+                {userEmail ?? userId}
+              </span>
+            )}
+            <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)}>Sign Out</button>
+          </>)}
         </div>
 
         <div style={{ position: "relative", flex: "0 1 420px" }}>
@@ -2540,9 +2752,9 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
 
                 {sectionTitle("Zoom")}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={zoomOut} style={panelBtnStyle(false)}>−</button>
-                  <div style={{ flex: 1, textAlign: "center", fontSize: 11, color: COLORS.text, lineHeight: "28px" }}>{(zoom * 100).toFixed(0)}%</div>
-                  <button onClick={zoomIn} style={panelBtnStyle(false)}>+</button>
+                  <button data-testid="zoom-out" onClick={zoomOut} style={panelBtnStyle(false)}>−</button>
+                  <div data-testid="zoom-level" style={{ flex: 1, textAlign: "center", fontSize: 11, color: COLORS.text, lineHeight: "28px" }}>{(zoom * 100).toFixed(0)}%</div>
+                  <button data-testid="zoom-in" onClick={zoomIn} style={panelBtnStyle(false)}>+</button>
                   <button onClick={zoomFit} style={panelBtnStyle(false)}>Fit</button>
                 </div>
 
@@ -2694,13 +2906,29 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                   ))}
                 </div>
 
+                {sectionTitle("Intersection Templates")}
+                <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                  {([
+                    { id: 't' as const, label: 'T-Junction', icon: '⊤' },
+                    { id: '4way' as const, label: '4-Way', icon: '✛' },
+                  ]).map((itype) => (
+                    <button key={itype.id}
+                      onClick={() => { setIntersectionType(itype.id); switchTool("intersection"); }}
+                      style={{ flex: 1, padding: "8px 4px", fontSize: 9, background: intersectionType === itype.id && tool === "intersection" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: `1px solid ${intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.panelBorder}`, color: intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.textMuted, borderRadius: 5, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                      <span style={{ fontSize: 16 }}>{itype.icon}</span>
+                      <span>{itype.label}</span>
+                    </button>
+                  ))}
+                </div>
+
                 <div style={{ marginTop: 12, padding: 8, background: "rgba(245,158,11,0.05)", borderRadius: 6, border: `1px solid rgba(245,158,11,0.1)` }}>
                   <div style={{ fontSize: 9, color: COLORS.accent }}>
-                    {roadDrawMode === "straight" && "Click and drag to draw a straight road."}
-                    {roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
-                    {roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
-                    {roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
-                    {roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
+                    {tool === "intersection" && `Click canvas to stamp a ${intersectionType === '4way' ? '4-way' : 'T-junction'} intersection using the selected road type.`}
+                    {tool !== "intersection" && roadDrawMode === "straight" && "Click and drag to draw a straight road."}
+                    {tool !== "intersection" && roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
+                    {tool !== "intersection" && roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
+                    {tool !== "intersection" && roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
+                    {tool !== "intersection" && roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
                   </div>
                 </div>
               </>
@@ -2709,7 +2937,7 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
         </div>
 
         {/* ─── CANVAS (Konva Stage) ─── */}
-        <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <div ref={containerRef} data-testid="canvas-container" style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <Stage
             ref={stageRef}
             data-testid="konva-stage"
@@ -2795,9 +3023,9 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                 </span>
               )}
               <span data-testid="object-count">{objects.length} objects</span>
-              <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : ""}</span>
+              <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
-              <span>{snapEnabled ? "Snap: endpoint" : "Snap OFF"}</span>
+              <span>{snapEnabled ? "Snap: segment" : "Snap OFF"}</span>
               {autosaveError
                 ? <span style={{ color: COLORS.danger }} title={`Auto-save failed: ${autosaveError}`}>⚠ Save failed</span>
                 : <span style={{ color: COLORS.success }} title="Auto-saved to browser storage">● Auto-saved</span>
@@ -2822,11 +3050,19 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
                 style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "manifest" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "manifest" ? COLORS.accent : COLORS.textDim, cursor: "pointer" }}>
                 Manifest
               </button>
+              <button type="button" role="tab" aria-selected={rightTab === "qc"} tabIndex={rightTab === "qc" ? 0 : -1}
+                ref={qcTabRef} data-testid="tab-qc"
+                onClick={() => setRightTab("qc")} onKeyDown={(e) => handleRightTabKeyDown(e, "qc")}
+                style={{ flex: 1, padding: "8px 6px", fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, background: "none", border: "none", borderBottom: rightTab === "qc" ? `2px solid ${COLORS.accent}` : "2px solid transparent", color: rightTab === "qc" ? COLORS.accent : COLORS.textDim, cursor: "pointer", position: "relative" }}>
+                QC{getQCBadgeColor(qcIssues) && <span style={{ position: "absolute", top: 6, right: 2, width: 6, height: 6, borderRadius: "50%", background: getQCBadgeColor(qcIssues)! }} />}
+              </button>
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
               ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
-              : <ManifestPanel objects={objects} />
+              : rightTab === "manifest"
+              ? <ManifestPanel objects={objects} />
+              : <QCPanel issues={qcIssues} />
             }
 
             <div style={{ marginTop: "auto", borderTop: `1px solid ${COLORS.panelBorder}`, padding: 12 }}>
@@ -2865,6 +3101,30 @@ export default function TrafficControlPlanner({ userId = null, onSignOut }: Plan
           </button>
         )}
       </div>
+      {showDashboard && userId && CLOUD_ENABLED && (
+        <PlanDashboard
+          userId={userId}
+          onOpen={handleDashboardOpen}
+          onClose={() => setShowDashboard(false)}
+        />
+      )}
+      {showTemplatePicker && (
+        <TemplatePicker
+          onApply={handleTemplateApply}
+          onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
+      {exportPreview && (
+        <ExportPreviewModal
+          canvasDataUrl={`data:image/png;base64,${exportPreview.canvas_image_b64 as string}`}
+          planTitle={planTitle}
+          planMeta={planMeta}
+          planCreatedAt={planCreatedAt}
+          qcIssues={qcIssues}
+          onConfirm={confirmExportPDF}
+          onClose={() => setExportPreview(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
 import { stageStub, mockCanvas } from './konva-stub'
+import * as planStorage from '../planStorage'
+import * as analytics from '../analytics'
 
 beforeEach(() => {
   localStorage.clear()
@@ -320,6 +322,10 @@ describe('PNG export', () => {
     mockCanvas.toBlob.mockClear()
     ;(URL.createObjectURL as ReturnType<typeof vi.fn>).mockClear()
     ;(URL.revokeObjectURL as ReturnType<typeof vi.fn>).mockClear()
+    const trackSpy = vi.spyOn(analytics, 'track')
+
+    // Render first so React's <a> elements are created before the spy is set up
+    const { user } = setup()
 
     const mockAnchor = { href: '', download: '', click: vi.fn() }
     const realCreateElement = document.createElement.bind(document)
@@ -327,7 +333,6 @@ describe('PNG export', () => {
       tag === 'a' ? (mockAnchor as unknown as HTMLElement) : realCreateElement(tag),
     )
 
-    const { user } = setup()
     await user.click(screen.getByTestId('export-png-button'))
 
     expect(stageStub.toCanvas).toHaveBeenCalledWith({ pixelRatio: 2 })
@@ -336,6 +341,7 @@ describe('PNG export', () => {
     expect(mockAnchor.download).toMatch(/\.png$/)
     expect(mockAnchor.click).toHaveBeenCalled()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+    expect(trackSpy).toHaveBeenCalledWith('plan_exported_png', expect.objectContaining({ object_count: expect.any(Number) }))
 
     createElementSpy.mockRestore()
   })
@@ -503,10 +509,22 @@ describe('Auth props', () => {
     expect(screen.getByTestId('sign-out-button')).toBeInTheDocument()
   })
 
-  it('sign-out button title includes the userId', () => {
+  it('user-identity label shows the userId when no email is provided', () => {
     render(<TrafficControlPlanner userId="alice@example.com" onSignOut={vi.fn()} />)
-    const btn = screen.getByTestId('sign-out-button')
-    expect(btn.title).toContain('alice@example.com')
+    expect(screen.getByTestId('user-identity').textContent).toContain('alice@example.com')
+  })
+
+  it('user-identity label prefers userEmail over userId', () => {
+    render(<TrafficControlPlanner userId="cognito-uuid" userEmail="alice@example.com" onSignOut={vi.fn()} />)
+    const el = screen.getByTestId('user-identity')
+    expect(el.textContent).toContain('alice@example.com')
+    expect(el.textContent).not.toContain('cognito-uuid')
+    expect(el.title).toBe('alice@example.com')
+  })
+
+  it('user-identity label is not rendered when neither userId nor userEmail is provided', () => {
+    render(<TrafficControlPlanner onSignOut={vi.fn()} />)
+    expect(screen.queryByTestId('user-identity')).not.toBeInTheDocument()
   })
 
   it('clicking sign-out button calls onSignOut', async () => {
@@ -517,15 +535,44 @@ describe('Auth props', () => {
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 
-  it('sign-out button appears after export buttons in the toolbar', () => {
+  it('sign-out button is visible and appears after export buttons in the page', () => {
     render(<TrafficControlPlanner userId="user-abc" onSignOut={vi.fn()} />)
-    const toolbar = screen.getByTestId('toolbar')
-    const buttons = within(toolbar).getAllByRole('button')
-    const pngIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'export-png-button')
-    const pdfIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'export-pdf-button')
-    const signOutIdx = buttons.findIndex(b => b.getAttribute('data-testid') === 'sign-out-button')
+    const allButtons = screen.getAllByRole('button')
+    const pngIdx = allButtons.findIndex(b => b.getAttribute('data-testid') === 'export-png-button')
+    const pdfIdx = allButtons.findIndex(b => b.getAttribute('data-testid') === 'export-pdf-button')
+    const signOutIdx = allButtons.findIndex(b => b.getAttribute('data-testid') === 'sign-out-button')
     expect(signOutIdx).toBeGreaterThan(pngIdx)
     expect(signOutIdx).toBeGreaterThan(pdfIdx)
+  })
+})
+
+// ─── Pre-beta banner ──────────────────────────────────────────────────────────
+describe('Pre-beta banner', () => {
+  beforeEach(() => sessionStorage.clear())
+
+  it('shows the banner by default', () => {
+    render(<TrafficControlPlanner />)
+    expect(screen.getByTestId('prebeta-banner')).toBeInTheDocument()
+  })
+
+  it('hides the banner after clicking dismiss', async () => {
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner />)
+    await user.click(screen.getByTestId('dismiss-banner'))
+    expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
+  })
+
+  it('does not show the banner if already dismissed this session', () => {
+    sessionStorage.setItem('tcp_prebeta_banner_dismissed', '1')
+    render(<TrafficControlPlanner />)
+    expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
+  })
+
+  it('contact email link is present in the toolbar', () => {
+    render(<TrafficControlPlanner />)
+    const link = screen.getByTestId('contact-email')
+    expect(link).toBeInTheDocument()
+    expect(link.getAttribute('href')).toMatch(/^mailto:/)
   })
 })
 
@@ -839,5 +886,161 @@ describe('Legend Box', () => {
     expect(counts).toHaveLength(2)
     expect(counts[0]).toHaveTextContent('1')
     expect(counts[1]).toHaveTextContent('1')
+  })
+})
+
+// ─── Cloud Save / Load ────────────────────────────────────────────────────────
+describe('Cloud Save / Load', () => {
+  it('☁ Save button is absent when no userId prop is given', () => {
+    render(<TrafficControlPlanner />)
+    expect(screen.queryByTestId('cloud-save-button')).not.toBeInTheDocument()
+  })
+
+  it('☁ Plans button is absent when no userId prop is given', () => {
+    render(<TrafficControlPlanner />)
+    expect(screen.queryByTestId('cloud-plans-button')).not.toBeInTheDocument()
+  })
+
+  it('☁ Save button is present when userId is provided', () => {
+    render(<TrafficControlPlanner userId="user-123" />)
+    expect(screen.getByTestId('cloud-save-button')).toBeInTheDocument()
+  })
+
+  it('☁ Plans button is present when userId is provided', () => {
+    render(<TrafficControlPlanner userId="user-123" />)
+    expect(screen.getByTestId('cloud-plans-button')).toBeInTheDocument()
+  })
+
+  it('clicking ☁ Save calls savePlanToCloud with correct userId and payload shape', async () => {
+    const saveSpy = vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledTimes(1)
+      const [userId, planId, payload] = saveSpy.mock.calls[0] as [string, string, Record<string, unknown>]
+      expect(userId).toBe('user-abc')
+      expect(typeof planId).toBe('string')
+      expect(planId.length).toBeGreaterThan(0)
+      expect(payload).toMatchObject({ id: planId, userId: 'user-abc' })
+      expect(payload.canvasState).toBeDefined()
+      expect(Array.isArray((payload.canvasState as { objects: unknown[] }).objects)).toBe(true)
+    })
+  })
+
+  it('shows "Saved ✓" in button after successful save', async () => {
+    vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+    const trackSpy = vi.spyOn(analytics, 'track')
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+    expect(trackSpy).toHaveBeenCalledWith('plan_saved_cloud', expect.objectContaining({ object_count: expect.any(Number) }))
+  })
+
+  it('shows error message in button when save fails', async () => {
+    vi.spyOn(planStorage, 'savePlanToCloud').mockRejectedValue(new Error('Network error'))
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Network error')
+    )
+  })
+
+  it('clears save status after 3 seconds', async () => {
+    vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+    let clearCallback: (() => void) | undefined
+    const origSetTimeout = globalThis.setTimeout
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: TimerHandler, delay?: number) => {
+      if (typeof fn === 'function' && delay === 3000) { clearCallback = fn as () => void; return 0 }
+      return origSetTimeout(fn, delay)
+    }) as typeof setTimeout)
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+    act(() => { clearCallback?.() })
+    expect(screen.getByTestId('cloud-save-button')).not.toHaveTextContent('Saved ✓')
+  })
+
+  it('clicking ☁ Plans opens the plan dashboard', async () => {
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    expect(screen.getByTestId('plan-dashboard')).toBeInTheDocument()
+  })
+
+  it('closing the dashboard hides it', async () => {
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    await user.click(screen.getByTestId('dashboard-close'))
+    expect(screen.queryByTestId('plan-dashboard')).not.toBeInTheDocument()
+  })
+})
+
+// ─── Analytics — canvas events ────────────────────────────────────────────────
+describe('Analytics — canvas events', () => {
+  it('placing a sign fires sign_placed with sign_id and sign_source', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(trackSpy).toHaveBeenCalledWith('sign_placed', expect.objectContaining({
+      sign_id: expect.any(String),
+      sign_source: expect.stringMatching(/^builtin|custom$/),
+    }))
+  })
+
+  it('sign_placed does not include sign_label for custom signs', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    const call = trackSpy.mock.calls.find(([event]) => event === 'sign_placed')
+    // built-in signs include label; custom signs must not
+    if (call && (call[1] as Record<string, unknown>).sign_source === 'custom') {
+      expect((call[1] as Record<string, unknown>).sign_label).toBeUndefined()
+    }
+  })
+
+  it('committing a polyline road with Enter fires road_drawn', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    const { user } = setup()
+    // Open the roads left panel, then switch to poly mode
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByText('Polyline'))
+    const canvas = screen.getByTestId('konva-stage')
+    // Two clicks add two points (getPointerPosition always returns {0,0} — that's fine for length check)
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseDown(canvas)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      road_type: expect.any(String),
+      draw_mode: expect.any(String),
+    }))
+  })
+
+  it('placing a straight road fires road_drawn with draw_mode straight', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    // Return different positions so the distance check (>5px) passes
+    let calls = 0
+    vi.spyOn(stageStub, 'getPointerPosition').mockImplementation(() =>
+      calls++ === 0 ? { x: 0, y: 0 } : { x: 100, y: 100 }
+    )
+    setup()
+    fireEvent.keyDown(window, { key: 'R' })
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      draw_mode: 'straight',
+      road_type: expect.any(String),
+    }))
   })
 })

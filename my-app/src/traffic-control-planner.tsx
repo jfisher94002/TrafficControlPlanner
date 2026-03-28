@@ -989,7 +989,8 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary, onSignChange }: SignEdito
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   const signData = useMemo(() => ({
-    id: "custom_preview",
+    // Derive id from configuration so legend/analytics can distinguish different editor signs.
+    id: `custom_${shape}_${(text || " ").trim().toLowerCase().replace(/\s+/g, "_")}`,
     label: text || " ",
     shape,
     color: bgColor,
@@ -2896,7 +2897,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {signSubTab === "editor" && (
                   <SignEditorPanel
-                    onSignChange={(signData) => setSelectedSign(signData)}
+                    onSignChange={setSelectedSign}
                     onUseSign={() => switchTool("sign")}
                     onSaveToLibrary={(signData) => {
                       const existing = customSigns.find((s) =>

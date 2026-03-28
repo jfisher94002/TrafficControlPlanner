@@ -1139,7 +1139,7 @@ describe('Sign Editor', () => {
     expect(labels).toContain('ONE WAY')
   })
 
-  it('changing shape in editor updates the placed sign (verified via legend)', async () => {
+  it('changing shape in editor updates the placed sign — legend SVG uses circle element', async () => {
     const { user } = setup()
     // Arm sign tool first
     fireEvent.keyDown(window, { key: 'S' })
@@ -1147,8 +1147,12 @@ describe('Sign Editor', () => {
     // Select circle shape — editor label stays "CUSTOM"
     await user.click(screen.getByRole('button', { name: /circle/i }))
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    // Label is present
     const labels = screen.getAllByTestId('legend-item-label').map(l => l.textContent)
     expect(labels).toContain('CUSTOM')
+    // Legend SVG must contain a <circle> element (SignIconSvg renders one for circle shape)
+    const legendBox = screen.getByTestId('legend-box')
+    expect(legendBox.querySelector('circle')).toBeInTheDocument()
   })
 
   it('Place button activates sign tool so next canvas click places the editor sign', async () => {

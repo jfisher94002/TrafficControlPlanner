@@ -6,7 +6,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
-  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject, CrosswalkObject,
+  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject, CrosswalkObject, TurnLaneObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
@@ -235,6 +235,7 @@ const TOOLS: ToolDef[] = [
   { id: "taper",     label: "Taper",     icon: "⋈", shortcut: "P" },
   { id: "lane_mask", label: "Lane Mask", icon: "▧", shortcut: "M" },
   { id: "crosswalk", label: "Crosswalk", icon: "⊟", shortcut: "C" },
+  { id: "turn_lane", label: "Turn Lane", icon: "↰", shortcut: "L" },
   { id: "erase",     label: "Erase",     icon: "✕", shortcut: "X" },
 ];
 
@@ -940,6 +941,117 @@ function LaneMaskShape({ obj, isSelected }: LaneMaskShapeProps) {
   );
 }
 
+interface TurnLaneShapeProps { obj: TurnLaneObject; isSelected: boolean; }
+function TurnLaneShape({ obj, isSelected }: TurnLaneShapeProps) {
+  const { x, y, rotation, laneWidth, taperLength, runLength, side, turnDir } = obj;
+  const sign = side === 'right' ? 1 : -1;
+
+  return (
+    <Shape
+      x={x} y={y}
+      rotation={rotation}
+      shadowColor={isSelected ? COLORS.selected : undefined}
+      shadowBlur={isSelected ? 12 : 0}
+      listening={false}
+      sceneFunc={(ctx: KonvaContext) => {
+        // Draw taper section (triangle/trapezoid)
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(taperLength, 0);
+        ctx.lineTo(taperLength, sign * laneWidth);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(70,80,100,0.85)";
+        ctx.fill();
+
+        // Draw run section (rectangle)
+        ctx.beginPath();
+        ctx.moveTo(taperLength, 0);
+        ctx.lineTo(taperLength + runLength, 0);
+        ctx.lineTo(taperLength + runLength, sign * laneWidth);
+        ctx.lineTo(taperLength, sign * laneWidth);
+        ctx.closePath();
+        ctx.fill();
+
+        // Outer edge line (diagonal taper edge + run outer edge)
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(taperLength, sign * laneWidth);
+        ctx.lineTo(taperLength + runLength, sign * laneWidth);
+        ctx.stroke();
+
+        // Inner edge line (along road direction, run section only)
+        ctx.beginPath();
+        ctx.moveTo(taperLength, 0);
+        ctx.lineTo(taperLength + runLength, 0);
+        ctx.stroke();
+
+        // End cap
+        ctx.beginPath();
+        ctx.moveTo(taperLength + runLength, 0);
+        ctx.lineTo(taperLength + runLength, sign * laneWidth);
+        ctx.stroke();
+
+        // Centerline dashes in run section
+        ctx.strokeStyle = "rgba(255,220,0,0.7)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.moveTo(taperLength, sign * laneWidth / 2);
+        ctx.lineTo(taperLength + runLength * 0.7, sign * laneWidth / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Turn arrow
+        const ax = taperLength + runLength * 0.8;
+        const ay = sign * laneWidth / 2;
+        const arrowSize = Math.min(laneWidth * 0.35, 12);
+        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if (turnDir === 'thru') {
+          // Straight arrow pointing in +x direction
+          ctx.moveTo(ax - arrowSize, ay);
+          ctx.lineTo(ax, ay);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(ax - arrowSize * 0.4, ay - arrowSize * 0.4);
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(ax - arrowSize * 0.4, ay + arrowSize * 0.4);
+          ctx.stroke();
+        } else if (turnDir === 'right') {
+          // Right turn arrow (curves toward +y for side=right)
+          ctx.moveTo(ax - arrowSize, ay);
+          ctx.lineTo(ax, ay);
+          ctx.lineTo(ax, ay + sign * arrowSize);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(ax, ay + sign * arrowSize);
+          ctx.lineTo(ax - arrowSize * 0.4, ay + sign * arrowSize * 0.6);
+          ctx.moveTo(ax, ay + sign * arrowSize);
+          ctx.lineTo(ax + arrowSize * 0.4, ay + sign * arrowSize * 0.6);
+          ctx.stroke();
+        } else {
+          // Left turn arrow
+          ctx.moveTo(ax + arrowSize, ay);
+          ctx.lineTo(ax, ay);
+          ctx.lineTo(ax, ay + sign * arrowSize);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(ax, ay + sign * arrowSize);
+          ctx.lineTo(ax - arrowSize * 0.4, ay + sign * arrowSize * 0.6);
+          ctx.moveTo(ax, ay + sign * arrowSize);
+          ctx.lineTo(ax + arrowSize * 0.4, ay + sign * arrowSize * 0.6);
+          ctx.stroke();
+        }
+      }}
+    />
+  );
+}
+
 interface CrosswalkShapeProps { obj: CrosswalkObject; isSelected: boolean; }
 function CrosswalkShape({ obj, isSelected }: CrosswalkShapeProps) {
   const { x1, y1, x2, y2, depth, stripeCount, stripeColor } = obj;
@@ -1004,6 +1116,7 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
     case "taper":        return <TaperShape obj={obj} isSelected={isSelected} />;
     case "lane_mask":    return <LaneMaskShape obj={obj} isSelected={isSelected} />;
     case "crosswalk":    return <CrosswalkShape obj={obj} isSelected={isSelected} />;
+    case "turn_lane":    return <TurnLaneShape obj={obj} isSelected={isSelected} />;
     default:             return null;
   }
 }
@@ -1472,6 +1585,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     deviceCounts,
     roads,
     tapers,
+    turnLanes,
     zones,
     arrows,
     texts,
@@ -1485,6 +1599,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     const nextDeviceCounts: Record<string, number> = {};
     let roadsCount = 0;
     let tapersCount = 0;
+    let turnLanesCount = 0;
     let zonesCount = 0;
     let arrowsCount = 0;
     let textsCount = 0;
@@ -1501,6 +1616,8 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         roadsCount++;
       } else if (obj.type === "taper") {
         tapersCount++;
+      } else if (obj.type === "turn_lane") {
+        turnLanesCount++;
       } else if (obj.type === "zone") {
         zonesCount++;
       } else if (obj.type === "arrow") {
@@ -1518,13 +1635,14 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
 
     const hasAnyObjects = objects.length > 0;
     const otherCountTotal =
-      roadsCount + tapersCount + zonesCount + arrowsCount + textsCount + measuresCount + laneMasksCount + crosswalksCount;
+      roadsCount + tapersCount + turnLanesCount + zonesCount + arrowsCount + textsCount + measuresCount + laneMasksCount + crosswalksCount;
 
     return {
       signCounts: nextSignCounts,
       deviceCounts: nextDeviceCounts,
       roads: roadsCount,
       tapers: tapersCount,
+      turnLanes: turnLanesCount,
       zones: zonesCount,
       arrows: arrowsCount,
       texts: textsCount,
@@ -1556,6 +1674,7 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         <>{sectionTitle("Other")}
           {roads      > 0 && <ManifestRow icon="━"  label="Road segments" count={roads} />}
           {tapers     > 0 && <ManifestRow icon="⋈"  label="Tapers"        count={tapers} />}
+          {turnLanes  > 0 && <ManifestRow icon="↰"  label="Turn Lanes"    count={turnLanes} />}
           {laneMasks  > 0 && <ManifestRow icon="▧"  label="Lane Masks"    count={laneMasks} />}
           {crosswalks > 0 && <ManifestRow icon="⊟"  label="Crosswalks"    count={crosswalks} />}
           {zones      > 0 && <ManifestRow icon="▨"  label="Work zones"    count={zones} />}
@@ -1644,7 +1763,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type === "lane_mask" ? "Lane Mask" : obj.type === "crosswalk" ? "Crosswalk" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type === "lane_mask" ? "Lane Mask" : obj.type === "crosswalk" ? "Crosswalk" : obj.type === "turn_lane" ? "Turn Lane" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -1726,6 +1845,57 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
               <input type="range" min={0} max={360} value={t.rotation}
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => onUpdate(t.id, { rotation: +e.target.value })} />
+            </label>
+          </div>
+        );
+      })()}
+
+      {obj.type === "turn_lane" && (() => {
+        const tl = obj as TurnLaneObject;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {sectionTitle("Turn Lane")}
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>Side</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["right", "left"] as const).map((s) => (
+                <button key={s} onClick={() => onUpdate(tl.id, { side: s })}
+                  style={{ ...panelBtnStyle(tl.side === s), flex: 1, textTransform: "capitalize" }}>
+                  {s === "right" ? "Right" : "Left"}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>Turn Direction</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {([["left", "← Left"], ["thru", "↑ Thru"], ["right", "→ Right"]] as const).map(([dir, label]) => (
+                <button key={dir} onClick={() => onUpdate(tl.id, { turnDir: dir })}
+                  style={{ ...panelBtnStyle(tl.turnDir === dir), flex: 1, fontSize: 9 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Taper Length: {tl.taperLength}px
+              <input type="range" min={20} max={200} step={5} value={tl.taperLength}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { taperLength: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Run Length: {tl.runLength}px
+              <input type="range" min={40} max={300} step={5} value={tl.runLength}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { runLength: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Lane Width: {tl.laneWidth}px
+              <input type="range" min={10} max={50} step={1} value={tl.laneWidth}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { laneWidth: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Rotation: {tl.rotation}°
+              <input type="range" min={0} max={360} value={tl.rotation}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { rotation: +e.target.value })} />
             </label>
           </div>
         );
@@ -2415,6 +2585,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             : calcTaperLength(o.speed, o.laneWidth, o.numLanes);
         const taperHitRadius = Math.max(30, Math.min(effectiveTaperLength * TAPER_SCALE / 2, 150));
         if (dist(wx, wy, o.x, o.y) < taperHitRadius) return o;
+      } else if (o.type === "turn_lane") {
+        // Hit within bounding radius (taper+run length / 2) capped to reasonable range
+        const totalLen = o.taperLength + o.runLength;
+        const hitRadius = Math.max(30, Math.min(totalLen / 2, 150));
+        if (dist(wx, wy, o.x, o.y) < hitRadius) return o;
       } else if (o.type === "sign" || o.type === "device" || o.type === "text") {
         if (dist(wx, wy, o.x, o.y) < 30) return o;
       }
@@ -2538,6 +2713,13 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const newTaper: TaperObject = { id: uid(), type: "taper", x: raw.x, y: raw.y, rotation: 0, speed, laneWidth, taperLength: calcTaperLength(speed, laneWidth), manualLength: false, numLanes: 1 };
       const newObjs = [...objects, newTaper];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newTaper.id);
+      return;
+    }
+
+    if (tool === "turn_lane") {
+      const newTL: TurnLaneObject = { id: uid(), type: "turn_lane", x: raw.x, y: raw.y, rotation: 0, laneWidth: 20, taperLength: 80, runLength: 100, side: 'right', turnDir: 'right' };
+      const newObjs = [...objects, newTL];
+      setObjects(newObjs); pushHistory(newObjs); setSelected(newTL.id);
       return;
     }
 
@@ -3340,6 +3522,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   ))}
                 </div>
 
+                {sectionTitle("Turn Lane")}
+                <button
+                  onClick={() => switchTool("turn_lane")}
+                  style={{ width: "100%", padding: "10px 12px", background: tool === "turn_lane" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: tool === "turn_lane" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: tool === "turn_lane" ? COLORS.accent : COLORS.textMuted, fontSize: 11 }}>
+                  <span style={{ fontSize: 16 }}>↰</span>
+                  <span>Place Turn Lane</span>
+                </button>
+
                 {sectionTitle("Intersection Templates")}
                 <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
                   {([
@@ -3462,6 +3652,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               {tool === "crosswalk" && !drawStart && (
                 <span style={{ color: COLORS.info }}>Click and drag across a road to place a crosswalk</span>
               )}
+              {tool === "turn_lane" && (
+                <span style={{ color: COLORS.info }}>Click to place a turn lane</span>
+              )}
               <span data-testid="object-count">{objects.length} objects</span>
               <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
@@ -3515,7 +3708,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   <div key={obj.id} onClick={() => setSelected(obj.id)}
                     style={{ padding: "5px 8px", borderRadius: 4, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, background: selected === obj.id ? COLORS.accentDim : "transparent", color: selected === obj.id ? COLORS.accent : COLORS.textMuted, border: selected === obj.id ? `1px solid rgba(245,158,11,0.2)` : "1px solid transparent" }}>
                     <span style={{ fontSize: 12 }}>
-                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : obj.type === "lane_mask" ? "▧" : obj.type === "crosswalk" ? "⊟" : "📏"}
+                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : obj.type === "lane_mask" ? "▧" : obj.type === "crosswalk" ? "⊟" : obj.type === "turn_lane" ? "↰" : "📏"}
                     </span>
                     <span>
                       {obj.type === "sign" ? obj.signData.label :
@@ -3528,6 +3721,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                        obj.type === "taper" ? `taper ${obj.speed}mph` :
                        obj.type === "lane_mask" ? "lane mask" :
                        obj.type === "crosswalk" ? "crosswalk" :
+                       obj.type === "turn_lane" ? `turn lane (${obj.turnDir})` :
                        obj.type}
                     </span>
                   </div>

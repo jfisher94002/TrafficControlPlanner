@@ -169,6 +169,19 @@ export interface TaperObject {
   numLanes: number;     // lanes being closed, 1 or 2
 }
 
+export interface TurnLaneObject {
+  id: string;
+  type: 'turn_lane';
+  x: number;           // anchor point (where lane branches from road)
+  y: number;
+  rotation: number;    // degrees — aligns to road direction
+  laneWidth: number;   // world px, default 20
+  taperLength: number; // world px, default 80 (run-in taper before full width)
+  runLength: number;   // world px, default 100 (full-width run section)
+  side: 'left' | 'right'; // which side of anchor road the lane opens on
+  turnDir: 'left' | 'right' | 'thru'; // arrow direction shown at end
+}
+
 export interface LaneMaskObject {
   id: string;
   type: 'lane_mask';
@@ -206,7 +219,8 @@ export type CanvasObject =
   | MeasureObject
   | TaperObject
   | LaneMaskObject
-  | CrosswalkObject;
+  | CrosswalkObject
+  | TurnLaneObject;
 
 // ─── PLAN METADATA ────────────────────────────────────────────────────────────
 

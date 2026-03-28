@@ -1,6 +1,6 @@
 import type {
   CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
-  SignObject, DeviceObject, ZoneObject, TextObject, TaperObject,
+  SignObject, DeviceObject, ZoneObject, TextObject, TaperObject, TurnLaneObject,
   StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject, LaneMaskObject, CrosswalkObject,
 } from './types'
 
@@ -28,11 +28,11 @@ export function cloneObject(obj: CanvasObject, dx = 20, dy = 20): CanvasObject {
 
 // ─── TYPE GUARDS ──────────────────────────────────────────────────────────────
 
-/** Objects with a single x/y position (sign, device, zone, text, taper). */
+/** Objects with a single x/y position (sign, device, zone, text, taper, turn_lane). */
 export const isPointObject = (
   o: CanvasObject,
-): o is SignObject | DeviceObject | ZoneObject | TextObject | TaperObject =>
-  o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text' || o.type === 'taper'
+): o is SignObject | DeviceObject | ZoneObject | TextObject | TaperObject | TurnLaneObject =>
+  o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text' || o.type === 'taper' || o.type === 'turn_lane'
 
 /** Objects with x1/y1–x2/y2 endpoints (straight road, arrow, measure, lane_mask, crosswalk). */
 export const isLineObject = (

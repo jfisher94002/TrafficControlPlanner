@@ -980,7 +980,7 @@ function ToolButton({ tool, active, onClick }: ToolButtonProps) {
 
 // ─── SIGN EDITOR PANEL ───────────────────────────────────────────────────────
 
-interface SignEditorPanelProps { onUseSign: (signData: SignData) => void; onSaveToLibrary: (signData: SignData) => void; onSignChange: (signData: SignData) => void; }
+interface SignEditorPanelProps { onUseSign: () => void; onSaveToLibrary: (signData: SignData) => void; onSignChange: (signData: SignData) => void; }
 function SignEditorPanel({ onUseSign, onSaveToLibrary, onSignChange }: SignEditorPanelProps) {
   const [shape, setShape] = useState<SignShape>("diamond");
   const [text, setText] = useState("CUSTOM");
@@ -1070,7 +1070,7 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary, onSignChange }: SignEdito
 
       <div style={{ display: "flex", gap: 6 }}>
         <button
-          onClick={() => onUseSign(signData)}
+          onClick={onUseSign}
           style={{
             flex: 1, padding: "8px 0", background: COLORS.accentDim,
             border: `1px solid ${COLORS.accent}`, borderRadius: 6,

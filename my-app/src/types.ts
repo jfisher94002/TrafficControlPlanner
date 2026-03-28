@@ -53,6 +53,9 @@ export interface StraightRoadObject {
   realWidth: number;
   lanes: number;
   roadType: string;
+  shoulderWidth?: number;   // world px, 0 = disabled
+  sidewalkWidth?: number;   // world px, 0 = disabled
+  sidewalkSide?: 'both' | 'left' | 'right';  // default 'both'
 }
 
 export interface PolylineRoadObject {
@@ -64,6 +67,9 @@ export interface PolylineRoadObject {
   lanes: number;
   roadType: string;
   smooth: boolean;
+  shoulderWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkSide?: 'both' | 'left' | 'right';
 }
 
 export interface CurveRoadObject {
@@ -74,6 +80,9 @@ export interface CurveRoadObject {
   realWidth: number;
   lanes: number;
   roadType: string;
+  shoulderWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkSide?: 'both' | 'left' | 'right';
 }
 
 export interface CubicBezierRoadObject {
@@ -84,6 +93,9 @@ export interface CubicBezierRoadObject {
   realWidth: number;
   lanes: number;
   roadType: string;
+  shoulderWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkSide?: 'both' | 'left' | 'right';
 }
 
 export interface SignObject {

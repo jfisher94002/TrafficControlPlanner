@@ -345,11 +345,19 @@ function GridLines({ offset, zoom, canvasSize }: GridLinesProps) {
 
 interface RoadSegmentProps { obj: StraightRoadObject; isSelected: boolean; }
 function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
-  const { x1, y1, x2, y2, width, lanes, roadType } = obj;
+  const { x1, y1, x2, y2, width, lanes, roadType, shoulderWidth = 0, sidewalkWidth = 0, sidewalkSide } = obj;
   const angle = angleBetween(x1, y1, x2, y2);
   const perpAngle = angle + Math.PI / 2;
   const hw = width / 2;
   const cos = Math.cos(perpAngle), sin = Math.sin(perpAngle);
+
+  // Perpendicular unit vector (nx, ny) for offset lines
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+
+  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
+  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
 
   const roadPoly = [
     x1 + cos * hw, y1 + sin * hw,
@@ -382,8 +390,53 @@ function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
     }
   }
 
+  // Shoulder lines (rendered behind road body)
+  const shoulderLines = shoulderWidth > 0 ? [
+    <Line key="sl" points={[
+      x1 + nx * (hw + shoulderWidth / 2), y1 + ny * (hw + shoulderWidth / 2),
+      x2 + nx * (hw + shoulderWidth / 2), y2 + ny * (hw + shoulderWidth / 2),
+    ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
+    <Line key="sr" points={[
+      x1 - nx * (hw + shoulderWidth / 2), y1 - ny * (hw + shoulderWidth / 2),
+      x2 - nx * (hw + shoulderWidth / 2), y2 - ny * (hw + shoulderWidth / 2),
+    ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
+  ] : [];
+
+  // Sidewalk lines (rendered behind road body, outside shoulder if present)
+  const swOff = hw + (shoulderWidth > 0 ? shoulderWidth : 0) + (sidewalkWidth > 0 ? sidewalkWidth / 2 : 0);
+  const sidewalkLines: React.ReactElement[] = [];
+  if (sidewalkWidth > 0 && sidewalkSide) {
+    if (showLeft) {
+      sidewalkLines.push(
+        <Line key="swl-fill" points={[
+          x1 + nx * swOff, y1 + ny * swOff,
+          x2 + nx * swOff, y2 + ny * swOff,
+        ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
+        <Line key="swl-edge" points={[
+          x1 + nx * (swOff + sidewalkWidth / 2), y1 + ny * (swOff + sidewalkWidth / 2),
+          x2 + nx * (swOff + sidewalkWidth / 2), y2 + ny * (swOff + sidewalkWidth / 2),
+        ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
+      );
+    }
+    if (showRight) {
+      sidewalkLines.push(
+        <Line key="swr-fill" points={[
+          x1 - nx * swOff, y1 - ny * swOff,
+          x2 - nx * swOff, y2 - ny * swOff,
+        ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
+        <Line key="swr-edge" points={[
+          x1 - nx * (swOff + sidewalkWidth / 2), y1 - ny * (swOff + sidewalkWidth / 2),
+          x2 - nx * (swOff + sidewalkWidth / 2), y2 - ny * (swOff + sidewalkWidth / 2),
+        ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
+      );
+    }
+  }
+
   return (
     <Group listening={false}>
+      {/* Shoulders and sidewalks rendered first (behind road body) */}
+      {sidewalkLines}
+      {shoulderLines}
       {/* End-cap discs fill visual gaps at intersections where roads of different widths meet */}
       <Circle x={x1} y={y1} radius={hw + 1} fill="#555" listening={false} />
       <Circle x={x2} y={y2} radius={hw + 1} fill="#555" listening={false} />
@@ -1527,6 +1580,47 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
           <div style={{ fontSize: 11, color: COLORS.textMuted }}>
             {obj.roadType} · {obj.lanes} lanes · {obj.width}px wide
           </div>
+        </div>
+      )}
+
+      {/* ── Shoulder & Sidewalk (straight roads only) ───────────────── */}
+      {obj.type === "road" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {sectionTitle("Shoulder & Sidewalk")}
+          <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+            Shoulder Width: {obj.shoulderWidth ? `${obj.shoulderWidth}px` : 'None'}
+            <input type="range" min={0} max={30} step={1} value={obj.shoulderWidth ?? 0}
+              style={{ width: "100%", accentColor: COLORS.accent }}
+              onChange={(e) => onUpdate(obj.id, { shoulderWidth: +e.target.value })} />
+          </label>
+          <label style={{ fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 3 }}>
+            Sidewalk
+            <select
+              value={obj.sidewalkSide ?? 'none'}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'none') {
+                  onUpdate(obj.id, { sidewalkSide: undefined, sidewalkWidth: 0 });
+                } else {
+                  onUpdate(obj.id, { sidewalkSide: val, sidewalkWidth: obj.sidewalkWidth || 12 });
+                }
+              }}
+              style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11 }}
+            >
+              <option value="none">None</option>
+              <option value="both">Both sides</option>
+              <option value="left">Left only</option>
+              <option value="right">Right only</option>
+            </select>
+          </label>
+          {obj.sidewalkSide && (obj.sidewalkWidth ?? 0) > 0 && (
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Sidewalk Width: {obj.sidewalkWidth}px
+              <input type="range" min={8} max={24} step={1} value={obj.sidewalkWidth ?? 12}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(obj.id, { sidewalkWidth: +e.target.value })} />
+            </label>
+          )}
         </div>
       )}
 

@@ -41,7 +41,7 @@ customRules:
   - source: /app/<*>
     target: /app.html
     status: "200"
-  # Fallback SPA catch-all (handles direct deep links into /app)
+  # Fallback for landing page deep links (routes all other paths to index.html)
   - source: /<*>
     target: /index.html
     status: "404-200"

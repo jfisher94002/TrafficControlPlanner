@@ -362,6 +362,11 @@ function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
 
   return (
     <Group listening={false}>
+      {/* End-cap discs fill visual gaps at intersections where roads of different widths meet */}
+      <Circle x={x1} y={y1} radius={hw + 1} fill="#555" listening={false} />
+      <Circle x={x2} y={y2} radius={hw + 1} fill="#555" listening={false} />
+      <Circle x={x1} y={y1} radius={hw - 1} fill={COLORS.road} listening={false} />
+      <Circle x={x2} y={y2} radius={hw - 1} fill={COLORS.road} listening={false} />
       <Line points={roadPoly} closed fill={COLORS.road} stroke="#555" strokeWidth={2} />
       <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
       <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
@@ -416,9 +421,9 @@ function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -469,9 +474,9 @@ function CurveRoad({ obj, isSelected }: CurveRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -523,9 +528,9 @@ function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -1793,6 +1798,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const mapTileCacheRef = useRef<Record<string, MapTileEntry>>({});
 
   const [roadDrawMode, setRoadDrawMode] = useState("straight");
+  const [intersectionType, setIntersectionType] = useState<'t' | '4way'>('4way');
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
   const [curvePoints, setCurvePoints] = useState<Point[]>([]);
   const [cubicPoints, setCubicPoints] = useState<Point[]>([]);
@@ -2202,16 +2208,32 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       }
     }
 
+    if (tool === "intersection") {
+      const L = selectedRoadType.width * 3;
+      const roadProps = { width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
+      const roads: StraightRoadObject[] = intersectionType === '4way' ? [
+        { id: uid(), type: 'road', x1: x - L, y1: y, x2: x + L, y2: y, ...roadProps },
+        { id: uid(), type: 'road', x1: x, y1: y - L, x2: x, y2: y + L, ...roadProps },
+      ] : [
+        { id: uid(), type: 'road', x1: x - L, y1: y, x2: x + L, y2: y, ...roadProps },
+        { id: uid(), type: 'road', x1: x, y1: y, x2: x, y2: y - L, ...roadProps },
+      ];
+      const newObjs = [...objects, ...roads];
+      setObjects(newObjs); pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
+      track('road_drawn', { road_type: selectedRoadType.id, draw_mode: intersectionType === '4way' ? 'intersection_4way' : 'intersection_t' });
+      return;
+    }
+
     if (["zone", "arrow", "measure"].includes(tool)) {
       setDrawStart({ x: raw.x, y: raw.y });
     }
-  }, [tool, roadDrawMode, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
+  }, [tool, roadDrawMode, intersectionType, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     const raw = toWorld();
     setCursorPos(raw);
 
-    if (tool === "road" && snapEnabled) {
+    if ((tool === "road" || tool === "intersection") && snapEnabled) {
       const { x, y, snapped } = snapToEndpoint(raw.x, raw.y, objects, SNAP_RADIUS, zoom);
       setSnapIndicator(snapped ? { x, y } : null);
     } else {
@@ -2875,13 +2897,29 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   ))}
                 </div>
 
+                {sectionTitle("Intersection Templates")}
+                <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                  {([
+                    { id: 't' as const, label: 'T-Junction', icon: '⊤' },
+                    { id: '4way' as const, label: '4-Way', icon: '✛' },
+                  ]).map((itype) => (
+                    <button key={itype.id}
+                      onClick={() => { setIntersectionType(itype.id); switchTool("intersection"); }}
+                      style={{ flex: 1, padding: "8px 4px", fontSize: 9, background: intersectionType === itype.id && tool === "intersection" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: `1px solid ${intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.panelBorder}`, color: intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.textMuted, borderRadius: 5, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                      <span style={{ fontSize: 16 }}>{itype.icon}</span>
+                      <span>{itype.label}</span>
+                    </button>
+                  ))}
+                </div>
+
                 <div style={{ marginTop: 12, padding: 8, background: "rgba(245,158,11,0.05)", borderRadius: 6, border: `1px solid rgba(245,158,11,0.1)` }}>
                   <div style={{ fontSize: 9, color: COLORS.accent }}>
-                    {roadDrawMode === "straight" && "Click and drag to draw a straight road."}
-                    {roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
-                    {roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
-                    {roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
-                    {roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
+                    {tool === "intersection" && `Click canvas to stamp a ${intersectionType === '4way' ? '4-way' : 'T-junction'} intersection using the selected road type.`}
+                    {tool !== "intersection" && roadDrawMode === "straight" && "Click and drag to draw a straight road."}
+                    {tool !== "intersection" && roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
+                    {tool !== "intersection" && roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
+                    {tool !== "intersection" && roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
+                    {tool !== "intersection" && roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
                   </div>
                 </div>
               </>
@@ -2976,7 +3014,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 </span>
               )}
               <span data-testid="object-count">{objects.length} objects</span>
-              <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : ""}</span>
+              <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
               <span>{snapEnabled ? "Snap: endpoint" : "Snap OFF"}</span>
               {autosaveError

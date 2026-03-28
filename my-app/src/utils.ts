@@ -91,6 +91,14 @@ export function geoRoadWidthPx(
   return Math.max(10, road.realWidth / metersPerPixel)
 }
 
+function closestPointOnSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): Point {
+  const dx = bx - ax, dy = by - ay
+  const lenSq = dx * dx + dy * dy
+  if (lenSq === 0) return { x: ax, y: ay }
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq))
+  return { x: ax + t * dx, y: ay + t * dy }
+}
+
 export function snapToEndpoint(
   wx: number,
   wy: number,
@@ -99,12 +107,10 @@ export function snapToEndpoint(
   zoom: number,
 ): SnapResult {
   const t = thresholdScreenPx / zoom
+  // Pass 1: endpoints have priority — snap to them first
   for (const obj of objects) {
     if (obj.type === 'road') {
-      for (const ep of [
-        { x: obj.x1, y: obj.y1 },
-        { x: obj.x2, y: obj.y2 },
-      ]) {
+      for (const ep of [{ x: obj.x1, y: obj.y1 }, { x: obj.x2, y: obj.y2 }]) {
         if (dist(wx, wy, ep.x, ep.y) < t) return { x: ep.x, y: ep.y, snapped: true }
       }
     }
@@ -112,12 +118,29 @@ export function snapToEndpoint(
       (obj.type === 'polyline_road' || obj.type === 'curve_road' || obj.type === 'cubic_bezier_road') &&
       obj.points?.length
     ) {
-      const eps = [obj.points[0], obj.points[obj.points.length - 1]]
-      for (const ep of eps) {
+      for (const ep of [obj.points[0], obj.points[obj.points.length - 1]]) {
         if (dist(wx, wy, ep.x, ep.y) < t) return { x: ep.x, y: ep.y, snapped: true }
       }
     }
   }
+  // Pass 2: snap to any point on a road segment (mid-segment snap)
+  let bestDist = t
+  let bestPt: Point | null = null
+  for (const obj of objects) {
+    if (obj.type === 'road') {
+      const cp = closestPointOnSegment(wx, wy, obj.x1, obj.y1, obj.x2, obj.y2)
+      const d = dist(wx, wy, cp.x, cp.y)
+      if (d < bestDist) { bestDist = d; bestPt = cp }
+    }
+    if ((obj.type === 'polyline_road') && obj.points?.length >= 2) {
+      for (let i = 0; i < obj.points.length - 1; i++) {
+        const cp = closestPointOnSegment(wx, wy, obj.points[i].x, obj.points[i].y, obj.points[i+1].x, obj.points[i+1].y)
+        const d = dist(wx, wy, cp.x, cp.y)
+        if (d < bestDist) { bestDist = d; bestPt = cp }
+      }
+    }
+  }
+  if (bestPt) return { ...bestPt, snapped: true }
   return { x: wx, y: wy, snapped: false }
 }
 

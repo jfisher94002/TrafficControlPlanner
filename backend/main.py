@@ -72,9 +72,14 @@ def create_issue(payload: CreateIssueRequest):
         raise HTTPException(status_code=503, detail="Issue creation is not configured on this server.")
 
     priority_label = f"{_PRIORITY_EMOJI[payload.priority]} {payload.priority.capitalize()}"
+    submitter_line = payload.submitter_name
+    if payload.submitter_email:
+        submitter_line += f" ({payload.submitter_email})"
+    if payload.submitter_id:
+        submitter_line += f" — user ID: `{payload.submitter_id}`"
     issue_body = (
         f"## {payload.issue_type.capitalize()} Report\n\n"
-        f"**Submitted by:** {payload.submitter_name}\n"
+        f"**Submitted by:** {submitter_line}\n"
         f"**Priority:** {priority_label}\n"
         f"**Type:** {payload.issue_type}\n\n"
         f"---\n\n"

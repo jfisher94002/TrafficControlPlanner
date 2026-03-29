@@ -3122,7 +3122,13 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         {/* Right-side user controls — flexShrink:0 so toolbar overflow never pushes these off screen */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, borderLeft: `1px solid ${COLORS.panelBorder}`, paddingLeft: 12, marginLeft: 4 }}>
           <button onClick={() => setShowHelp(true)} data-testid="help-button" style={panelBtnStyle(false)} title="Help — keyboard shortcuts &amp; tool guide (?)">? Help</button>
-          <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
+          <button onClick={() => {
+            const params = new URLSearchParams();
+            if (userId) params.set('uid', userId);
+            if (userEmail) params.set('email', userEmail);
+            const qs = params.toString();
+            window.open(`/feedback.html${qs ? `?${qs}` : ''}`, '_blank', 'noopener,noreferrer');
+          }} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
           <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap" }} title="Email support">{CONTACT_EMAIL}</a>
           {onSignOut && (<>
             {(userEmail || userId) && (

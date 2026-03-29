@@ -167,32 +167,30 @@ test.describe('Beta Tools — Road Shoulders', () => {
     await page.keyboard.press('R')
     await expect(page.getByTestId('tool-road')).toHaveAttribute('aria-pressed', 'true', { timeout: 8_000 })
 
+    // Use boundingBox so all mouse coords are in the same viewport space
     const canvas = page.getByTestId('canvas-container')
-    await canvas.hover({ position: { x: 200, y: 300 } })
+    const box = await canvas.boundingBox()
+    await page.mouse.move(box!.x + 200, box!.y + 300)
     await page.mouse.down()
-    await page.mouse.move(450, 300)
+    await page.mouse.move(box!.x + 450, box!.y + 300)
     await page.mouse.up()
 
-    // Switch to select tool and click the road to select it
-    await page.keyboard.press('V')
-    await canvas.click({ position: { x: 325, y: 300 } })
-
+    // Road is auto-selected after drawing — properties panel shows immediately
     // The properties panel should show "Shoulder & Sidewalk"
     await expect(page.getByTestId('right-panel').getByText('Shoulder & Sidewalk')).toBeVisible({ timeout: 8_000 })
   })
 
   test('shoulder width slider is interactive', async ({ page }) => {
-    // Place a road
+    // Place a road using consistent viewport coordinates
     await page.keyboard.press('R')
     const canvas = page.getByTestId('canvas-container')
-    await canvas.hover({ position: { x: 200, y: 300 } })
+    const box = await canvas.boundingBox()
+    await page.mouse.move(box!.x + 200, box!.y + 300)
     await page.mouse.down()
-    await page.mouse.move(450, 300)
+    await page.mouse.move(box!.x + 450, box!.y + 300)
     await page.mouse.up()
 
-    // Select the road
-    await page.keyboard.press('V')
-    await canvas.click({ position: { x: 325, y: 300 } })
+    // Road is auto-selected after drawing — properties panel shows immediately
 
     // The properties tab should be active (it is by default)
     await expect(page.getByTestId('right-panel').getByText('Shoulder & Sidewalk')).toBeVisible({ timeout: 8_000 })

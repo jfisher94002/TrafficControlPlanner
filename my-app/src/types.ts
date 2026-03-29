@@ -275,6 +275,7 @@ export interface ToolDef {
   label: string;
   icon: string;
   shortcut: string;
+  helpText?: string;
 }
 
 // ─── GEOCODING ────────────────────────────────────────────────────────────────

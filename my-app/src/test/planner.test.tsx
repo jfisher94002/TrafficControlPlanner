@@ -1433,3 +1433,61 @@ describe('New Beta Tools — Lane Mask, Crosswalk, Turn Lane, Shoulders', () => 
     expect(rangeInput).toBeInTheDocument()
   })
 })
+
+// ─── Help Modal ───────────────────────────────────────────────────────────────
+describe('Help Modal', () => {
+  it('clicking the ? Help button opens the help modal', async () => {
+    const { user } = setup()
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('help-button'))
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+  })
+
+  it('pressing ? toggles the help modal open', () => {
+    setup()
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+  })
+
+  it('pressing ? again closes the help modal', () => {
+    setup()
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+  })
+
+  it('clicking the close button dismisses the help modal', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+    await user.click(screen.getByTestId('help-modal-close'))
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+  })
+
+  it('help modal shows keyboard shortcuts section', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    const modal = screen.getByTestId('help-modal')
+    expect(within(modal).getAllByText(/keyboard shortcuts/i).length).toBeGreaterThan(0)
+  })
+
+  it('help modal shows tool guide section', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    const modal = screen.getByTestId('help-modal')
+    expect(within(modal).getAllByText(/tool guide/i).length).toBeGreaterThan(0)
+  })
+
+  it('help modal lists all tools', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    const modal = screen.getByTestId('help-modal')
+    expect(within(modal).getByText('Road')).toBeInTheDocument()
+    expect(within(modal).getByText('Taper')).toBeInTheDocument()
+    expect(within(modal).getByText('Lane Mask')).toBeInTheDocument()
+    expect(within(modal).getByText('Crosswalk')).toBeInTheDocument()
+    expect(within(modal).getByText('Turn Lane')).toBeInTheDocument()
+  })
+})

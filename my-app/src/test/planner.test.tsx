@@ -1113,6 +1113,61 @@ describe('Analytics — canvas events', () => {
   })
 })
 
+// ─── Session analytics ────────────────────────────────────────────────────────
+describe('Session analytics', () => {
+  it('fires app_session_started on mount', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    expect(trackSpy).toHaveBeenCalledWith('app_session_started', expect.objectContaining({
+      resumed_plan: expect.any(Boolean),
+      object_count: expect.any(Number),
+    }))
+  })
+
+  it('app_session_started reports resumed_plan: false for a fresh canvas', () => {
+    localStorage.clear()
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    expect(trackSpy).toHaveBeenCalledWith('app_session_started', expect.objectContaining({
+      resumed_plan: false,
+      object_count: 0,
+    }))
+  })
+
+  it('fires app_session_ended with duration_seconds on beforeunload', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent(window, new Event('beforeunload'))
+    expect(trackSpy).toHaveBeenCalledWith('app_session_ended', expect.objectContaining({
+      duration_seconds: expect.any(Number),
+      pdf_exported: expect.any(Boolean),
+    }))
+  })
+
+  it('app_session_ended reports pdf_exported: false when no PDF was generated', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent(window, new Event('beforeunload'))
+    const call = trackSpy.mock.calls.find(([event]) => event === 'app_session_ended')
+    expect(call?.[1]).toMatchObject({ pdf_exported: false })
+  })
+
+  it('app_session_ended reports pdf_exported: true after a successful PDF export', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['%PDF'], { type: 'application/pdf' })),
+    }))
+    const { user } = setup()
+    await user.click(screen.getByTestId('export-pdf-button'))
+    const confirmBtn = await screen.findByTestId('export-preview-confirm')
+    await user.click(confirmBtn)
+    fireEvent(window, new Event('beforeunload'))
+    const call = trackSpy.mock.calls.find(([event]) => event === 'app_session_ended')
+    expect(call?.[1]).toMatchObject({ pdf_exported: true })
+  })
+})
+
 // ─── Sign search ──────────────────────────────────────────────────────────────
 describe('Sign search', () => {
   async function openSignLibrary(user: ReturnType<typeof userEvent.setup>) {

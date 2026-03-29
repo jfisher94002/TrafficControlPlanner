@@ -2149,6 +2149,8 @@ const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
 export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sessionStartRef = useRef<number>(Date.now());
+  const pdfExportedRef = useRef<boolean>(false);
 
   // Read autosave once — reused by all useState initializers below
   const initialAutosave = useRef(readAutosave()).current;
@@ -2268,6 +2270,25 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     });
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Session duration tracking
+  useEffect(() => {
+    const initialObjectCount = initialAutosave?.canvasState?.objects?.length ?? 0;
+    track('app_session_started', {
+      resumed_plan: initialObjectCount > 0,
+      object_count: initialObjectCount,
+    });
+    const handleUnload = () => {
+      const duration_seconds = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      track('app_session_ended', {
+        duration_seconds,
+        pdf_exported: pdfExportedRef.current,
+      });
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Clear poly/curve/cubic in-progress when tool or draw mode changes
@@ -2971,6 +2992,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const url = URL.createObjectURL(blob);
       triggerDownload(url, `${safePlanTitle}.pdf`);
       URL.revokeObjectURL(url);
+      pdfExportedRef.current = true;
       track('plan_exported_pdf', { object_count: objects.length });
     } catch (err) {
       console.error("PDF export failed:", err);

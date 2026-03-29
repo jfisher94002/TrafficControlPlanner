@@ -3410,6 +3410,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 ? <span style={{ color: COLORS.danger }} title={`Auto-save failed: ${autosaveError}`}>⚠ Save failed</span>
                 : <span style={{ color: COLORS.success }} title="Auto-saved to browser storage">● Auto-saved</span>
               }
+              <span data-testid="app-version" style={{ color: COLORS.textDim, opacity: 0.6 }} title="App version">v{__APP_VERSION__}</span>
             </div>
           </div>
         </div>

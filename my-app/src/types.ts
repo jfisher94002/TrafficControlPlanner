@@ -20,6 +20,7 @@ export interface SignData {
   color: string;
   textColor: string;
   border?: string;
+  mutcd?: string;  // MUTCD designation code (e.g. "R1-1", "W20-1")
 }
 
 export interface DeviceData {
@@ -52,6 +53,9 @@ export interface StraightRoadObject {
   realWidth: number;
   lanes: number;
   roadType: string;
+  shoulderWidth?: number;   // world px, 0 = disabled
+  sidewalkWidth?: number;   // world px, 0 = disabled
+  sidewalkSide?: 'both' | 'left' | 'right';  // default 'both'
 }
 
 export interface PolylineRoadObject {
@@ -63,6 +67,9 @@ export interface PolylineRoadObject {
   lanes: number;
   roadType: string;
   smooth: boolean;
+  shoulderWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkSide?: 'both' | 'left' | 'right';
 }
 
 export interface CurveRoadObject {
@@ -73,6 +80,9 @@ export interface CurveRoadObject {
   realWidth: number;
   lanes: number;
   roadType: string;
+  shoulderWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkSide?: 'both' | 'left' | 'right';
 }
 
 export interface CubicBezierRoadObject {
@@ -83,6 +93,9 @@ export interface CubicBezierRoadObject {
   realWidth: number;
   lanes: number;
   roadType: string;
+  shoulderWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkWidth?: number;   // world px, 0 = disabled (TODO: rendering not yet implemented)
+  sidewalkSide?: 'both' | 'left' | 'right';
 }
 
 export interface SignObject {
@@ -156,6 +169,43 @@ export interface TaperObject {
   numLanes: number;     // lanes being closed, 1 or 2
 }
 
+export interface TurnLaneObject {
+  id: string;
+  type: 'turn_lane';
+  x: number;           // anchor point (where lane branches from road)
+  y: number;
+  rotation: number;    // degrees — aligns to road direction
+  laneWidth: number;   // world px, default 20
+  taperLength: number; // world px, default 80 (run-in taper before full width)
+  runLength: number;   // world px, default 100 (full-width run section)
+  side: 'left' | 'right'; // which side of anchor road the lane opens on
+  turnDir: 'left' | 'right' | 'thru'; // arrow direction shown at end
+}
+
+export interface LaneMaskObject {
+  id: string;
+  type: 'lane_mask';
+  x1: number;   // start point world coords
+  y1: number;
+  x2: number;   // end point world coords
+  y2: number;
+  laneWidth: number;  // width of mask band, world px (default 20)
+  color: string;      // default "rgba(239,68,68,0.5)"
+  style: 'hatch' | 'solid'; // default 'hatch'
+}
+
+export interface CrosswalkObject {
+  id: string;
+  type: 'crosswalk';
+  x1: number;        // one side of the crosswalk (drag start)
+  y1: number;
+  x2: number;        // other side (drag end)
+  y2: number;
+  depth: number;     // crosswalk depth along road direction, world px (default 24)
+  stripeCount: number;  // number of white stripes (default 6)
+  stripeColor: string;  // default "#ffffff"
+}
+
 export type CanvasObject =
   | StraightRoadObject
   | PolylineRoadObject
@@ -167,7 +217,10 @@ export type CanvasObject =
   | ArrowObject
   | TextObject
   | MeasureObject
-  | TaperObject;
+  | TaperObject
+  | LaneMaskObject
+  | CrosswalkObject
+  | TurnLaneObject;
 
 // ─── PLAN METADATA ────────────────────────────────────────────────────────────
 

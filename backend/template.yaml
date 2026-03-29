@@ -62,10 +62,10 @@ Resources:
     Properties:
       BucketName: !Sub "tcp-assets-${Stage}-${AWS::AccountId}"
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
+        BlockPublicAcls: true       # prevent ACL-based public access
+        IgnorePublicAcls: true      # ignore any pre-existing public ACLs
+        BlockPublicPolicy: false    # must be false — bucket policy grants public GET on signs/*
+        RestrictPublicBuckets: false # must be false — bucket policy grants public GET on signs/*
       CorsConfiguration:
         CorsRules:
           - AllowedOrigins: ["*"]

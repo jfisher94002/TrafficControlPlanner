@@ -6,6 +6,9 @@
  *
  * All functions throw on failure — callers are responsible for error handling.
  */
+
+/** Increment when the stored plan shape changes in a breaking way. */
+export const PLAN_SCHEMA_VERSION = 1
 import { uploadData, list, getUrl, remove } from 'aws-amplify/storage'
 
 export interface CloudPlanMeta {
@@ -20,7 +23,7 @@ export interface CloudPlanMeta {
 export async function savePlanToCloud(userId: string, planId: string, data: object): Promise<void> {
   await uploadData({
     path: `plans/${userId}/${planId}.tcp.json`,
-    data: JSON.stringify(data),
+    data: JSON.stringify({ ...data, _schemaVersion: PLAN_SCHEMA_VERSION }),
     options: { contentType: 'application/json' },
   }).result
 }
@@ -48,7 +51,12 @@ export async function loadPlanFromCloud(path: string): Promise<Record<string, un
   const { url } = await getUrl({ path, options: { expiresIn: 60 } })
   const res = await fetch(url.toString())
   if (!res.ok) throw new Error(`Failed to fetch plan (${res.status})`)
-  return res.json()
+  const data = await res.json() as Record<string, unknown>
+  const version = typeof data._schemaVersion === 'number' ? data._schemaVersion : 0
+  if (version > PLAN_SCHEMA_VERSION) {
+    throw new Error(`Plan was saved with a newer version of TCPlanPro (v${version}). Please refresh the app.`)
+  }
+  return data
 }
 
 /** Delete a plan from S3. */

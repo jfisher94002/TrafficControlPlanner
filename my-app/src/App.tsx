@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Amplify } from 'aws-amplify'
-import { signUp } from 'aws-amplify/auth'
+import { signUp, signOut as amplifySignOut } from 'aws-amplify/auth'
 import { Authenticator, ThemeProvider, useAuthenticator } from '@aws-amplify/ui-react'
 import '@aws-amplify/ui-react/styles.css'
 import TrafficControlPlanner from './traffic-control-planner'
@@ -47,7 +47,9 @@ function AuthedApp() {
 
   const handleSignOut = async () => {
     try {
-      await signOut()
+      // global: true revokes the Cognito refresh token server-side so the
+      // user isn't auto-signed back in when they return to /app.
+      await amplifySignOut({ global: true })
     } catch (err) {
       // Log so server-side session failures are visible in monitoring.
       console.error('[Auth] signOut error:', err)

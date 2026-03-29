@@ -1,0 +1,73 @@
+phase: 1 - MVP  #E11D48
+Phase
+Work that must ship before Alpha
+PDF export, sign manifest, taper tool
+phase: 2 - roads  #F59E0B
+Phase
+Intersection, curves, turn lanes work
+Intersection editor snapping logic
+phase: 3 - compliance  #059669
+Phase
+Full MUTCD library, templates, spacing calc
+Add all 200+ MUTCD signs to library
+phase: 4 - monetization  #3B82F6
+Phase
+Auth, cloud save, Stripe, collaboration
+Stripe webhook for Pro upgrade
+AREA — Which part of the product?
+area: canvas  #006B75
+Area
+Drawing engine, object placement, geometry
+Bezier curve handles jump on zoom
+area: map  #0075CA
+Area
+Map tiles, geocoding, providers, opacity
+CartoDB tiles not loading at zoom 19
+area: signs  #5319E7
+Area
+Sign library, SVG rendering, custom signs
+W20-1 sign SVG has alignment offset
+area: export  #0E8A16
+Area
+PDF, PNG, DXF generation
+PDF title block font too small
+area: auth  #D73A4A
+Area
+Cognito, login/signup, sessions
+Session expires too quickly
+area: backend  #0075CA
+Area
+FastAPI, Lambda, AWS infrastructure
+Lambda cold start adding 3s to PDF gen
+area: payments  #FBCA04
+Area
+Stripe, freemium gating, plan tiers
+Free tier plan limit not enforcing
+area: ux  #666666
+Area
+UI, keyboard shortcuts, responsiveness
+Toolbar tooltip overlaps canvas on mobile
+STATUS — Where is this in the workflow?
+status: blocked  #D73A4A
+Status
+Cannot proceed — waiting on something else
+Waiting on ReportLab Lambda layer setup
+status: needs design  #5319E7
+Status
+Needs UX or architecture decision first
+How should multi-page PDF work?
+status: ready  #0E8A16
+Status
+Fully defined, ready to pick up and code
+All acceptance criteria written
+status: alpha-feedback  #D93F0B
+Status
+Reported by an alpha user
+Jim: sign labels cut off on export
+status: beta-feedback  #0075CA
+Status
+Reported by a beta user
+
+
+
+

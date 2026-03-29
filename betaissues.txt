@@ -1,0 +1,48 @@
+120	OPEN	Expand automated tests for templates and QC	priority: high, phase: 2 - Beta, area: canvas, tech debt, Testing	2026-03-24T21:49:17Z
+119	OPEN	Add export preview improvements for beta plans	enhancement, priority: high, phase: 2 - Beta, area: export	2026-03-24T21:49:17Z
+118	OPEN	Add plan duplication with scenario reuse	feature, priority: high, phase: 2 - Beta, area: canvas	2026-03-24T21:49:16Z
+117	OPEN	Template and wizard analytics	enhancement, priority: high, phase: 2 - Beta, area: data	2026-03-24T21:49:16Z
+116	OPEN	Add first-pass risk or complexity score	enhancement, priority: high, phase: 2 - Beta, area: data	2026-03-24T21:49:15Z
+115	OPEN	Add QC panel for plan warnings	feature, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:49:15Z
+114	OPEN	Add MUTCD-style rule checks	feature, priority: high, phase: 2 - Beta, area: canvas, area: export	2026-03-24T21:49:15Z
+113	OPEN	Auto-place signs and devices from scenario rules	feature, priority: high, phase: 2 - Beta, area: canvas, area: signs	2026-03-24T21:49:14Z
+112	OPEN	Build plan creation wizard	feature, priority: high, phase: 2 - Beta, area: canvas, area: ux	2026-03-24T21:49:14Z
+111	OPEN	Add template library for common traffic control plans	feature, priority: high, phase: 2 - Beta, area: canvas, area: ux	2026-03-24T21:49:13Z
+110	OPEN	Regression tests for status workflow and locked plans (edit/undo/redo blocked)	priority: high, phase: 2 - Beta, area: canvas, tech debt	2026-03-24T21:49:13Z
+109	OPEN	End‑to‑end tests for project permissions and share‑by‑link viewer	priority: high, phase: 2 - Beta, tech debt, Testing	2026-03-24T21:49:13Z
+108	OPEN	Notification surface for new comments and status changes (in‑app badge)	enhancement, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:49:12Z
+107	OPEN	Object‑anchored comments (select object → add comment)	feature, priority: high, phase: 2 - Beta, area: canvas, area: ux	2026-03-24T21:49:12Z
+106	OPEN	Plan‑level comments thread (sidebar panel)	feature, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:49:12Z
+105	OPEN	Lock “Issued/Approved” versions to prevent accidental edits	feature, priority: high, phase: 2 - Beta, area: canvas, area: data	2026-03-24T21:49:11Z
+104	OPEN	Display status and review notes in PDF title block	enhancement, priority: high, phase: 2 - Beta, area: export	2026-03-24T21:49:11Z
+103	OPEN	Review panel UI for status changes + notes	feature, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:49:10Z
+102	OPEN	Add plan status field (Draft/Submitted/Approved/As-built/Archived)	feature, priority: high, phase: 2 - Beta, area: data	2026-03-24T21:49:10Z
+101	OPEN	Audit logging for share link creation and access	feature, priority: high, phase: 2 - Beta, area: data, Security	2026-03-24T21:49:10Z
+100	OPEN	“Share plan” dialog (create/revoke share links)	feature, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:49:09Z
+99	OPEN	Watermark and limited toolbar for public viewer	enhancement, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:49:09Z
+98	OPEN	Read‑only plan viewer route (no auth, token‑based)	feature, priority: high, phase: 2 - Beta, area: export, area: ux, Security	2026-03-24T21:49:09Z
+97	OPEN	Create “public share token” model for plans	feature, priority: high, phase: 2 - Beta, area: ux, Security	2026-03-24T21:49:08Z
+96	OPEN	Enforce project‑level permissions on plan load/save APIs	bug, priority: high, phase: 2 - Beta, area: data, Security	2026-03-24T21:49:08Z
+95	OPEN	Project details page with plan list + “Add plan to project” flow	feature, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:52:19Z
+94	OPEN	Project membership model with roles (owner/editor/viewer)	feature, priority: high, phase: 2 - Beta, area: data, Security	2026-03-24T21:52:19Z
+93	OPEN	Implement Project list view (table of projects)	feature, priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:52:19Z
+92	OPEN	Add Project entity and schema for grouping plans	feature, priority: high, phase: 2 - Beta, area: data	2026-03-24T21:52:18Z
+85	OPEN	Context-sensitive on-screen help	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:52:18Z
+84	OPEN	Deploy app on tcplanpro.com	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:52:18Z
+83	OPEN	Basic user session management	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:52:17Z
+82	OPEN	Protected routes — app requires login	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:52:17Z
+81	OPEN	Sign up / sign in / forgot password flows	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:52:17Z
+80	OPEN	AWS Cognito setup	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:53:12Z
+79	OPEN	Set up email forwarding for jfisher@fisherconsulting.com	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:53:12Z
+78	OPEN	Versioning strategy and version readme	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:53:11Z
+77	OPEN	Add email contact link in UI	priority: high, phase: 2 - Beta, area: ux	2026-03-24T21:53:11Z
+76	OPEN	Configure Cognito Identity Pool for Amplify Storage (issue #63 follow-up)	enhancement, priority: high, phase: 2 - Beta	2026-03-24T21:56:42Z
+69	OPEN	Activate Cognito auth for production deployment	priority: critical, priority: high, phase: 1 - MVP, phase: 2 - Beta, Security	2026-03-24T21:56:42Z
+67	OPEN	Preliminary MUTCD Compliance Engine	priority: high, phase: 2 - Beta, area: canvas	2026-03-24T21:53:11Z
+66	OPEN	Server-side DXF/CAD Export	priority: high, phase: 2 - Beta, area: canvas	2026-03-24T21:53:10Z
+61	OPEN	Set up domain routing: tcplanpro.com primary with redirects from tcpmaker.com and trafficcontrolplanner.com	priority: high, phase: 2 - Beta	2026-03-24T21:56:41Z
+20	OPEN	Lane masking / removal	feature, priority: medium, phase: 2 - Beta, area: canvas	2026-03-24T21:53:10Z
+19	OPEN	Crosswalks	feature, priority: medium, phase: 2 - Beta, area: canvas	2026-03-24T21:53:10Z
+18	OPEN	Road shoulders & sidewalks	feature, priority: medium, phase: 2 - Beta, area: canvas	2026-03-24T21:53:09Z
+17	OPEN	Turn lanes / slip lanes	feature, priority: medium, phase: 2 - Beta, area: canvas	2026-03-24T21:53:09Z
+16	OPEN	Intersection editor	feature, priority: high, phase: 2 - Beta, area: canvas	2026-03-24T21:53:08Z

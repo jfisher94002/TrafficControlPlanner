@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "TCP Backend \u2014 FastAPI on Lambda + HTTP API Gateway"
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures:
+    - arm64
+    MemorySize: 512
+    Timeout: 30
+    Environment:
+      Variables:
+        ALLOWED_ORIGINS:
+          Ref: AllowedOrigins
+        GITHUB_TOKEN:
+          Ref: GitHubToken
+        GITHUB_REPO:
+          Ref: GitHubRepo
+        ASSETS_BUCKET:
+          Ref: TcpAssetsBucket
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+    - dev
+    - staging
+    - prod
+  AllowedOrigins:
+    Type: String
+    Default: '*'
+    Description: Comma-separated list of allowed CORS origins
+  GitHubToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Fine-grained GitHub PAT with issues:write (for feedback portal)
+  GitHubRepo:
+    Type: String
+    Default: jfisher94002/TrafficControlPlanner
+    Description: GitHub repo for feedback issue creation (owner/repo)
+Resources:
+  TcpApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TcpApiFunction
+      Handler: main.handler
+      Description: TCP FastAPI backend (PDF export, issue creation)
+      Events:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+      Policies:
+      - S3ReadPolicy:
+          BucketName:
+            Ref: TcpAssetsBucket
+    Metadata:
+      SamResourceId: TcpApiFunction
+  TcpAssetsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: tcp-assets-${Stage}-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+        - AllowedOrigins:
+          - '*'
+          AllowedMethods:
+          - GET
+          AllowedHeaders:
+          - '*'
+          MaxAge: 3600
+  TcpAssetsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: TcpAssetsBucket
+      PolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action: s3:GetObject
+          Resource:
+            Fn::Sub: arn:aws:s3:::${TcpAssetsBucket}/signs/*
+          Condition:
+            Bool:
+              aws:SecureTransport: 'true'
+Outputs:
+  ApiUrl:
+    Description: HTTP API Gateway endpoint URL
+    Value:
+      Fn::Sub: https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  AssetsBucketName:
+    Description: 'S3 bucket for sign SVG assets (used by issue #29)'
+    Value:
+      Ref: TcpAssetsBucket
+  FunctionArn:
+    Description: Lambda function ARN
+    Value:
+      Fn::GetAtt:
+      - TcpApiFunction
+      - Arn

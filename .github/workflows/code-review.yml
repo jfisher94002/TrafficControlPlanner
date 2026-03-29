@@ -43,7 +43,8 @@ jobs:
 
       - name: Verify package.json version was bumped
         run: |
-          BASE=$(git show origin/${{ github.base_ref }}:my-app/package.json | jq -r .version)
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          BASE=$(git show "${BASE_SHA}:my-app/package.json" | jq -r .version)
           HEAD=$(jq -r .version my-app/package.json)
           if [ "$BASE" = "$HEAD" ]; then
             echo "ERROR: package.json version was not bumped (still $HEAD)"

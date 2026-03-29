@@ -1,0 +1,4 @@
+question  #006B75
+Type
+Needs discussion or decision before work begins
+Should taper calc run client-side or on Lambda?

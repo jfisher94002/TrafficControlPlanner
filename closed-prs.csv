@@ -1,0 +1,30 @@
+75,MERGED,Add cloud save/load via AWS S3 (issue #63),jfisher94002,,2026-03-24T07:32:13Z,2026-03-24T17:10:29Z
+74,MERGED,Address PR #68 review follow-up: legend tests, Sign Out layout, auth guards (closes #70 #71 #72 #73),jfisher94002,,2026-03-24T06:54:31Z,2026-03-24T07:11:39Z
+68,MERGED,Add AWS Amplify + Cognito auth layer (issue #62),jfisher94002,,2026-03-24T06:01:21Z,2026-03-24T06:27:38Z
+60,MERGED,Add cubic Bézier road tool (issue #15),jfisher94002,,2026-03-23T22:15:32Z,2026-03-23T22:34:53Z
+59,MERGED,Address Copilot review on PDF security audit (issue #33),jfisher94002,,2026-03-23T17:20:54Z,2026-03-23T21:48:33Z
+58,MERGED,Add auto legend box (closes #6),jfisher94002,,2026-03-23T01:04:28Z,2026-03-23T21:13:26Z
+56,MERGED,Add Z-ordering and position inputs to properties panel (issue #13),jfisher94002,,2026-03-22T20:22:24Z,2026-03-22T21:22:56Z
+55,MERGED,Fix minimap blank and map not panning with middle mouse,jfisher94002,,2026-03-22T20:11:02Z,2026-03-22T20:40:33Z
+54,MERGED,PDF security audit: input sanitization and complexity limits (issue #33),jfisher94002,,2026-03-22T19:19:30Z,2026-03-22T19:45:13Z
+53,MERGED,Add S3 sign asset library with 82 MUTCD signs (issue #29),jfisher94002,,2026-03-22T17:48:39Z,2026-03-22T19:06:41Z
+52,MERGED,Add AWS SAM infrastructure for Lambda backend (issue #31),jfisher94002,,2026-03-22T16:58:21Z,2026-03-22T17:08:28Z
+51,MERGED,Add password-protected feedback portal and Report Issue button,jfisher94002,,2026-03-22T16:15:50Z,2026-03-22T16:41:35Z
+49,MERGED,Fixing build and lint errors during PR review,app/copilot-swe-agent,,2026-03-22T00:38:43Z,2026-03-22T00:38:56Z
+48,MERGED,Address PDF backend review feedback: fixture reliability, CORS config, dead code, frontend proxy,app/copilot-swe-agent,priority: high|tech debt|,2026-03-21T22:42:30Z,2026-03-22T01:18:48Z
+47,MERGED,Dev,jfisher94002,,2026-03-21T22:30:14Z,2026-03-21T22:31:34Z
+46,MERGED,Add FastAPI PDF export backend (issue #28),jfisher94002,,2026-03-21T22:20:41Z,2026-03-21T22:43:22Z
+45,MERGED,Fix north arrow SVG accessibility: add role and title element,app/copilot-swe-agent,,2026-03-21T04:45:23Z,2026-03-21T22:29:29Z
+44,MERGED,Add north arrow overlay (issue #12),jfisher94002,,2026-03-21T04:42:10Z,2026-03-21T04:45:35Z
+43,MERGED,Add copy/paste/duplicate shortcuts (issues #8 #32),jfisher94002,,2026-03-21T04:25:10Z,2026-03-21T04:34:13Z
+42,MERGED,Fix safePlanTitle: trim/condense underscores so "plan" fallback fires for all-punctuation titles,app/copilot-swe-agent,,2026-03-21T04:04:20Z,2026-03-21T04:12:08Z
+41,MERGED,Add PNG export (issue #11),jfisher94002,,2026-03-21T03:57:53Z,2026-03-21T04:08:07Z
+40,MERGED,Manifest panel: useMemo optimization + strengthened test coverage,app/copilot-swe-agent,,2026-03-21T03:52:37Z,2026-03-21T03:54:50Z
+39,MERGED,Add sign & device manifest panel (issue #7),jfisher94002,,2026-03-21T03:28:48Z,2026-03-21T03:53:29Z
+38,MERGED,Add localStorage auto-save persistence,jfisher94002,,2026-03-21T02:38:26Z,2026-03-21T03:16:40Z
+37,MERGED,Fix taper tool: multi-lane MUTCD formula, hit detection, and Konva listening flag,app/copilot-swe-agent,,2026-03-21T01:58:38Z,2026-03-21T02:32:45Z
+36,MERGED,Add basic taper tool with MUTCD formula,jfisher94002,,2026-03-21T01:51:29Z,2026-03-21T02:15:03Z
+35,MERGED,Migrate to TypeScript and add Vitest test framework,jfisher94002,,2026-03-20T22:25:49Z,2026-03-21T01:34:39Z
+3,MERGED,Add .github/copilot-instructions.md for agent onboarding,app/copilot-swe-agent,,2026-02-24T23:29:43Z,2026-02-26T08:13:05Z
+2,MERGED,Dev,jfisher94002,,2026-02-18T22:22:58Z,2026-02-18T22:23:16Z
+1,MERGED,created a sign editor and a road drawing functionality ,jfisher94002,,2026-02-17T05:22:09Z,2026-02-17T05:22:33Z

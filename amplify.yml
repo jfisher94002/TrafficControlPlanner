@@ -24,7 +24,9 @@ frontend:
 # To apply: commit this file and trigger an Amplify redeploy, or update the
 # rewrite rules directly in the Amplify console (App settings → Rewrites).
 customRules:
-  # API proxy — replace <API_GATEWAY_URL> after sam deploy
+  # API proxy — <API_GATEWAY_URL> is a placeholder; replace with the actual
+  # API Gateway URL from `sam deploy` outputs before these rules go live.
+  # Until replaced, /export-pdf, /create-issue, and /health will 404.
   - source: /export-pdf
     target: <API_GATEWAY_URL>/export-pdf
     status: "200"
@@ -41,7 +43,7 @@ customRules:
   - source: /app/<*>
     target: /app.html
     status: "200"
-  # Fallback SPA catch-all (handles direct deep links into /app)
+  # Fallback for landing page deep links (routes all other paths to index.html)
   - source: /<*>
     target: /index.html
     status: "404-200"

@@ -1,0 +1,22 @@
+130	OPEN	Add performance and regression hardening	priority: medium, phase: 3 - Production, tech debt	2026-03-24T21:49:39Z
+129	OPEN	Add CAD and GIS interoperability	feature, priority: medium, phase: 3 - Production, area: export	2026-03-24T21:49:39Z
+128	OPEN	Add audit logging	feature, priority: medium, phase: 3 - Production, area: data, Security	2026-03-24T21:49:39Z
+127	OPEN	Add notification system	enhancement, priority: medium, phase: 3 - Production, area: ux	2026-03-24T21:49:38Z
+126	OPEN	Add comments and review notes	feature, priority: medium, phase: 3 - Production, area: ux	2026-03-24T21:49:38Z
+125	OPEN	Lock approved plans and support duplication	feature, priority: high, phase: 3 - Production, area: canvas	2026-03-24T21:49:38Z
+124	OPEN	Add approval workflow and plan statuses	feature, priority: high, phase: 3 - Production, area: ux	2026-03-24T21:49:37Z
+123	OPEN	Add share-by-link read-only viewer	feature, priority: high, phase: 3 - Production, area: ux, Security	2026-03-24T21:49:37Z
+122	OPEN	Add role-based permissions	feature, priority: critical, phase: 3 - Production, area: data, Security	2026-03-24T21:49:36Z
+121	OPEN	Add projects and team collaboration	feature, priority: high, phase: 3 - Production, area: data	2026-03-24T21:49:36Z
+91	OPEN	Chatbot for Q&A	priority: high, phase: 4 - monetization, area: ux	2026-03-24T21:54:21Z
+90	OPEN	Update notifications	priority: high, phase: 4 - monetization, area: auth, area: backend	2026-03-24T21:54:20Z
+89	OPEN	Analytics page	priority: high, phase: 4 - monetization, area: auth, area: backend	2026-03-24T21:54:20Z
+88	OPEN	Admin page — user and subscription management	priority: high, phase: 4 - monetization, area: auth, area: backend	2026-03-24T21:54:20Z
+87	OPEN	Paying user identification and PDF watermark gating	priority: high, phase: 4 - monetization, area: auth, area: backend	2026-03-24T21:54:19Z
+86	OPEN	Stripe payments integration	priority: high, phase: 4 - monetization, area: auth, area: backend	2026-03-24T21:54:19Z
+26	OPEN	Reusable saved components	feature, priority: low, phase: 3 - Production, area: ux	2026-03-24T21:49:36Z
+25	OPEN	Searchable sign library	feature, priority: low, phase: 3 - Production, area: signs	2026-03-24T21:49:35Z
+24	OPEN	Sign spacing calculator	feature, priority: low, phase: 3 - Production, area: signs	2026-03-24T21:49:35Z
+23	OPEN	MUTCD typical app templates	feature, priority: low, phase: 3 - Production, area: canvas	2026-03-24T21:49:34Z
+22	OPEN	Taper auto-calc (full MUTCD)	feature, priority: low, phase: 3 - Production, area: canvas	2026-03-24T21:49:34Z
+21	OPEN	Full MUTCD library (200+ signs)	priority: low, phase: 3 - Production, area: signs, area: ux	2026-03-24T21:49:34Z

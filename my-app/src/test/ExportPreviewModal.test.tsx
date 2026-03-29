@@ -107,4 +107,15 @@ describe('ExportPreviewModal', () => {
     render(<ExportPreviewModal {...defaultProps} qcIssues={issues} />)
     expect(screen.getByText(/Plan has errors/)).toBeInTheDocument()
   })
+
+  it('shows error message and keeps modal open when export fails', async () => {
+    const onConfirm = vi.fn().mockRejectedValue(new Error('Export failed'))
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    render(<ExportPreviewModal {...defaultProps} onConfirm={onConfirm} onClose={onClose} />)
+    await user.click(screen.getByTestId('export-preview-confirm'))
+    expect(await screen.findByText(/Export failed/)).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByTestId('export-preview-confirm')).not.toBeDisabled()
+  })
 })

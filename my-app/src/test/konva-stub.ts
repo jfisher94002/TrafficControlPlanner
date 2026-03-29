@@ -5,6 +5,7 @@ const mockBlob = new Blob([''], { type: 'image/png' })
 
 export const mockCanvas = {
   toBlob: vi.fn((cb: (b: Blob | null) => void) => cb(mockBlob)),
+  toDataURL: vi.fn(() => 'data:image/png;base64,mockdata'),
 }
 
 export const stageStub = {

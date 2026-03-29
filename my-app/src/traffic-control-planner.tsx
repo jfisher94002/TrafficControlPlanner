@@ -6,7 +6,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
-  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject,
+  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject, CrosswalkObject, TurnLaneObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
   GeocodeResult, SignShape,
@@ -18,6 +18,7 @@ import TemplatePicker from './TemplatePicker';
 import ExportPreviewModal from './ExportPreviewModal';
 import { runQCChecks, type QCIssue } from './qcRules';
 import { track } from './analytics';
+import { LaneMaskShape, CrosswalkShape, TurnLaneShape } from './shapes/TrafficControlShapes';
 
 // ─── CONSTANTS & DATA ────────────────────────────────────────────────────────
 const GRID_SIZE = 20;
@@ -62,118 +63,118 @@ const SIGN_CATEGORIES: Record<string, { label: string; color: string; signs: Sig
     label: "Regulatory",
     color: "#ef4444",
     signs: [
-      { id: "stop",          label: "STOP",         shape: "octagon",  color: "#ef4444", textColor: "#fff" },
-      { id: "yield",         label: "YIELD",        shape: "triangle", color: "#ef4444", textColor: "#fff" },
-      { id: "speed15",       label: "15 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed20",       label: "20 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed25",       label: "25 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed30",       label: "30 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed35",       label: "35 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed40",       label: "40 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed45",       label: "45 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed50",       label: "50 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed55",       label: "55 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "speed65",       label: "65 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "noentry",       label: "NO ENTRY",     shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "oneway",        label: "ONE WAY",      shape: "rect",     color: "#111",    textColor: "#fff" },
-      { id: "donotenter",    label: "DO NOT ENTER", shape: "rect",     color: "#ef4444", textColor: "#fff" },
-      { id: "noleftturn",    label: "NO LEFT TRN",  shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "norightturn",   label: "NO RIGHT TRN", shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "noparking",     label: "NO PARKING",   shape: "circle",   color: "#ef4444", textColor: "#fff" },
-      { id: "nopassing",     label: "NO PASSING",   shape: "rect",     color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "wrongway",      label: "WRONG WAY",    shape: "rect",     color: "#ef4444", textColor: "#fff" },
+      { id: "stop",          label: "STOP",         shape: "octagon",  color: "#ef4444", textColor: "#fff", mutcd: "R1-1" },
+      { id: "yield",         label: "YIELD",        shape: "triangle", color: "#ef4444", textColor: "#fff", mutcd: "R1-2" },
+      { id: "speed15",       label: "15 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed20",       label: "20 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed25",       label: "25 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed30",       label: "30 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed35",       label: "35 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed40",       label: "40 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed45",       label: "45 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed50",       label: "50 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed55",       label: "55 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed65",       label: "65 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "noentry",       label: "NO ENTRY",     shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R5-1" },
+      { id: "oneway",        label: "ONE WAY",      shape: "rect",     color: "#111",    textColor: "#fff", mutcd: "R6-1" },
+      { id: "donotenter",    label: "DO NOT ENTER", shape: "rect",     color: "#ef4444", textColor: "#fff", mutcd: "R5-1" },
+      { id: "noleftturn",    label: "NO LEFT TRN",  shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R3-2" },
+      { id: "norightturn",   label: "NO RIGHT TRN", shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R3-1" },
+      { id: "noparking",     label: "NO PARKING",   shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R7-1" },
+      { id: "nopassing",     label: "NO PASSING",   shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R4-1" },
+      { id: "wrongway",      label: "WRONG WAY",    shape: "rect",     color: "#ef4444", textColor: "#fff", mutcd: "R5-1a" },
     ],
   },
   warning: {
     label: "Warning",
     color: "#f59e0b",
     signs: [
-      { id: "roadwork",       label: "ROAD WORK",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "flagahead",      label: "FLAGGER",      shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "merge",          label: "MERGE",        shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "curve",          label: "CURVE",        shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "narrow",         label: "NARROW",       shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "bump",           label: "BUMP",         shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "pedestrian",     label: "PED XING",     shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "signal",         label: "SIGNAL AHEAD", shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "schoolzone",     label: "SCHOOL ZONE",  shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "schoolxing",     label: "SCHOOL XING",  shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "bikexing",       label: "BIKE XING",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "deerxing",       label: "DEER XING",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "slippery",       label: "SLIPPERY",     shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "loosegravel",    label: "LOOSE GRAVEL", shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "dividedroad",    label: "DIVIDED RD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "endsdivided",    label: "ENDS DIVIDED", shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "lowclearance",   label: "LOW CLEAR",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "rightcurve",     label: "RIGHT CURVE",  shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "leftcurve",      label: "LEFT CURVE",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "hillgrade",        label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "workers",          label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "trafficcontrols",  label: "TRAF CTRL",    shape: "diamond", color: "#f97316", textColor: "#111" },
+      { id: "roadwork",       label: "ROAD WORK",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "flagahead",      label: "FLAGGER",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
+      { id: "merge",          label: "MERGE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-2" },
+      { id: "curve",          label: "CURVE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2" },
+      { id: "narrow",         label: "NARROW",       shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-1" },
+      { id: "bump",           label: "BUMP",         shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-1" },
+      { id: "pedestrian",     label: "PED XING",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-2" },
+      { id: "signal",         label: "SIGNAL AHEAD", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W3-3" },
+      { id: "schoolzone",     label: "SCHOOL ZONE",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-2" },
+      { id: "schoolxing",     label: "SCHOOL XING",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "S1-1" },
+      { id: "bikexing",       label: "BIKE XING",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-15" },
+      { id: "deerxing",       label: "DEER XING",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-3" },
+      { id: "slippery",       label: "SLIPPERY",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-5" },
+      { id: "loosegravel",    label: "LOOSE GRAVEL", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-7" },
+      { id: "dividedroad",    label: "DIVIDED RD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W6-1" },
+      { id: "endsdivided",    label: "ENDS DIVIDED", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W6-2" },
+      { id: "lowclearance",   label: "LOW CLEAR",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W12-2" },
+      { id: "rightcurve",     label: "RIGHT CURVE",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2R" },
+      { id: "leftcurve",      label: "LEFT CURVE",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2L" },
+      { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-5" },
+      { id: "hillgrade",      label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W7-1" },
+      { id: "workers",        label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-1a" },
+      { id: "trafficcontrols",label: "TRAF CTRL",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7" },
     ],
   },
   temporary: {
     label: "Temp Traffic Control",
     color: "#f97316",
     signs: [
-      { id: "roadclosed",   label: "ROAD CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "detour",       label: "DETOUR",        shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "laneclosed",   label: "LANE CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "endwork",      label: "END ROAD WORK", shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "slowtraffic",  label: "SLOW TRAFFIC",  shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "workzone",     label: "WORK ZONE",     shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "workahead",    label: "WORK AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "preparestop",  label: "PREP TO STOP",  shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "onelane",      label: "ONE LANE RD",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "surveyors",    label: "SURVEYORS",     shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "rightlane",    label: "RIGHT LANE",    shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "leftlane",     label: "LEFT LANE",     shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "centerlane",   label: "CENTER LANE",   shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "flaggerahead", label: "FLAGGER AHD",   shape: "diamond", color: "#f97316", textColor: "#111" },
-      { id: "reducespeed",  label: "REDUCE SPEED",  shape: "rect",    color: "#f97316", textColor: "#111" },
-      { id: "endworkahead", label: "END WORK AHD",  shape: "rect",    color: "#f97316", textColor: "#111" },
+      { id: "roadclosed",   label: "ROAD CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2" },
+      { id: "detour",       label: "DETOUR",        shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "M4-8" },
+      { id: "laneclosed",   label: "LANE CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2a" },
+      { id: "endwork",      label: "END ROAD WORK", shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
+      { id: "slowtraffic",  label: "SLOW TRAFFIC",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "workzone",     label: "WORK ZONE",     shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "workahead",    label: "WORK AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "preparestop",  label: "PREP TO STOP",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "onelane",      label: "ONE LANE RD",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4a" },
+      { id: "surveyors",    label: "SURVEYORS",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-5" },
+      { id: "rightlane",    label: "RIGHT LANE",    shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-1" },
+      { id: "leftlane",     label: "LEFT LANE",     shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-2" },
+      { id: "centerlane",   label: "CENTER LANE",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-3" },
+      { id: "flaggerahead", label: "FLAGGER AHD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
+      { id: "reducespeed",  label: "REDUCE SPEED",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "endworkahead", label: "END WORK AHD",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
     ],
   },
   guide: {
     label: "Guide & Info",
     color: "#22c55e",
     signs: [
-      { id: "parking",       label: "P",           shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "hospital",      label: "H",           shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "info",          label: "INFO",        shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "interstate",    label: "I-95",        shape: "shield", color: "#3b82f6", textColor: "#fff" },
-      { id: "exitramp",      label: "EXIT",        shape: "rect",   color: "#22c55e", textColor: "#fff" },
-      { id: "speedadvisory", label: "ADVISORY",    shape: "rect",   color: "#f59e0b", textColor: "#111" },
-      { id: "distanceahead", label: "1 MILE",      shape: "rect",   color: "#22c55e", textColor: "#fff" },
-      { id: "noparkingnorth",label: "NO PARKING",  shape: "rect",   color: "#fff",    textColor: "#111", border: "#111" },
-      { id: "restarea",      label: "REST AREA",   shape: "rect",   color: "#3b82f6", textColor: "#fff" },
-      { id: "foodgas",       label: "FOOD/GAS",    shape: "rect",   color: "#3b82f6", textColor: "#fff" },
+      { id: "parking",       label: "P",           shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "D4-1" },
+      { id: "hospital",      label: "H",           shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "H-1" },
+      { id: "info",          label: "INFO",        shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "I-2" },
+      { id: "interstate",    label: "I-95",        shape: "shield", color: "#3b82f6", textColor: "#fff", mutcd: "M1-1" },
+      { id: "exitramp",      label: "EXIT",        shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "E5-1" },
+      { id: "speedadvisory", label: "ADVISORY",    shape: "rect",   color: "#f59e0b", textColor: "#111", mutcd: "R2-3" },
+      { id: "distanceahead", label: "1 MILE",      shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "W16-2" },
+      { id: "noparkingnorth",label: "NO PARKING",  shape: "rect",   color: "#fff",    textColor: "#111", border: "#111", mutcd: "R7-1" },
+      { id: "restarea",      label: "REST AREA",   shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "D5-1" },
+      { id: "foodgas",       label: "FOOD/GAS",    shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "I-2" },
     ],
   },
   school: {
     label: "School Zone",
     color: "#f59e0b",
     signs: [
-      { id: "school",       label: "SCHOOL",      shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "schoolspeed",  label: "15 SCHOOL",   shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "slowschool",   label: "SLOW SCHOOL", shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "schoolbus",    label: "SCHOOL BUS",  shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "schoolbusxing",label: "BUS XING",    shape: "diamond", color: "#f59e0b", textColor: "#111" },
-      { id: "crosswalk",    label: "CROSSWALK",   shape: "rect",    color: "#f59e0b", textColor: "#111" },
-      { id: "pedxing",      label: "PED XING",    shape: "diamond", color: "#f59e0b", textColor: "#111" },
+      { id: "school",       label: "SCHOOL",      shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S4-3" },
+      { id: "schoolspeed",  label: "15 SCHOOL",   shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S5-1" },
+      { id: "slowschool",   label: "SLOW SCHOOL", shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S4-3a" },
+      { id: "schoolbus",    label: "SCHOOL BUS",  shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S3-1" },
+      { id: "schoolbusxing",label: "BUS XING",    shape: "diamond", color: "#f59e0b", textColor: "#111", mutcd: "S3-1" },
+      { id: "crosswalk",    label: "CROSSWALK",   shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "R7-9" },
+      { id: "pedxing",      label: "PED XING",    shape: "diamond", color: "#f59e0b", textColor: "#111", mutcd: "W11-2" },
     ],
   },
   bicycle: {
     label: "Bicycle & Pedestrian",
     color: "#22c55e",
     signs: [
-      { id: "bikeroute",   label: "BIKE ROUTE",  shape: "rect",    color: "#22c55e", textColor: "#fff" },
-      { id: "bikexingped", label: "BIKE XING",   shape: "diamond", color: "#22c55e", textColor: "#111" },
-      { id: "pedxingbike", label: "PED XING",    shape: "diamond", color: "#22c55e", textColor: "#111" },
-      { id: "sharedpath",  label: "SHARED PATH", shape: "rect",    color: "#22c55e", textColor: "#fff" },
-      { id: "hikerbiker",  label: "HIKE/BIKE",   shape: "rect",    color: "#22c55e", textColor: "#fff" },
-      { id: "bikepath",    label: "BIKE PATH",   shape: "rect",    color: "#22c55e", textColor: "#fff" },
+      { id: "bikeroute",   label: "BIKE ROUTE",  shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
+      { id: "bikexingped", label: "BIKE XING",   shape: "diamond", color: "#22c55e", textColor: "#111", mutcd: "W11-15" },
+      { id: "pedxingbike", label: "PED XING",    shape: "diamond", color: "#22c55e", textColor: "#111", mutcd: "W11-2" },
+      { id: "sharedpath",  label: "SHARED PATH", shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "R9-7" },
+      { id: "hikerbiker",  label: "HIKE/BIKE",   shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
+      { id: "bikepath",    label: "BIKE PATH",   shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
     ],
   },
 };
@@ -190,6 +191,28 @@ const DEVICES: DeviceData[] = [
   { id: "crashcush",   label: "Crash Cushion", icon: "⟐",  color: "#ef4444" },
   { id: "water_barrel",label: "Water Barrel",  icon: "⊚",  color: "#3b82f6" },
 ];
+
+/** Strips hyphens, spaces, and dots then lowercases — used for fuzzy MUTCD matching. */
+function normalizeForSearch(s: string): string {
+  return s.toLowerCase().replace(/[\s\-./]/g, '')
+}
+
+function createIntersectionRoads(
+  cx: number, cy: number,
+  type: 't' | '4way',
+  roadType: RoadType,
+): StraightRoadObject[] {
+  const L = roadType.width * 3
+  const base = { width: roadType.width, realWidth: roadType.realWidth, lanes: roadType.lanes, roadType: roadType.id }
+  if (type === '4way') return [
+    { id: uid(), type: 'road', x1: cx - L, y1: cy, x2: cx + L, y2: cy, ...base },
+    { id: uid(), type: 'road', x1: cx, y1: cy - L, x2: cx, y2: cy + L, ...base },
+  ]
+  return [
+    { id: uid(), type: 'road', x1: cx - L, y1: cy, x2: cx + L, y2: cy, ...base },
+    { id: uid(), type: 'road', x1: cx, y1: cy, x2: cx, y2: cy - L, ...base },
+  ]
+}
 
 // realWidth = diagram-scale meters (≈3× real-world so roads are wide enough to work with on screen)
 const ROAD_TYPES: RoadType[] = [
@@ -208,10 +231,13 @@ const TOOLS: ToolDef[] = [
   { id: "device",  label: "Device",    icon: "▲", shortcut: "D" },
   { id: "zone",    label: "Work Zone", icon: "▨", shortcut: "Z" },
   { id: "text",    label: "Text",      icon: "T", shortcut: "T" },
-  { id: "measure", label: "Measure",   icon: "📏", shortcut: "M" },
+  { id: "measure", label: "Measure",   icon: "📏", shortcut: "U" },
   { id: "arrow",   label: "Arrow",     icon: "→", shortcut: "A" },
-  { id: "taper",   label: "Taper",     icon: "⋈", shortcut: "P" },
-  { id: "erase",   label: "Erase",     icon: "✕", shortcut: "X" },
+  { id: "taper",     label: "Taper",     icon: "⋈", shortcut: "P" },
+  { id: "lane_mask", label: "Lane Mask", icon: "▧", shortcut: "M" },
+  { id: "crosswalk", label: "Crosswalk", icon: "⊟", shortcut: "C" },
+  { id: "turn_lane", label: "Turn Lane", icon: "↰", shortcut: "L" },
+  { id: "erase",     label: "Erase",     icon: "✕", shortcut: "X" },
 ];
 
 // ─── AUTOSAVE ────────────────────────────────────────────────────────────────
@@ -244,7 +270,7 @@ const panelBtnStyle = (active: boolean): React.CSSProperties => ({
 // ─── DRAW SIGN (kept for SignEditorPanel preview canvas) ───────────────────────
 function drawSign(ctx: CanvasRenderingContext2D, sign: { x: number; y: number; signData: SignData; rotation: number; scale: number }, isSelected: boolean): void {
   const { x, y, signData, rotation = 0, scale = 1 } = sign;
-  const s = 28 * scale;
+  const s = 18 * scale;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate((rotation * Math.PI) / 180);
@@ -323,11 +349,19 @@ function GridLines({ offset, zoom, canvasSize }: GridLinesProps) {
 
 interface RoadSegmentProps { obj: StraightRoadObject; isSelected: boolean; }
 function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
-  const { x1, y1, x2, y2, width, lanes, roadType } = obj;
+  const { x1, y1, x2, y2, width, lanes, roadType, shoulderWidth = 0, sidewalkWidth = 0, sidewalkSide } = obj;
   const angle = angleBetween(x1, y1, x2, y2);
   const perpAngle = angle + Math.PI / 2;
   const hw = width / 2;
   const cos = Math.cos(perpAngle), sin = Math.sin(perpAngle);
+
+  // Perpendicular unit vector (nx, ny) for offset lines
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+
+  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
+  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
 
   const roadPoly = [
     x1 + cos * hw, y1 + sin * hw,
@@ -360,8 +394,58 @@ function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
     }
   }
 
+  // Shoulder lines (rendered behind road body)
+  const shoulderLines = shoulderWidth > 0 ? [
+    <Line key="sl" points={[
+      x1 + nx * (hw + shoulderWidth / 2), y1 + ny * (hw + shoulderWidth / 2),
+      x2 + nx * (hw + shoulderWidth / 2), y2 + ny * (hw + shoulderWidth / 2),
+    ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
+    <Line key="sr" points={[
+      x1 - nx * (hw + shoulderWidth / 2), y1 - ny * (hw + shoulderWidth / 2),
+      x2 - nx * (hw + shoulderWidth / 2), y2 - ny * (hw + shoulderWidth / 2),
+    ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
+  ] : [];
+
+  // Sidewalk lines (rendered behind road body, outside shoulder if present)
+  const swOff = hw + (shoulderWidth > 0 ? shoulderWidth : 0) + (sidewalkWidth > 0 ? sidewalkWidth / 2 : 0);
+  const sidewalkLines: React.ReactElement[] = [];
+  if (sidewalkWidth > 0 && sidewalkSide) {
+    if (showLeft) {
+      sidewalkLines.push(
+        <Line key="swl-fill" points={[
+          x1 + nx * swOff, y1 + ny * swOff,
+          x2 + nx * swOff, y2 + ny * swOff,
+        ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
+        <Line key="swl-edge" points={[
+          x1 + nx * (swOff + sidewalkWidth / 2), y1 + ny * (swOff + sidewalkWidth / 2),
+          x2 + nx * (swOff + sidewalkWidth / 2), y2 + ny * (swOff + sidewalkWidth / 2),
+        ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
+      );
+    }
+    if (showRight) {
+      sidewalkLines.push(
+        <Line key="swr-fill" points={[
+          x1 - nx * swOff, y1 - ny * swOff,
+          x2 - nx * swOff, y2 - ny * swOff,
+        ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
+        <Line key="swr-edge" points={[
+          x1 - nx * (swOff + sidewalkWidth / 2), y1 - ny * (swOff + sidewalkWidth / 2),
+          x2 - nx * (swOff + sidewalkWidth / 2), y2 - ny * (swOff + sidewalkWidth / 2),
+        ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
+      );
+    }
+  }
+
   return (
     <Group listening={false}>
+      {/* Shoulders and sidewalks rendered first (behind road body) */}
+      {sidewalkLines}
+      {shoulderLines}
+      {/* End-cap discs fill visual gaps at intersections where roads of different widths meet */}
+      <Circle x={x1} y={y1} radius={hw + 1} fill="#555" listening={false} />
+      <Circle x={x2} y={y2} radius={hw + 1} fill="#555" listening={false} />
+      <Circle x={x1} y={y1} radius={hw - 1} fill={COLORS.road} listening={false} />
+      <Circle x={x2} y={y2} radius={hw - 1} fill={COLORS.road} listening={false} />
       <Line points={roadPoly} closed fill={COLORS.road} stroke="#555" strokeWidth={2} />
       <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
       <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
@@ -416,9 +500,9 @@ function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -469,9 +553,9 @@ function CurveRoad({ obj, isSelected }: CurveRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -523,9 +607,9 @@ function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
 
   return (
     <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="butt" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="butt" lineJoin="round" tension={0} />
+      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
       {laneMarkings}
       {isSelected && (
         <>
@@ -548,7 +632,7 @@ function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
 interface SignShapeProps { obj: SignObject; isSelected: boolean; }
 function SignShape({ obj, isSelected }: SignShapeProps) {
   const { x, y, signData, rotation = 0, scale: sc = 1 } = obj;
-  const s = 28 * sc;
+  const s = 18 * sc;
   return (
     <Shape
       x={x} y={y}
@@ -777,6 +861,9 @@ function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
     case "text":         return <TextLabel obj={obj} isSelected={isSelected} />;
     case "measure":      return <MeasurementShape obj={obj} />;
     case "taper":        return <TaperShape obj={obj} isSelected={isSelected} />;
+    case "lane_mask":    return <LaneMaskShape obj={obj} isSelected={isSelected} />;
+    case "crosswalk":    return <CrosswalkShape obj={obj} isSelected={isSelected} />;
+    case "turn_lane":    return <TurnLaneShape obj={obj} isSelected={isSelected} />;
     default:             return null;
   }
 }
@@ -812,6 +899,34 @@ function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicat
         points={[drawStart.x, drawStart.y, cursorPos.x, cursorPos.y]}
         stroke="rgba(245,158,11,0.5)" strokeWidth={1} dash={[6, 4]} listening={false} />
     );
+  }
+
+  // Lane mask preview
+  if (drawStart && tool === "lane_mask") {
+    const previewMask: LaneMaskObject = {
+      id: "__preview__",
+      type: "lane_mask",
+      x1: drawStart.x, y1: drawStart.y,
+      x2: cursorPos.x, y2: cursorPos.y,
+      laneWidth: 20,
+      color: "rgba(239,68,68,0.5)",
+      style: "hatch",
+    };
+    elements.push(<LaneMaskShape key="lane-mask-preview" obj={previewMask} isSelected={false} />);
+  }
+
+  // Crosswalk preview
+  if (drawStart && tool === "crosswalk") {
+    const previewCW: CrosswalkObject = {
+      id: "__preview__",
+      type: "crosswalk",
+      x1: drawStart.x, y1: drawStart.y,
+      x2: cursorPos.x, y2: cursorPos.y,
+      depth: 24,
+      stripeCount: 6,
+      stripeColor: "#ffffff",
+    };
+    elements.push(<CrosswalkShape key="crosswalk-preview" obj={previewCW} isSelected={false} />);
   }
 
   // Polyline / smooth in-progress
@@ -953,8 +1068,8 @@ function ToolButton({ tool, active, onClick }: ToolButtonProps) {
 
 // ─── SIGN EDITOR PANEL ───────────────────────────────────────────────────────
 
-interface SignEditorPanelProps { onUseSign: (signData: SignData) => void; onSaveToLibrary: (signData: SignData) => void; }
-function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
+interface SignEditorPanelProps { onUseSign: () => void; onSaveToLibrary: (signData: SignData) => void; onSignChange: (signData: SignData) => void; }
+function SignEditorPanel({ onUseSign, onSaveToLibrary, onSignChange }: SignEditorPanelProps) {
   const [shape, setShape] = useState<SignShape>("diamond");
   const [text, setText] = useState("CUSTOM");
   const [bgColor, setBgColor] = useState("#f97316");
@@ -962,13 +1077,18 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   const signData = useMemo(() => ({
-    id: "custom_preview",
+    // Derive id from configuration so legend/analytics can distinguish different editor signs.
+    id: `custom_${shape}_${(text || " ").trim().toLowerCase().replace(/\s+/g, "_")}`,
     label: text || " ",
     shape,
     color: bgColor,
     textColor,
     border: "#333",
   }), [shape, text, bgColor, textColor]);
+
+  // Keep parent's selectedSign in sync so clicking the canvas always places
+  // the current editor sign (not whatever was last selected from the library).
+  useEffect(() => { onSignChange(signData) }, [signData, onSignChange]);
 
   useEffect(() => {
     const cvs = previewRef.current;
@@ -978,7 +1098,7 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
     ctx.clearRect(0, 0, 100, 100);
     ctx.fillStyle = COLORS.canvas;
     ctx.fillRect(0, 0, 100, 100);
-    drawSign(ctx, { x: 50, y: 50, signData, rotation: 0, scale: 1.5 }, false);
+    drawSign(ctx, { x: 50, y: 50, signData, rotation: 0, scale: 2.2 }, false);
   }, [signData]);
 
   return (
@@ -1039,7 +1159,7 @@ function SignEditorPanel({ onUseSign, onSaveToLibrary }: SignEditorPanelProps) {
 
       <div style={{ display: "flex", gap: 6 }}>
         <button
-          onClick={() => onUseSign({ ...signData, id: "custom_" + uid() })}
+          onClick={onUseSign}
           style={{
             flex: 1, padding: "8px 0", background: COLORS.accentDim,
             border: `1px solid ${COLORS.accent}`, borderRadius: 6,
@@ -1212,10 +1332,13 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     deviceCounts,
     roads,
     tapers,
+    turnLanes,
     zones,
     arrows,
     texts,
     measures,
+    laneMasks,
+    crosswalks,
     hasAny,
     otherCount,
   } = useMemo(() => {
@@ -1223,10 +1346,13 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
     const nextDeviceCounts: Record<string, number> = {};
     let roadsCount = 0;
     let tapersCount = 0;
+    let turnLanesCount = 0;
     let zonesCount = 0;
     let arrowsCount = 0;
     let textsCount = 0;
     let measuresCount = 0;
+    let laneMasksCount = 0;
+    let crosswalksCount = 0;
 
     for (const obj of objects) {
       if (obj.type === "sign") {
@@ -1237,6 +1363,8 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         roadsCount++;
       } else if (obj.type === "taper") {
         tapersCount++;
+      } else if (obj.type === "turn_lane") {
+        turnLanesCount++;
       } else if (obj.type === "zone") {
         zonesCount++;
       } else if (obj.type === "arrow") {
@@ -1245,22 +1373,29 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
         textsCount++;
       } else if (obj.type === "measure") {
         measuresCount++;
+      } else if (obj.type === "lane_mask") {
+        laneMasksCount++;
+      } else if (obj.type === "crosswalk") {
+        crosswalksCount++;
       }
     }
 
     const hasAnyObjects = objects.length > 0;
     const otherCountTotal =
-      roadsCount + tapersCount + zonesCount + arrowsCount + textsCount + measuresCount;
+      roadsCount + tapersCount + turnLanesCount + zonesCount + arrowsCount + textsCount + measuresCount + laneMasksCount + crosswalksCount;
 
     return {
       signCounts: nextSignCounts,
       deviceCounts: nextDeviceCounts,
       roads: roadsCount,
       tapers: tapersCount,
+      turnLanes: turnLanesCount,
       zones: zonesCount,
       arrows: arrowsCount,
       texts: textsCount,
       measures: measuresCount,
+      laneMasks: laneMasksCount,
+      crosswalks: crosswalksCount,
       hasAny: hasAnyObjects,
       otherCount: otherCountTotal,
     };
@@ -1284,12 +1419,15 @@ function ManifestPanel({ objects }: { objects: CanvasObject[] }) {
       )}
       {otherCount > 0 && (
         <>{sectionTitle("Other")}
-          {roads   > 0 && <ManifestRow icon="━" label="Road segments" count={roads} />}
-          {tapers  > 0 && <ManifestRow icon="⋈" label="Tapers"        count={tapers} />}
-          {zones   > 0 && <ManifestRow icon="▨" label="Work zones"    count={zones} />}
-          {arrows  > 0 && <ManifestRow icon="→" label="Arrows"        count={arrows} />}
-          {texts   > 0 && <ManifestRow icon="T" label="Text labels"   count={texts} />}
-          {measures > 0 && <ManifestRow icon="📏" label="Measurements" count={measures} />}
+          {roads      > 0 && <ManifestRow icon="━"  label="Road segments" count={roads} />}
+          {tapers     > 0 && <ManifestRow icon="⋈"  label="Tapers"        count={tapers} />}
+          {turnLanes  > 0 && <ManifestRow icon="↰"  label="Turn Lanes"    count={turnLanes} />}
+          {laneMasks  > 0 && <ManifestRow icon="▧"  label="Lane Masks"    count={laneMasks} />}
+          {crosswalks > 0 && <ManifestRow icon="⊟"  label="Crosswalks"    count={crosswalks} />}
+          {zones      > 0 && <ManifestRow icon="▨"  label="Work zones"    count={zones} />}
+          {arrows     > 0 && <ManifestRow icon="→"  label="Arrows"        count={arrows} />}
+          {texts      > 0 && <ManifestRow icon="T"  label="Text labels"   count={texts} />}
+          {measures   > 0 && <ManifestRow icon="📏" label="Measurements"  count={measures} />}
         </>
       )}
       {hasAny && (
@@ -1372,7 +1510,7 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
   return (
     <div style={{ padding: 12 }}>
       <div style={{ fontSize: 11, color: COLORS.accent, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type} Properties
+        {obj.type === "polyline_road" ? "Polyline Road" : obj.type === "curve_road" ? "Quad Bézier Road" : obj.type === "cubic_bezier_road" ? "Cubic Bézier Road" : obj.type === "taper" ? "Taper" : obj.type === "lane_mask" ? "Lane Mask" : obj.type === "crosswalk" ? "Crosswalk" : obj.type === "turn_lane" ? "Turn Lane" : obj.type} Properties
       </div>
 
       {obj.type === "sign" && (
@@ -1459,6 +1597,57 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
         );
       })()}
 
+      {obj.type === "turn_lane" && (() => {
+        const tl = obj as TurnLaneObject;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {sectionTitle("Turn Lane")}
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>Side</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["right", "left"] as const).map((s) => (
+                <button key={s} onClick={() => onUpdate(tl.id, { side: s })}
+                  style={{ ...panelBtnStyle(tl.side === s), flex: 1, textTransform: "capitalize" }}>
+                  {s === "right" ? "Right" : "Left"}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>Turn Direction</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {([["left", "← Left"], ["thru", "↑ Thru"], ["right", "→ Right"]] as const).map(([dir, label]) => (
+                <button key={dir} onClick={() => onUpdate(tl.id, { turnDir: dir })}
+                  style={{ ...panelBtnStyle(tl.turnDir === dir), flex: 1, fontSize: 9 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Taper Length: {tl.taperLength}px
+              <input type="range" min={20} max={200} step={5} value={tl.taperLength}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { taperLength: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Run Length: {tl.runLength}px
+              <input type="range" min={40} max={300} step={5} value={tl.runLength}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { runLength: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Lane Width: {tl.laneWidth}px
+              <input type="range" min={10} max={50} step={1} value={tl.laneWidth}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { laneWidth: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Rotation: {tl.rotation}°
+              <input type="range" min={0} max={360} value={tl.rotation}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(tl.id, { rotation: +e.target.value })} />
+            </label>
+          </div>
+        );
+      })()}
+
       {obj.type === "text" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <input value={obj.text} onChange={(e) => onUpdate(obj.id, { text: e.target.value })}
@@ -1497,6 +1686,119 @@ function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planM
           </div>
         </div>
       )}
+
+      {/* ── Shoulder & Sidewalk (straight roads only) ───────────────── */}
+      {obj.type === "road" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {sectionTitle("Shoulder & Sidewalk")}
+          <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+            Shoulder Width: {obj.shoulderWidth ? `${obj.shoulderWidth}px` : 'None'}
+            <input type="range" min={0} max={30} step={1} value={obj.shoulderWidth ?? 0}
+              style={{ width: "100%", accentColor: COLORS.accent }}
+              onChange={(e) => onUpdate(obj.id, { shoulderWidth: +e.target.value })} />
+          </label>
+          <label style={{ fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 3 }}>
+            Sidewalk
+            <select
+              value={obj.sidewalkSide ?? 'none'}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'none') {
+                  onUpdate(obj.id, { sidewalkSide: undefined, sidewalkWidth: 0 });
+                } else {
+                  onUpdate(obj.id, { sidewalkSide: val, sidewalkWidth: obj.sidewalkWidth || 12 });
+                }
+              }}
+              style={{ background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11 }}
+            >
+              <option value="none">None</option>
+              <option value="both">Both sides</option>
+              <option value="left">Left only</option>
+              <option value="right">Right only</option>
+            </select>
+          </label>
+          {obj.sidewalkSide && (obj.sidewalkWidth ?? 0) > 0 && (
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Sidewalk Width: {obj.sidewalkWidth}px
+              <input type="range" min={8} max={24} step={1} value={obj.sidewalkWidth ?? 12}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(obj.id, { sidewalkWidth: +e.target.value })} />
+            </label>
+          )}
+        </div>
+      )}
+
+      {obj.type === "lane_mask" && (() => {
+        const m = obj as LaneMaskObject;
+        // Convert rgba/hex color to a #rrggbb hex value for the color picker
+        const colorToHex = (c: string): string => {
+          const m2 = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (m2) {
+            return "#" + [m2[1], m2[2], m2[3]].map(n => parseInt(n).toString(16).padStart(2, "0")).join("");
+          }
+          return c.startsWith("#") ? c.slice(0, 7) : "#ef4444";
+        };
+        const hexToRgba = (hex: string, alpha = 0.5): string => {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        };
+        // Extract alpha from current color
+        const alphaMatch = m.color.match(/rgba?\(\d+,\s*\d+,\s*\d+,\s*([\d.]+)\)/);
+        const currentAlpha = alphaMatch ? parseFloat(alphaMatch[1]) : 0.5;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Lane Width: {m.laneWidth}px
+              <input type="range" min={10} max={60} step={1} value={m.laneWidth}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(m.id, { laneWidth: +e.target.value })} />
+            </label>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 2 }}>Style</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["hatch", "solid"] as const).map((s) => (
+                <button key={s} onClick={() => onUpdate(m.id, { style: s })}
+                  style={{ ...panelBtnStyle(m.style === s), flex: 1, textTransform: "capitalize" }}>
+                  {s === "hatch" ? "▧ Hatch" : "█ Solid"}
+                </button>
+              ))}
+            </div>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Color
+              <input type="color" value={colorToHex(m.color)}
+                onChange={(e) => onUpdate(m.id, { color: hexToRgba(e.target.value, currentAlpha) })}
+                style={{ width: "100%", height: 24, cursor: "pointer", marginTop: 4 }} />
+            </label>
+          </div>
+        );
+      })()}
+
+      {obj.type === "crosswalk" && (() => {
+        const cw = obj as CrosswalkObject;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Depth: {cw.depth}px
+              <input type="range" min={10} max={60} step={1} value={cw.depth}
+                style={{ width: "100%", accentColor: COLORS.accent }}
+                onChange={(e) => onUpdate(cw.id, { depth: +e.target.value })} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Stripes: {cw.stripeCount}
+              <input type="number" min={3} max={12} step={1} value={cw.stripeCount}
+                style={{ width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, padding: "4px 6px", borderRadius: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", outline: "none" }}
+                onChange={(e) => { const v = parseInt(e.target.value); if (v >= 3 && v <= 12) onUpdate(cw.id, { stripeCount: v }); }} />
+            </label>
+            <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+              Stripe Color
+              <input type="color" value={cw.stripeColor}
+                onChange={(e) => onUpdate(cw.id, { stripeColor: e.target.value })}
+                style={{ width: "100%", height: 24, cursor: "pointer", marginTop: 4 }} />
+            </label>
+          </div>
+        );
+      })()}
 
       {/* ── Position inputs ────────────────────────────────────────── */}
       {isPointObject(obj) && (
@@ -1793,11 +2095,13 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const mapTileCacheRef = useRef<Record<string, MapTileEntry>>({});
 
   const [roadDrawMode, setRoadDrawMode] = useState("straight");
+  const [intersectionType, setIntersectionType] = useState<'t' | '4way'>('4way');
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
   const [curvePoints, setCurvePoints] = useState<Point[]>([]);
   const [cubicPoints, setCubicPoints] = useState<Point[]>([]);
   const [snapIndicator, setSnapIndicator] = useState<Point | null>(null);
   const [signSubTab, setSignSubTab] = useState("library");
+  const [signSearch, setSignSearch] = useState("");
   const [customSigns, setCustomSigns] = useState<SignData[]>(() => {
     try { return JSON.parse(localStorage.getItem("tcp_custom_signs") || "[]"); }
     catch { return []; }
@@ -2028,6 +2332,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             : calcTaperLength(o.speed, o.laneWidth, o.numLanes);
         const taperHitRadius = Math.max(30, Math.min(effectiveTaperLength * TAPER_SCALE / 2, 150));
         if (dist(wx, wy, o.x, o.y) < taperHitRadius) return o;
+      } else if (o.type === "turn_lane") {
+        // Hit within bounding radius (taper+run length / 2) capped to reasonable range
+        const totalLen = o.taperLength + o.runLength;
+        const hitRadius = Math.max(30, Math.min(totalLen / 2, 150));
+        if (dist(wx, wy, o.x, o.y) < hitRadius) return o;
       } else if (o.type === "sign" || o.type === "device" || o.type === "text") {
         if (dist(wx, wy, o.x, o.y) < 30) return o;
       }
@@ -2038,6 +2347,19 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         const d1 = dist(wx, wy, o.x1, o.y1), d2 = dist(wx, wy, o.x2, o.y2);
         const segLen = dist(o.x1, o.y1, o.x2, o.y2);
         if (d1 + d2 < segLen + effectiveHalfWidth(o)) return o;
+      }
+      if (o.type === "lane_mask") {
+        const d1 = dist(wx, wy, o.x1, o.y1), d2 = dist(wx, wy, o.x2, o.y2);
+        const segLen = dist(o.x1, o.y1, o.x2, o.y2);
+        if (d1 + d2 < segLen + o.laneWidth / 2 + 6) return o;
+      }
+      if (o.type === "crosswalk") {
+        // Distance from click to the crosswalk center axis (x1y1→x2y2)
+        const cwDx = o.x2 - o.x1, cwDy = o.y2 - o.y1;
+        const cwLenSq = cwDx * cwDx + cwDy * cwDy;
+        const cwT = cwLenSq === 0 ? 0 : Math.max(0, Math.min(1, ((wx - o.x1) * cwDx + (wy - o.y1) * cwDy) / cwLenSq));
+        const cwCx = o.x1 + cwT * cwDx, cwCy = o.y1 + cwT * cwDy;
+        if (dist(wx, wy, cwCx, cwCy) < o.depth / 2 + 5) return o;
       }
       if (o.type === "polyline_road" && o.points?.length >= 2) {
         if (distToPolyline(wx, wy, o.points) < effectiveHalfWidth(o)) return o;
@@ -2141,6 +2463,13 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       return;
     }
 
+    if (tool === "turn_lane") {
+      const newTL: TurnLaneObject = { id: uid(), type: "turn_lane", x: raw.x, y: raw.y, rotation: 0, laneWidth: 20, taperLength: 80, runLength: 100, side: 'right', turnDir: 'right' };
+      const newObjs = [...objects, newTL];
+      setObjects(newObjs); pushHistory(newObjs); setSelected(newTL.id);
+      return;
+    }
+
     if (tool === "text") {
       const textVal = prompt("Enter text label:");
       if (textVal) {
@@ -2202,16 +2531,24 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       }
     }
 
-    if (["zone", "arrow", "measure"].includes(tool)) {
+    if (tool === "intersection") {
+      const roads = createIntersectionRoads(x, y, intersectionType, selectedRoadType);
+      const newObjs = [...objects, ...roads];
+      setObjects(newObjs); pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
+      track('road_drawn', { road_type: selectedRoadType.id, draw_mode: intersectionType === '4way' ? 'intersection_4way' : 'intersection_t' });
+      return;
+    }
+
+    if (["zone", "arrow", "measure", "lane_mask", "crosswalk"].includes(tool)) {
       setDrawStart({ x: raw.x, y: raw.y });
     }
-  }, [tool, roadDrawMode, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
+  }, [tool, roadDrawMode, intersectionType, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     const raw = toWorld();
     setCursorPos(raw);
 
-    if (tool === "road" && snapEnabled) {
+    if ((tool === "road" || tool === "intersection") && snapEnabled) {
       const { x, y, snapped } = snapToEndpoint(raw.x, raw.y, objects, SNAP_RADIUS, zoom);
       setSnapIndicator(snapped ? { x, y } : null);
     } else {
@@ -2287,7 +2624,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       return;
     }
 
-    if (drawStart && ["zone", "arrow", "measure"].includes(tool)) {
+    if (drawStart && ["zone", "arrow", "measure", "lane_mask", "crosswalk"].includes(tool)) {
       const { x, y } = toWorld();
       const d = dist(drawStart.x, drawStart.y, x, y);
       if (d < 5) { setDrawStart(null); return; }
@@ -2300,6 +2637,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         newObj = { id: uid(), type: "arrow", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, color: "#fff" };
       } else if (tool === "measure") {
         newObj = { id: uid(), type: "measure", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y };
+      } else if (tool === "lane_mask") {
+        newObj = { id: uid(), type: "lane_mask", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, laneWidth: 20, color: "rgba(239,68,68,0.5)", style: "hatch" };
+      } else if (tool === "crosswalk") {
+        newObj = { id: uid(), type: "crosswalk", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, depth: 24, stripeCount: 6, stripeColor: "#ffffff" };
       }
 
       if (newObj) {
@@ -2421,7 +2762,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const handleCloudSave = async () => {
-    if (!userId) return;
+    if (!userId || cloudSaveStatus === 'Saving…') return;
     setCloudSaveStatus('Saving…');
     try {
       const objectCount = objects.length;
@@ -2579,6 +2920,22 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
   // suppress mapRenderTick lint warning — used to trigger re-render when tiles load
   void mapRenderTick;
+
+  // Pre-compute sign search results so JSX stays readable
+  const signSearchResults: { sign: SignData; catLabel: string; catColor: string }[] = (() => {
+    const q = signSearch.trim()
+    if (!q) return []
+    const nq = normalizeForSearch(q)
+    const builtIn = Object.entries(SIGN_CATEGORIES).flatMap(([, cat]) =>
+      cat.signs
+        .filter(s => normalizeForSearch(s.label).includes(nq) || (s.mutcd && normalizeForSearch(s.mutcd).includes(nq)))
+        .map(s => ({ sign: s, catLabel: cat.label, catColor: cat.color }))
+    )
+    const custom = customSigns
+      .filter(s => normalizeForSearch(s.label).includes(nq))
+      .map(s => ({ sign: s, catLabel: "Custom", catColor: COLORS.textMuted }))
+    return [...builtIn, ...custom]
+  })()
 
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
@@ -2748,6 +3105,43 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {signSubTab === "library" && (
                   <>
+                    {/* Search input */}
+                    <input
+                      type="text"
+                      aria-label="Search signs by name or MUTCD code"
+                      placeholder="Search by name or MUTCD code…"
+                      value={signSearch}
+                      onChange={e => setSignSearch(e.target.value)}
+                      style={{ width: "100%", boxSizing: "border-box", marginBottom: 8, padding: "5px 8px", fontSize: 11, background: "rgba(255,255,255,0.05)", border: `1px solid ${COLORS.panelBorder}`, borderRadius: 4, color: COLORS.text, outline: "none" }}
+                    />
+
+                    {signSearch.trim() ? (
+                      /* ── Search results ── */
+                      <>
+                        {signSearchResults.length === 0 ? (
+                          <div style={{ fontSize: 11, color: COLORS.textDim, textAlign: "center", padding: "16px 0" }}>No signs found</div>
+                        ) : (
+                          <>
+                            {sectionTitle(`${signSearchResults.length} result${signSearchResults.length !== 1 ? "s" : ""}`)}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+                              {signSearchResults.map(({ sign, catLabel, catColor }) => (
+                                <button key={sign.id} onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                                  style={{ padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                                  <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : sign.shape === "diamond" ? 0 : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none", transform: sign.shape === "diamond" ? "rotate(45deg)" : "none" }}>
+                                    <span style={{ transform: sign.shape === "diamond" ? "rotate(-45deg)" : "none", fontSize: 8 }}>{sign.label.slice(0, 3)}</span>
+                                  </div>
+                                  <span style={{ fontSize: 8, color: COLORS.textMuted, textAlign: "center" }}>{sign.label}</span>
+                                  {sign.mutcd && <span style={{ fontSize: 7, color: catColor, opacity: 0.8 }}>{sign.mutcd}</span>}
+                                  <span style={{ fontSize: 7, color: COLORS.textDim }}>{catLabel}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      /* ── Browse by category ── */
+                      <>
                     {sectionTitle("Sign Category")}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
                       {Object.entries(SIGN_CATEGORIES).map(([key, cat]) => (
@@ -2770,6 +3164,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                         </button>
                       ))}
                     </div>
+                      </>
+                    )}
                     {customSigns.length > 0 && (
                       <>
                         {sectionTitle("My Custom Signs")}
@@ -2800,10 +3196,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {signSubTab === "editor" && (
                   <SignEditorPanel
-                    onUseSign={(signData) => {
-                      setSelectedSign(signData);
-                      switchTool("sign");
-                    }}
+                    onSignChange={setSelectedSign}
+                    onUseSign={() => switchTool("sign")}
                     onSaveToLibrary={(signData) => {
                       const existing = customSigns.find((s) =>
                         s.label === signData.label && s.shape === signData.shape &&
@@ -2875,13 +3269,37 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   ))}
                 </div>
 
+                {sectionTitle("Turn Lane")}
+                <button
+                  onClick={() => switchTool("turn_lane")}
+                  style={{ width: "100%", padding: "10px 12px", background: tool === "turn_lane" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: tool === "turn_lane" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: tool === "turn_lane" ? COLORS.accent : COLORS.textMuted, fontSize: 11 }}>
+                  <span style={{ fontSize: 16 }}>↰</span>
+                  <span>Place Turn Lane</span>
+                </button>
+
+                {sectionTitle("Intersection Templates")}
+                <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                  {([
+                    { id: 't' as const, label: 'T-Junction', icon: '⊤' },
+                    { id: '4way' as const, label: '4-Way', icon: '✛' },
+                  ]).map((itype) => (
+                    <button key={itype.id}
+                      onClick={() => { setIntersectionType(itype.id); switchTool("intersection"); }}
+                      style={{ flex: 1, padding: "8px 4px", fontSize: 9, background: intersectionType === itype.id && tool === "intersection" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: `1px solid ${intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.panelBorder}`, color: intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.textMuted, borderRadius: 5, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                      <span style={{ fontSize: 16 }}>{itype.icon}</span>
+                      <span>{itype.label}</span>
+                    </button>
+                  ))}
+                </div>
+
                 <div style={{ marginTop: 12, padding: 8, background: "rgba(245,158,11,0.05)", borderRadius: 6, border: `1px solid rgba(245,158,11,0.1)` }}>
                   <div style={{ fontSize: 9, color: COLORS.accent }}>
-                    {roadDrawMode === "straight" && "Click and drag to draw a straight road."}
-                    {roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
-                    {roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
-                    {roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
-                    {roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
+                    {tool === "intersection" && `Click canvas to stamp a ${intersectionType === '4way' ? '4-way' : 'T-junction'} intersection using the selected road type.`}
+                    {tool !== "intersection" && roadDrawMode === "straight" && "Click and drag to draw a straight road."}
+                    {tool !== "intersection" && roadDrawMode === "poly" && "Click to add points. Double-click or Enter to finish. Esc to cancel."}
+                    {tool !== "intersection" && roadDrawMode === "smooth" && "Click to add points. Road curves smoothly through them. Double-click or Enter to finish."}
+                    {tool !== "intersection" && roadDrawMode === "curve" && "Click: start → control point → end. Esc to cancel."}
+                    {tool !== "intersection" && roadDrawMode === "cubic" && "Click: start → cp1 → cp2 → end. Drag handles to reshape. Esc to cancel."}
                   </div>
                 </div>
               </>
@@ -2975,10 +3393,19 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   Cubic: {cubicPoints.length === 1 ? "click cp1" : cubicPoints.length === 2 ? "click cp2" : "click end"} · Esc cancel
                 </span>
               )}
+              {tool === "lane_mask" && !drawStart && (
+                <span style={{ color: COLORS.danger }}>Click and drag to draw a lane closure mask</span>
+              )}
+              {tool === "crosswalk" && !drawStart && (
+                <span style={{ color: COLORS.info }}>Click and drag across a road to place a crosswalk</span>
+              )}
+              {tool === "turn_lane" && (
+                <span style={{ color: COLORS.info }}>Click to place a turn lane</span>
+              )}
               <span data-testid="object-count">{objects.length} objects</span>
-              <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : ""}</span>
+              <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
               <span>{showGrid ? "Grid ON" : "Grid OFF"}</span>
-              <span>{snapEnabled ? "Snap: endpoint" : "Snap OFF"}</span>
+              <span>{snapEnabled ? "Snap: segment" : "Snap OFF"}</span>
               {autosaveError
                 ? <span style={{ color: COLORS.danger }} title={`Auto-save failed: ${autosaveError}`}>⚠ Save failed</span>
                 : <span style={{ color: COLORS.success }} title="Auto-saved to browser storage">● Auto-saved</span>
@@ -3028,7 +3455,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   <div key={obj.id} onClick={() => setSelected(obj.id)}
                     style={{ padding: "5px 8px", borderRadius: 4, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, background: selected === obj.id ? COLORS.accentDim : "transparent", color: selected === obj.id ? COLORS.accent : COLORS.textMuted, border: selected === obj.id ? `1px solid rgba(245,158,11,0.2)` : "1px solid transparent" }}>
                     <span style={{ fontSize: 12 }}>
-                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : "📏"}
+                      {obj.type === "road" ? "━" : obj.type === "polyline_road" ? "⌇" : obj.type === "curve_road" ? "⌒" : obj.type === "cubic_bezier_road" ? "⌣" : obj.type === "sign" ? "⬡" : obj.type === "device" ? "▲" : obj.type === "zone" ? "▨" : obj.type === "arrow" ? "→" : obj.type === "text" ? "T" : obj.type === "taper" ? "⋈" : obj.type === "lane_mask" ? "▧" : obj.type === "crosswalk" ? "⊟" : obj.type === "turn_lane" ? "↰" : "📏"}
                     </span>
                     <span>
                       {obj.type === "sign" ? obj.signData.label :
@@ -3039,6 +3466,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                        obj.type === "curve_road" ? "quad road" :
                        obj.type === "cubic_bezier_road" ? "cubic road" :
                        obj.type === "taper" ? `taper ${obj.speed}mph` :
+                       obj.type === "lane_mask" ? "lane mask" :
+                       obj.type === "crosswalk" ? "crosswalk" :
+                       obj.type === "turn_lane" ? `turn lane (${obj.turnDir})` :
                        obj.type}
                     </span>
                   </div>

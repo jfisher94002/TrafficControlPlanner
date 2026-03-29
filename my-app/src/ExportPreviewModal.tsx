@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import type { PlanMeta } from './types'
 import type { QCIssue } from './qcRules'
 
@@ -83,6 +83,8 @@ export default function ExportPreviewModal({
   canvasDataUrl, planTitle, planMeta, planCreatedAt, qcIssues, onConfirm, onClose,
 }: ExportPreviewModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   useEffect(() => { modalRef.current?.focus() }, [])
 
   const dateStr = (() => {
@@ -96,7 +98,7 @@ export default function ExportPreviewModal({
   const visibleIssues = qcIssues.filter(i => i.severity !== 'info')
 
   return (
-    <div data-testid="export-preview-overlay" style={S.overlay} onClick={onClose}>
+    <div data-testid="export-preview-overlay" style={S.overlay} onClick={isExporting ? undefined : onClose}>
       <div
         data-testid="export-preview-modal"
         ref={modalRef}
@@ -106,7 +108,7 @@ export default function ExportPreviewModal({
         aria-labelledby="export-preview-title"
         tabIndex={-1}
         onClick={e => e.stopPropagation()}
-        onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }}
+        onKeyDown={e => { if (e.key === 'Escape' && !isExporting) { e.stopPropagation(); onClose() } }}
       >
         <div style={S.header}>
           <span id="export-preview-title" style={S.title}>↓ PDF EXPORT PREVIEW</span>
@@ -173,18 +175,35 @@ export default function ExportPreviewModal({
         </div>
 
         <div style={S.footer}>
-          {errors.length > 0 && (
+          {exportError && (
+            <span style={{ fontSize: 10, color: '#ef4444', marginRight: 'auto' }}>
+              Export failed: {exportError}
+            </span>
+          )}
+          {!exportError && errors.length > 0 && (
             <span style={{ fontSize: 10, color: '#ef4444', marginRight: 'auto' }}>
               Plan has errors — review QC before exporting
             </span>
           )}
-          <button style={S.cancelBtn} onClick={onClose}>Cancel</button>
+          <button style={{ ...S.cancelBtn, opacity: isExporting ? 0.4 : 1, cursor: isExporting ? 'not-allowed' : 'pointer' }} disabled={isExporting} onClick={onClose}>Cancel</button>
           <button
             data-testid="export-preview-confirm"
-            style={S.exportBtn}
-            onClick={async () => { await onConfirm(); onClose() }}
+            style={{ ...S.exportBtn, opacity: isExporting ? 0.6 : 1, cursor: isExporting ? 'not-allowed' : 'pointer' }}
+            disabled={isExporting}
+            onClick={async () => {
+              setExportError(null)
+              setIsExporting(true)
+              try {
+                await onConfirm()
+                onClose()
+              } catch (e) {
+                setExportError(e instanceof Error ? e.message : 'Unknown error')
+              } finally {
+                setIsExporting(false)
+              }
+            }}
           >
-            Export PDF
+            {isExporting ? 'Exporting…' : 'Export PDF'}
           </button>
         </div>
       </div>

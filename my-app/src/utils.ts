@@ -1,7 +1,7 @@
 import type {
   CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
-  SignObject, DeviceObject, ZoneObject, TextObject, TaperObject,
-  StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject,
+  SignObject, DeviceObject, ZoneObject, TextObject, TaperObject, TurnLaneObject,
+  StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject, LaneMaskObject, CrosswalkObject,
 } from './types'
 
 // ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
@@ -28,17 +28,17 @@ export function cloneObject(obj: CanvasObject, dx = 20, dy = 20): CanvasObject {
 
 // ─── TYPE GUARDS ──────────────────────────────────────────────────────────────
 
-/** Objects with a single x/y position (sign, device, zone, text, taper). */
+/** Objects with a single x/y position (sign, device, zone, text, taper, turn_lane). */
 export const isPointObject = (
   o: CanvasObject,
-): o is SignObject | DeviceObject | ZoneObject | TextObject | TaperObject =>
-  o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text' || o.type === 'taper'
+): o is SignObject | DeviceObject | ZoneObject | TextObject | TaperObject | TurnLaneObject =>
+  o.type === 'sign' || o.type === 'device' || o.type === 'zone' || o.type === 'text' || o.type === 'taper' || o.type === 'turn_lane'
 
-/** Objects with x1/y1–x2/y2 endpoints (straight road, arrow, measure). */
+/** Objects with x1/y1–x2/y2 endpoints (straight road, arrow, measure, lane_mask, crosswalk). */
 export const isLineObject = (
   o: CanvasObject,
-): o is StraightRoadObject | ArrowObject | MeasureObject =>
-  o.type === 'road' || o.type === 'arrow' || o.type === 'measure'
+): o is StraightRoadObject | ArrowObject | MeasureObject | LaneMaskObject | CrosswalkObject =>
+  o.type === 'road' || o.type === 'arrow' || o.type === 'measure' || o.type === 'lane_mask' || o.type === 'crosswalk'
 
 /** Any road type (straight, polyline, curve, cubic). */
 export const isRoad = (
@@ -91,6 +91,18 @@ export function geoRoadWidthPx(
   return Math.max(10, road.realWidth / metersPerPixel)
 }
 
+function distSq(ax: number, ay: number, bx: number, by: number): number {
+  return (bx - ax) ** 2 + (by - ay) ** 2
+}
+
+function closestPointOnSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): Point {
+  const dx = bx - ax, dy = by - ay
+  const lenSq = dx * dx + dy * dy
+  if (lenSq === 0) return { x: ax, y: ay }
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq))
+  return { x: ax + t * dx, y: ay + t * dy }
+}
+
 export function snapToEndpoint(
   wx: number,
   wy: number,
@@ -99,25 +111,41 @@ export function snapToEndpoint(
   zoom: number,
 ): SnapResult {
   const t = thresholdScreenPx / zoom
+  const tSq = t * t
+  // Pass 1: endpoints have priority — snap to them first (squared distance, no sqrt)
   for (const obj of objects) {
     if (obj.type === 'road') {
-      for (const ep of [
-        { x: obj.x1, y: obj.y1 },
-        { x: obj.x2, y: obj.y2 },
-      ]) {
-        if (dist(wx, wy, ep.x, ep.y) < t) return { x: ep.x, y: ep.y, snapped: true }
+      for (const ep of [{ x: obj.x1, y: obj.y1 }, { x: obj.x2, y: obj.y2 }]) {
+        if (distSq(wx, wy, ep.x, ep.y) < tSq) return { x: ep.x, y: ep.y, snapped: true }
       }
     }
     if (
       (obj.type === 'polyline_road' || obj.type === 'curve_road' || obj.type === 'cubic_bezier_road') &&
       obj.points?.length
     ) {
-      const eps = [obj.points[0], obj.points[obj.points.length - 1]]
-      for (const ep of eps) {
-        if (dist(wx, wy, ep.x, ep.y) < t) return { x: ep.x, y: ep.y, snapped: true }
+      for (const ep of [obj.points[0], obj.points[obj.points.length - 1]]) {
+        if (distSq(wx, wy, ep.x, ep.y) < tSq) return { x: ep.x, y: ep.y, snapped: true }
       }
     }
   }
+  // Pass 2: snap to closest point on any straight/polyline road segment
+  let bestDistSq = tSq
+  let bestPt: Point | null = null
+  for (const obj of objects) {
+    if (obj.type === 'road') {
+      const cp = closestPointOnSegment(wx, wy, obj.x1, obj.y1, obj.x2, obj.y2)
+      const d2 = distSq(wx, wy, cp.x, cp.y)
+      if (d2 < bestDistSq) { bestDistSq = d2; bestPt = cp }
+    }
+    if (obj.type === 'polyline_road' && obj.points?.length >= 2) {
+      for (let i = 0; i < obj.points.length - 1; i++) {
+        const cp = closestPointOnSegment(wx, wy, obj.points[i].x, obj.points[i].y, obj.points[i+1].x, obj.points[i+1].y)
+        const d2 = distSq(wx, wy, cp.x, cp.y)
+        if (d2 < bestDistSq) { bestDistSq = d2; bestPt = cp }
+      }
+    }
+  }
+  if (bestPt) return { ...bestPt, snapped: true }
   return { x: wx, y: wy, snapped: false }
 }
 

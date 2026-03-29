@@ -1,0 +1,16 @@
+priority: critical  #B60205
+Priority
+Blocking a release. Drop everything.
+PDF export crashes on large plans — blocking Alpha
+priority: high  #D93F0B
+Priority
+Should be in the next session or two
+Sign manifest count is off by one
+priority: medium  #FBCA04
+Priority
+Important but not blocking anything
+Snapping is inconsistent near map edges
+priority: low  #0E8A16
+Priority
+Nice to fix but can wait
+Dark theme color slightly off on modal

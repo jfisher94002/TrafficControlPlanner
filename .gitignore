@@ -32,3 +32,6 @@ my-app/dist/
 *.docx
 *.pdf
 tcp_app_architecture_handoff.md
+
+# SAM build artifacts
+backend/.aws-sam/

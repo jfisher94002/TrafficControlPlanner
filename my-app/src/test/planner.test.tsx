@@ -1057,6 +1057,30 @@ describe('Analytics — canvas events', () => {
     }))
   })
 
+  it('stamping a 4-way intersection fires road_drawn with draw_mode intersection_4way', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /4-Way/i }))
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      draw_mode: 'intersection_4way',
+      road_type: expect.any(String),
+    }))
+  })
+
+  it('stamping a T-junction intersection fires road_drawn with draw_mode intersection_t', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /T-Junction/i }))
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      draw_mode: 'intersection_t',
+      road_type: expect.any(String),
+    }))
+  })
+
   it('opening a plan from the dashboard fires plan_loaded_cloud', async () => {
     const trackSpy = vi.spyOn(analytics, 'track')
     vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([

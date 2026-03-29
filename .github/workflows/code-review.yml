@@ -31,3 +31,32 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: my-app
+
+  version-check:
+    name: Version bump check
+    runs-on: ubuntu-latest
+    if: "${{ startsWith(github.event.pull_request.title, 'chore: release') }}"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify package.json version was bumped
+        run: |
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          BASE=$(git show "${BASE_SHA}:my-app/package.json" | jq -r .version)
+          HEAD=$(jq -r .version my-app/package.json)
+          if [ "$BASE" = "$HEAD" ]; then
+            echo "ERROR: package.json version was not bumped (still $HEAD)"
+            exit 1
+          fi
+          echo "Version bump: $BASE → $HEAD"
+
+      - name: Verify CHANGELOG.md entry exists
+        run: |
+          VERSION=$(jq -r .version my-app/package.json)
+          if ! grep -q "\[$VERSION\]" CHANGELOG.md; then
+            echo "ERROR: No CHANGELOG.md entry found for v$VERSION"
+            exit 1
+          fi
+          echo "CHANGELOG entry found for v$VERSION"

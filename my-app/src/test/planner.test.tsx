@@ -1110,6 +1110,7 @@ describe('Analytics — canvas events', () => {
     const confirmBtn = await screen.findByTestId('export-preview-confirm')
     await user.click(confirmBtn)
     expect(trackSpy).toHaveBeenCalledWith('plan_exported_pdf', expect.any(Object))
+    vi.unstubAllGlobals()
   })
 })
 
@@ -1165,6 +1166,7 @@ describe('Session analytics', () => {
     fireEvent(window, new Event('beforeunload'))
     const call = trackSpy.mock.calls.find(([event]) => event === 'app_session_ended')
     expect(call?.[1]).toMatchObject({ pdf_exported: true })
+    vi.unstubAllGlobals()
   })
 })
 
@@ -1510,6 +1512,14 @@ describe('Help Modal', () => {
     fireEvent.keyDown(window, { key: '?' })
     expect(screen.getByTestId('help-modal')).toBeInTheDocument()
     fireEvent.keyDown(window, { key: '?' })
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+  })
+
+  it('clicking the backdrop closes the help modal', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+    await user.click(screen.getByTestId('help-modal'))
     expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
   })
 

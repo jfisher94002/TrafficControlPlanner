@@ -1089,8 +1089,6 @@ const KEYBOARD_SHORTCUTS: { key: string; description: string }[] = [
   { key: "Ctrl+C", description: "Copy selected object" },
   { key: "Ctrl+V", description: "Paste copied object" },
   { key: "Del / Bksp", description: "Delete selected object" },
-  { key: "G", description: "Toggle grid" },
-  { key: "Esc", description: "Cancel in-progress draw / deselect" },
   { key: "Enter / DblClick", description: "Finish polyline" },
 ];
 
@@ -1112,7 +1110,7 @@ function HelpModal({ onClose }: HelpModalProps) {
         onClick={(e) => e.stopPropagation()}
         style={{
           background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`,
-          borderRadius: 10, width: 680, maxHeight: "80vh", overflow: "hidden",
+          borderRadius: 10, width: "min(680px, 100vw - 32px)", maxHeight: "80vh", overflow: "hidden",
           display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
         }}
       >
@@ -3549,11 +3547,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               {tool === "road" && !drawStart && !polyInProgress && !curveInProgress && !cubicInProgress && (
                 <span style={{ color: COLORS.textMuted }}>
                   {roadDrawMode === "straight" && "Click and drag to draw a road"}
-                  {roadDrawMode === "polyline" && "Click to start a polyline road · Enter/DblClick to finish"}
+                  {roadDrawMode === "poly" && "Click to start a polyline road · Enter/DblClick to finish"}
+                  {roadDrawMode === "smooth" && "Click to add smooth road points · Enter/DblClick to finish"}
                   {roadDrawMode === "curve" && "Click start, then control point, then end"}
                   {roadDrawMode === "cubic" && "Click start, cp1, cp2, end"}
-                  {roadDrawMode === "intersection" && "Click to stamp an intersection"}
                 </span>
+              )}
+              {tool === "intersection" && (
+                <span style={{ color: COLORS.textMuted }}>Click to stamp an intersection</span>
               )}
               {tool === "sign" && (
                 <span style={{ color: COLORS.textMuted }}>Click to place the selected sign</span>

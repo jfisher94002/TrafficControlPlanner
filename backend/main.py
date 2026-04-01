@@ -71,12 +71,17 @@ def create_issue(payload: CreateIssueRequest):
     if not token:
         raise HTTPException(status_code=503, detail="Issue creation is not configured on this server.")
 
+    def _md_escape(s: str) -> str:
+        """Strip newlines and escape markdown special characters."""
+        s = s.replace("\r", "").replace("\n", " ")
+        return s.replace("\\", "\\\\").replace("`", "\\`").replace("*", "\\*").replace("_", "\\_").replace("[", "\\[").replace("]", "\\]")
+
     priority_label = f"{_PRIORITY_EMOJI[payload.priority]} {payload.priority.capitalize()}"
-    submitter_line = payload.submitter_name
+    submitter_line = _md_escape(payload.submitter_name)
     if payload.submitter_email:
-        submitter_line += f" ({payload.submitter_email})"
+        submitter_line += f" ({_md_escape(payload.submitter_email)})"
     if payload.submitter_id:
-        submitter_line += f" — user ID: `{payload.submitter_id}`"
+        submitter_line += f" — user ID: `{_md_escape(payload.submitter_id)}`"
     issue_body = (
         f"## {payload.issue_type.capitalize()} Report\n\n"
         f"**Submitted by:** {submitter_line}\n"

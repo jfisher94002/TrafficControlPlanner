@@ -1097,19 +1097,34 @@ function HelpModal({ onClose }: HelpModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  // Auto-focus the close button on open; restore focus to the trigger on close
+  // Auto-focus the close button on open; restore focus to the trigger on close.
+  // We also focus the backdrop itself (tabIndex=-1) so that if the button focus
+  // doesn't stick (e.g. headless Chrome timing), Escape still has a target inside
+  // the modal.
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
+    // Focus close button first; fall back to backdrop so the modal always holds focus
     closeRef.current?.focus();
+    if (document.activeElement !== closeRef.current) {
+      backdropRef.current?.focus();
+    }
     return () => { prev?.focus(); };
   }, []);
 
-  // Esc closes; Tab/Shift+Tab are trapped inside the dialog
+  // Esc closes (listened on document so it fires regardless of where focus is);
+  // Tab/Shift+Tab are trapped inside the dialog via the backdrop listener.
+  useEffect(() => {
+    const onDocKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+    };
+    document.addEventListener('keydown', onDocKeyDown, true); // capture phase
+    return () => document.removeEventListener('keydown', onDocKeyDown, true);
+  }, [onClose]);
+
   useEffect(() => {
     const el = backdropRef.current;
     if (!el) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
       if (e.key === 'Tab') {
         const focusable = Array.from(
           el.querySelectorAll<HTMLElement>(
@@ -1137,6 +1152,7 @@ function HelpModal({ onClose }: HelpModalProps) {
       aria-modal="true"
       aria-label="Help"
       data-testid="help-modal"
+      tabIndex={-1}
       onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 9000,

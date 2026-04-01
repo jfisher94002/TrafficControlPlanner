@@ -65,6 +65,9 @@ _PRIORITY_EMOJI = {"low": "🟢", "medium": "🟡", "high": "🟠", "critical": 
 
 @app.post("/create-issue")
 def create_issue(payload: CreateIssueRequest):
+    if not payload.submitter_id:
+        raise HTTPException(status_code=403, detail="Forbidden: must submit from the app.")
+
     token = os.getenv("GITHUB_TOKEN", "")
     repo = os.getenv("GITHUB_REPO", "jfisher94002/TrafficControlPlanner")
 

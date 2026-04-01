@@ -58,6 +58,7 @@ def test_create_issue_returns_503_when_token_missing(monkeypatch):
         "body": "Test body",
         "priority": "medium",
         "submitter_name": "Tester",
+        "submitter_id": "user-123",
     })
     assert res.status_code == 503
 
@@ -71,6 +72,18 @@ def test_create_issue_validates_input():
         "submitter_name": "x",
     })
     assert res.status_code == 422
+
+
+def test_create_issue_missing_submitter_id_returns_403():
+    """Requests without a submitter_id (i.e. not coming through the app) are rejected."""
+    res = client.post("/create-issue", json={
+        "issue_type": "bug",
+        "title": "Test",
+        "body": "Test body",
+        "priority": "medium",
+        "submitter_name": "Tester",
+    })
+    assert res.status_code == 403
 
 
 # ─── Security / Input Sanitization Tests ─────────────────────────────────────
@@ -246,6 +259,7 @@ def test_create_issue_fields_at_limit_accepted(monkeypatch):
         "body": "B" * 5000,
         "priority": "medium",
         "submitter_name": "S" * 100,
+        "submitter_id": "user-123",
     })
     assert res.status_code == 503  # validation passed; fails only on missing token
 
@@ -266,6 +280,7 @@ def test_md_escape_strips_newlines(monkeypatch):
             "priority": "medium",
             "submitter_name": "Line1\nLine2",
             "submitter_email": "evil\r\nhdr@x.com",
+            "submitter_id": "user-123",
         })
     assert res.status_code == 200
     call_args = mock_open.call_args[0][0]
@@ -292,6 +307,7 @@ def test_md_escape_escapes_markdown_special_chars(monkeypatch):
             "priority": "medium",
             "submitter_name": "[Injection](http://evil.com)",
             "submitter_email": "test@example.com",
+            "submitter_id": "user-123",
         })
     assert res.status_code == 200
     call_args = mock_open.call_args[0][0]

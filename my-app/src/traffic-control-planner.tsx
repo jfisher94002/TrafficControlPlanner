@@ -1094,8 +1094,45 @@ const KEYBOARD_SHORTCUTS: { key: string; description: string }[] = [
 
 interface HelpModalProps { onClose: () => void; }
 function HelpModal({ onClose }: HelpModalProps) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Auto-focus the close button on open; restore focus to the trigger on close
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    return () => { prev?.focus(); };
+  }, []);
+
+  // Esc closes; Tab/Shift+Tab are trapped inside the dialog
+  useEffect(() => {
+    const el = backdropRef.current;
+    if (!el) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Tab') {
+        const focusable = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    };
+    el.addEventListener('keydown', onKeyDown);
+    return () => el.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   return (
     <div
+      ref={backdropRef}
       role="dialog"
       aria-modal="true"
       aria-label="Help"
@@ -1118,6 +1155,7 @@ function HelpModal({ onClose }: HelpModalProps) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${COLORS.panelBorder}` }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, fontFamily: "'JetBrains Mono', monospace" }}>Help — Keyboard Shortcuts &amp; Tool Guide</span>
           <button
+            ref={closeRef}
             onClick={onClose}
             data-testid="help-modal-close"
             style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}

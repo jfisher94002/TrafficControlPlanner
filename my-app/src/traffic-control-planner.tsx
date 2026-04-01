@@ -3136,7 +3136,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
       {/* ─── TOP BAR ─── */}
       <div style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
-        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 320px", minWidth: 0, overflow: "hidden" }}>
           <a href="/" data-testid="home-link" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }} title="Back to home">
             <span style={{ fontSize: 20, color: COLORS.accent }}>◆</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, letterSpacing: 1 }}>TCP</span>
@@ -3172,7 +3172,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             const qs = params.toString();
             window.open(`/feedback.html${qs ? `?${qs}` : ''}`, '_blank', 'noopener,noreferrer');
           }} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
-          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap" }} title="Email support">{CONTACT_EMAIL}</a>
+          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }} title="Email support">{CONTACT_EMAIL}</a>
           {onSignOut && (<>
             {(userEmail || userId) && (
               <span data-testid="user-identity" style={{ fontSize: 10, color: COLORS.textMuted, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={userEmail ?? userId ?? ''}>
@@ -3183,7 +3183,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           </>)}
         </div>
 
-        <div style={{ position: "relative", flex: "0 1 420px" }}>
+        <div style={{ position: "relative", flex: "0 1 300px" }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input
               value={searchQuery}

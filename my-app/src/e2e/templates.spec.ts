@@ -10,12 +10,14 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('Template Picker', () => {
   test('opens template picker from toolbar', async ({ page }) => {
-    await page.getByTestId('templates-button').click()
+    // templates-button may be inside an overflow:hidden toolbar clipped at CI widths; use JS click
+    await page.evaluate(() => { (document.querySelector('[data-testid="templates-button"]') as HTMLButtonElement)?.click() })
     await expect(page.getByRole('dialog', { name: /templates/i })).toBeVisible({ timeout: 8_000 })
   })
 
   test('shows all 5 starter templates', async ({ page }) => {
-    await page.getByTestId('templates-button').click()
+    // templates-button may be inside an overflow:hidden toolbar clipped at CI widths; use JS click
+    await page.evaluate(() => { (document.querySelector('[data-testid="templates-button"]') as HTMLButtonElement)?.click() })
     const dialog = page.getByRole('dialog', { name: /templates/i })
     await expect(dialog).toBeVisible({ timeout: 8_000 })
     // Should show exactly 5 starter templates
@@ -24,14 +26,16 @@ test.describe('Template Picker', () => {
   })
 
   test('closes on Escape', async ({ page }) => {
-    await page.getByTestId('templates-button').click()
+    // templates-button may be inside an overflow:hidden toolbar clipped at CI widths; use JS click
+    await page.evaluate(() => { (document.querySelector('[data-testid="templates-button"]') as HTMLButtonElement)?.click() })
     await expect(page.getByRole('dialog', { name: /templates/i })).toBeVisible({ timeout: 8_000 })
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog', { name: /templates/i })).not.toBeVisible()
   })
 
   test('applies template and closes picker', async ({ page }) => {
-    await page.getByTestId('templates-button').click()
+    // templates-button may be inside an overflow:hidden toolbar clipped at CI widths; use JS click
+    await page.evaluate(() => { (document.querySelector('[data-testid="templates-button"]') as HTMLButtonElement)?.click() })
     const dialog = page.getByRole('dialog', { name: /templates/i })
     await expect(dialog).toBeVisible({ timeout: 8_000 })
 

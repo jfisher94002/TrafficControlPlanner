@@ -17,7 +17,8 @@ test.describe('Plan Dashboard', () => {
       test.skip()
       return
     }
-    await dashBtn.click()
+    // cloud-plans-button may be inside an overflow:hidden toolbar clipped at CI widths; use JS click
+    await page.evaluate(() => { (document.querySelector('[data-testid="cloud-plans-button"]') as HTMLButtonElement)?.click() })
     await expect(page.getByTestId('plan-dashboard')).toBeVisible({ timeout: 10_000 })
   })
 

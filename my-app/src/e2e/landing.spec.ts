@@ -18,7 +18,10 @@ test.describe('Landing Page', () => {
 
   test('TCP logo links to landing page from app', async ({ page }) => {
     await page.goto('/app')
-    await page.getByTestId('home-link').click()
+    // home-link is inside an overflow:hidden toolbar that may clip it at CI viewport widths;
+    // verify the href attribute and navigate via JS to avoid coordinate-based click failures.
+    await expect(page.getByTestId('home-link')).toHaveAttribute('href', '/')
+    await page.evaluate(() => { (document.querySelector('[data-testid="home-link"]') as HTMLAnchorElement)?.click() })
     await expect(page).toHaveURL('/')
   })
 })

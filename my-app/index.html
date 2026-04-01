@@ -528,7 +528,7 @@
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#who">Who it's for</a>
-      <a href="mailto:jfisher@fisherconsulting.org">Contact</a><!-- keep in sync with VITE_CONTACT_EMAIL -->
+      <a href="mailto:jfisher@fisherconsulting.org" id="contact-btn" onclick="showContactModal(event)">Contact</a><!-- keep in sync with VITE_CONTACT_EMAIL -->
       <a href="/app" class="nav-cta">Try Pre-Beta Free</a>
     </div>
   </nav>
@@ -714,10 +714,71 @@
   <footer class="footer">
     <span>TCP Plan Pro · <a href="/app">tcpplanpro.com</a></span>
     <div class="footer-right">
-      <a href="mailto:jfisher@fisherconsulting.org">jfisher@fisherconsulting.org</a>
+      <a href="mailto:jfisher@fisherconsulting.org" onclick="showContactModal(event)" id="footer-contact-link">jfisher@fisherconsulting.org</a>
       <span>Pre-Beta © 2026</span>
     </div>
   </footer>
 
+  <!-- CONTACT MODAL -->
+  <div id="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,0.5);align-items:center;justify-content:center;" onclick="hideContactModal(event)">
+    <div style="background:#fff;border-radius:12px;padding:2rem;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+        <span id="contact-modal-title" style="font-weight:600;font-size:16px;color:#0F172A;">Contact us</span>
+        <button id="contact-modal-close" onclick="hideContactModal()" aria-label="Close contact dialog" style="background:none;border:none;cursor:pointer;font-size:20px;color:#94A3B8;line-height:1;">&times;</button>
+      </div>
+      <p style="font-size:14px;color:#475569;margin-bottom:1.25rem;">Send us an email at the address below — we read every message.</p>
+      <div style="display:flex;align-items:center;gap:8px;background:#F1F5F9;border-radius:8px;padding:10px 14px;">
+        <span id="contact-email-text" style="flex:1;font-size:14px;color:#0F172A;font-family:'DM Mono',monospace;"></span>
+        <button id="copy-btn" onclick="copyContactEmail()" style="background:#1A6EFF;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">Copy</button>
+      </div>
+      <a id="contact-mailto-link" href="#" style="display:block;text-align:center;margin-top:1rem;background:#0F172A;color:#fff;border-radius:8px;padding:10px;font-size:14px;font-weight:500;">Open in email client</a>
+    </div>
+  </div>
+
+  <script>
+    var CONTACT_EMAIL = 'jfisher@fisherconsulting.org'; // keep in sync with VITE_CONTACT_EMAIL
+
+    // Populate modal fields from single source of truth
+    document.getElementById('contact-email-text').textContent = CONTACT_EMAIL;
+    document.getElementById('contact-mailto-link').href = 'mailto:' + CONTACT_EMAIL;
+
+    function showContactModal(e) {
+      e.preventDefault();
+      var m = document.getElementById('contact-modal');
+      m.style.display = 'flex';
+      document.getElementById('contact-modal-close').focus();
+    }
+    function hideContactModal(e) {
+      if (e && e.target !== document.getElementById('contact-modal')) return;
+      document.getElementById('contact-modal').style.display = 'none';
+    }
+    function copyContactEmail() {
+      var btn = document.getElementById('copy-btn');
+      function showSuccess() {
+        btn.textContent = 'Copied!'; btn.style.background = '#16a34a';
+        setTimeout(function() { btn.textContent = 'Copy'; btn.style.background = '#1A6EFF'; }, 2000);
+      }
+      function showFailure() {
+        btn.textContent = 'Copy failed'; btn.style.background = '#dc2626';
+        setTimeout(function() { btn.textContent = 'Copy'; btn.style.background = '#1A6EFF'; }, 2000);
+      }
+      function fallbackCopy() {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = CONTACT_EMAIL;
+          ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+          document.body.appendChild(ta); ta.focus(); ta.select();
+          var ok = document.execCommand && document.execCommand('copy');
+          document.body.removeChild(ta);
+          ok ? showSuccess() : showFailure();
+        } catch(_) { showFailure(); }
+      }
+      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(CONTACT_EMAIL).then(showSuccess).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+    }
+  </script>
 </body>
 </html>

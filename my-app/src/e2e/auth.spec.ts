@@ -3,6 +3,8 @@
  * Covers sign-up, sign-in, sign-out, and regression cases for #147/#148.
  */
 import { test, expect } from '@playwright/test'
+import { writeFileSync } from 'fs'
+import { join } from 'path'
 
 const E2E_EMAIL    = process.env.E2E_TEST_EMAIL    ?? 'e2e-test@tcplanpro.com'
 const E2E_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'E2eTestPass2026!'
@@ -71,6 +73,8 @@ test.describe('Create Account', () => {
     await page.getByRole('button', { name: 'Create Account' }).click()
     // Should reach the confirmation code step
     await expect(page.getByText(/confirmation code/i)).toBeVisible({ timeout: 15_000 })
+    // Record the created email so the CI cleanup step can delete it from Cognito
+    writeFileSync(join(process.cwd(), '.e2e-created-user'), unique)
   })
 })
 

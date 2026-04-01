@@ -2790,7 +2790,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     const newMeta = (data.metadata as PlanMeta | undefined) ?? { projectNumber: '', client: '', location: '', notes: '' };
     const newOffset = (data.canvasOffset as Point | undefined) ?? { x: 0, y: 0 };
     const newZoom = typeof data.canvasZoom === 'number' ? data.canvasZoom : 1;
-    const newMapCenter = (data.mapCenter as MapCenter | null | undefined) ?? null;
+    const rawMC = data.mapCenter as { lat: number; lng: number; zoom: number } | null | undefined;
+    const newMapCenter: MapCenter | null = rawMC ? { lat: rawMC.lat, lon: rawMC.lng, zoom: rawMC.zoom } : null;
     setPlanId(newId);
     setPlanTitle(newTitle);
     setPlanCreatedAt(newCreatedAt);

@@ -2323,7 +2323,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       console.warn("[TCP] Auto-save failed:", msg);
       setAutosaveError(msg);
     }
-  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset, mapCenter]);
+  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset, mapCenter, userId]);
 
   // Passive wheel listener to prevent page scroll
   useEffect(() => {

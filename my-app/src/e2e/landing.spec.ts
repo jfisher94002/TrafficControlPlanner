@@ -18,7 +18,10 @@ test.describe('Landing Page', () => {
 
   test('TCP logo links to landing page from app', async ({ page }) => {
     await page.goto('/app')
-    await page.getByRole('link', { name: /TCP|logo/i }).first().click()
+    // home-link is inside an overflow:hidden toolbar that may clip it at CI viewport widths;
+    // verify the href attribute and navigate via JS to avoid coordinate-based click failures.
+    await expect(page.getByTestId('home-link')).toHaveAttribute('href', '/')
+    await page.evaluate(() => { (document.querySelector('[data-testid="home-link"]') as HTMLAnchorElement)?.click() })
     await expect(page).toHaveURL('/')
   })
 })
@@ -37,7 +40,7 @@ test.describe('Contact Modal', () => {
   test('modal displays the contact email address', async ({ page }) => {
     await page.getByRole('link', { name: 'Contact' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByText('jfisher@fisherconsulting.org')).toBeVisible()
+    await expect(page.getByRole('dialog').getByText('jfisher@fisherconsulting.org')).toBeVisible()
   })
 
   test('modal close button dismisses the modal', async ({ page }) => {

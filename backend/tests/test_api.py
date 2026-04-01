@@ -250,6 +250,57 @@ def test_create_issue_fields_at_limit_accepted(monkeypatch):
     assert res.status_code == 503  # validation passed; fails only on missing token
 
 
+# ─── _md_escape — submitter field sanitization ───────────────────────────────
+
+def test_md_escape_strips_newlines(monkeypatch):
+    """Newlines in submitter fields must not break the GitHub issue body."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_resp.read.return_value = b'{"number": 1, "html_url": "https://github.com/x"}'
+    with patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
+        res = client.post("/create-issue", json={
+            "issue_type": "bug", "title": "t", "body": "b",
+            "priority": "medium",
+            "submitter_name": "Line1\nLine2",
+            "submitter_email": "evil\r\nhdr@x.com",
+        })
+    assert res.status_code == 200
+    call_args = mock_open.call_args[0][0]
+    import json as _json
+    body_sent = _json.loads(call_args.data)["body"]
+    # Injected newlines must be stripped from the submitter fields
+    assert "Line1\nLine2" not in body_sent
+    assert "evil\r\nhdr" not in body_sent
+    # Content should still appear (without the injected newlines)
+    assert "Line1 Line2" in body_sent
+
+
+def test_md_escape_escapes_markdown_special_chars(monkeypatch):
+    """Markdown special characters in submitter fields must be escaped."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_resp.read.return_value = b'{"number": 1, "html_url": "https://github.com/x"}'
+    with patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
+        res = client.post("/create-issue", json={
+            "issue_type": "bug", "title": "t", "body": "b",
+            "priority": "medium",
+            "submitter_name": "[Injection](http://evil.com)",
+            "submitter_email": "test@example.com",
+        })
+    assert res.status_code == 200
+    call_args = mock_open.call_args[0][0]
+    import json as _json
+    body_sent = _json.loads(call_args.data)["body"]
+    assert "[Injection](http://evil.com)" not in body_sent
+    assert "\\[Injection\\]" in body_sent
+
+
 # ─── Model-level sanitization unit tests ─────────────────────────────────────
 
 def test_pdf_sanitize_plan_meta_fields():

@@ -2201,7 +2201,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchStatus, setSearchStatus] = useState("");
-  const [mapCenter, setMapCenter] = useState<MapCenter | null>(null);
+  const [mapCenter, setMapCenter] = useState<MapCenter | null>(() => {
+    const raw = initialAutosave?.mapCenter as { lat: number; lng?: number; lon?: number; zoom: number } | null | undefined;
+    const lon = raw?.lng ?? raw?.lon;
+    return raw != null && lon != null ? { lat: raw.lat, lon, zoom: raw.zoom } : null;
+  });
   const [mapRenderTick, setMapRenderTick] = useState(0);
   const mapTileCacheRef = useRef<Record<string, MapTileEntry>>({});
 
@@ -2311,6 +2315,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         userId: userId,
         canvasOffset: offset, canvasZoom: zoom,
         canvasState: { objects }, metadata: planMeta,
+        mapCenter,
       }));
       setAutosaveError(null);
     } catch (err) {
@@ -2318,7 +2323,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       console.warn("[TCP] Auto-save failed:", msg);
       setAutosaveError(msg);
     }
-  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset]);
+  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset, mapCenter]);
 
   // Passive wheel listener to prevent page scroll
   useEffect(() => {
@@ -2926,8 +2931,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     const newMeta = (data.metadata as PlanMeta | undefined) ?? { projectNumber: '', client: '', location: '', notes: '' };
     const newOffset = (data.canvasOffset as Point | undefined) ?? { x: 0, y: 0 };
     const newZoom = typeof data.canvasZoom === 'number' ? data.canvasZoom : 1;
-    const rawMC = data.mapCenter as { lat: number; lng: number; zoom: number } | null | undefined;
-    const newMapCenter: MapCenter | null = rawMC ? { lat: rawMC.lat, lon: rawMC.lng, zoom: rawMC.zoom } : null;
+    const rawMC = data.mapCenter as { lat: number; lng?: number; lon?: number; zoom: number } | null | undefined;
+    const rawLon = rawMC?.lng ?? rawMC?.lon;
+    const newMapCenter: MapCenter | null = rawMC != null && rawLon != null ? { lat: rawMC.lat, lon: rawLon, zoom: rawMC.zoom } : null;
     setPlanId(newId);
     setPlanTitle(newTitle);
     setPlanCreatedAt(newCreatedAt);

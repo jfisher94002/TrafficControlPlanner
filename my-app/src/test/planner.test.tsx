@@ -984,6 +984,98 @@ describe('Cloud Save / Load', () => {
   })
 })
 
+// ─── Map tiles / mapCenter ────────────────────────────────────────────────────
+describe('Map tiles — mapCenter persistence', () => {
+  it('mapCenter is restored from autosave on remount', () => {
+    localStorage.setItem('tcp_autosave', JSON.stringify({
+      canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lon: -122.4194, zoom: 14 },
+    }))
+    setup()
+    // After mount, autosave should be written back with mapCenter preserved
+    const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+    expect(saved.mapCenter).toMatchObject({ lat: 37.7749, lon: -122.4194, zoom: 14 })
+  })
+
+  it('mapCenter with legacy lng field is restored correctly from autosave', () => {
+    localStorage.setItem('tcp_autosave', JSON.stringify({
+      canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 14 },
+    }))
+    setup()
+    const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+    // After restoration the internal format uses lon; autosave should reflect that
+    expect(saved.mapCenter).toMatchObject({ lat: 37.7749, zoom: 14 })
+    expect(saved.mapCenter.lon ?? saved.mapCenter.lng).toBe(-122.4194)
+  })
+
+  it('loading a cloud plan with lng field sets mapCenter correctly', async () => {
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([
+      { path: 'plans/u/p.json', planId: 'plan-1', name: 'Geo Plan', lastModified: '2026-01-01T00:00:00.000Z', size: 100 },
+    ])
+    vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue({
+      id: 'plan-1', name: 'Geo Plan', canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 14 },
+    })
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    await user.click(await screen.findByTestId('dashboard-open-btn'))
+    await waitFor(() => expect(screen.queryByTestId('plan-dashboard')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('plan-title')).toHaveValue('Geo Plan'))
+    // mapCenter should be written to autosave with lon (not undefined)
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+      expect(saved.mapCenter?.lon ?? saved.mapCenter?.lng).toBe(-122.4194)
+    })
+  })
+
+  it('loading a cloud plan with lon field (cloud-to-cloud) sets mapCenter correctly', async () => {
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([
+      { path: 'plans/u/p.json', planId: 'plan-1', name: 'Geo Plan', lastModified: '2026-01-01T00:00:00.000Z', size: 100 },
+    ])
+    vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue({
+      id: 'plan-1', name: 'Geo Plan', canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lon: -122.4194, zoom: 14 },
+    })
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    await user.click(await screen.findByTestId('dashboard-open-btn'))
+    await waitFor(() => expect(screen.queryByTestId('plan-dashboard')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('plan-title')).toHaveValue('Geo Plan'))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+      expect(saved.mapCenter?.lon ?? saved.mapCenter?.lng).toBe(-122.4194)
+    })
+  })
+})
+
+// ─── Status bar road mode hints ───────────────────────────────────────────────
+describe('Status bar road mode hints', () => {
+  it('shows polyline hint when road tool is active with poly mode', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /Polyline/i }))
+    expect(screen.getByText(/polyline road/i)).toBeInTheDocument()
+  })
+
+  it('shows smooth hint when road tool is active with smooth mode', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /Smooth/i }))
+    expect(screen.getByText(/smooth road/i)).toBeInTheDocument()
+  })
+
+  it('shows intersection hint when intersection tool is active', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    // Switch to intersection tool via a 4-Way button
+    await user.click(screen.getByRole('button', { name: /4-Way/i }))
+    expect(screen.getByText(/stamp an intersection/i)).toBeInTheDocument()
+  })
+})
+
 // ─── Analytics — canvas events ────────────────────────────────────────────────
 describe('Analytics — canvas events', () => {
   it('placing a sign fires sign_placed with sign_id and sign_source', () => {

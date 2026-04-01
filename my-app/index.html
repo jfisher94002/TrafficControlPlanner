@@ -528,7 +528,7 @@
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#who">Who it's for</a>
-      <a href="mailto:jfisher@fisherconsulting.org">Contact</a><!-- keep in sync with VITE_CONTACT_EMAIL -->
+      <a href="mailto:jfisher@fisherconsulting.org" id="contact-btn" onclick="showContactModal(event)">Contact</a><!-- keep in sync with VITE_CONTACT_EMAIL -->
       <a href="/app" class="nav-cta">Try Pre-Beta Free</a>
     </div>
   </nav>
@@ -719,5 +719,40 @@
     </div>
   </footer>
 
+  <!-- CONTACT MODAL -->
+  <div id="contact-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,0.5);align-items:center;justify-content:center;" onclick="hideContactModal(event)">
+    <div style="background:#fff;border-radius:12px;padding:2rem;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+        <span style="font-weight:600;font-size:16px;color:#0F172A;">Contact us</span>
+        <button onclick="hideContactModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:#94A3B8;line-height:1;">&times;</button>
+      </div>
+      <p style="font-size:14px;color:#475569;margin-bottom:1.25rem;">Send us an email at the address below — we read every message.</p>
+      <div style="display:flex;align-items:center;gap:8px;background:#F1F5F9;border-radius:8px;padding:10px 14px;">
+        <span id="contact-email-text" style="flex:1;font-size:14px;color:#0F172A;font-family:'DM Mono',monospace;">jfisher@fisherconsulting.org</span>
+        <button id="copy-btn" onclick="copyContactEmail()" style="background:#1A6EFF;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">Copy</button>
+      </div>
+      <a href="mailto:jfisher@fisherconsulting.org" style="display:block;text-align:center;margin-top:1rem;background:#0F172A;color:#fff;border-radius:8px;padding:10px;font-size:14px;font-weight:500;">Open in email client</a>
+    </div>
+  </div>
+
+  <script>
+    function showContactModal(e) {
+      e.preventDefault();
+      var m = document.getElementById('contact-modal');
+      m.style.display = 'flex';
+    }
+    function hideContactModal(e) {
+      if (e && e.target !== document.getElementById('contact-modal')) return;
+      document.getElementById('contact-modal').style.display = 'none';
+    }
+    function copyContactEmail() {
+      navigator.clipboard.writeText('jfisher@fisherconsulting.org').then(function() {
+        var btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        btn.style.background = '#16a34a';
+        setTimeout(function() { btn.textContent = 'Copy'; btn.style.background = '#1A6EFF'; }, 2000);
+      });
+    }
+  </script>
 </body>
 </html>

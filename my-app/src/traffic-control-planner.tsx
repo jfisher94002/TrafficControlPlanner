@@ -2251,8 +2251,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAddressRequired, setShowAddressRequired] = useState(false);
   const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -2407,11 +2409,15 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   }, [history, historyIndex]);
 
   const switchTool = useCallback((newTool: string) => {
+    if (!mapCenter && newTool !== 'select' && newTool !== 'pan') {
+      setShowAddressRequired(true);
+      return;
+    }
     setTool(newTool);
     setPolyPoints([]);
     setCurvePoints([]);
     setCubicPoints([]);
-  }, []);
+  }, [mapCenter]);
 
   const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest" | "qc") => {
     const tabs: Array<"properties" | "manifest" | "qc"> = ["properties", "manifest", "qc"];
@@ -3140,7 +3146,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-      <style>{`@keyframes tcp-pdf-pulse { 0%,100%{box-shadow:0 0 0 3px rgba(26,110,255,0.35)} 50%{box-shadow:0 0 0 6px rgba(26,110,255,0.0)} }`}</style>
+      <style>{`@keyframes tcp-pdf-pulse { 0%,100%{box-shadow:0 0 0 3px rgba(26,110,255,0.35)} 50%{box-shadow:0 0 0 6px rgba(26,110,255,0.0)} } @keyframes tcp-addr-pulse { 0%,100%{border-color:rgba(245,158,11,0.6)} 50%{border-color:rgba(245,158,11,1)} }`}</style>
 
       {/* ─── PRE-BETA BANNER ─── */}
       {!bannerDismissed && (
@@ -3220,11 +3226,13 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         <div style={{ position: "relative", flex: "0 1 300px" }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input
+              ref={searchInputRef}
+              data-testid="address-search-input"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setSearchStatus(""); }}
               onKeyDown={(e) => e.key === "Enter" && doAddressSearch()}
-              placeholder="Search address…"
-              style={{ flex: 1, padding: "5px 10px", fontSize: 11, background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, borderRadius: 5, fontFamily: "inherit", outline: "none" }}
+              placeholder={mapCenter ? "Search address…" : "Enter job site address to load the map"}
+              style={{ flex: 1, padding: "5px 10px", fontSize: 11, background: COLORS.bg, border: `1px solid ${mapCenter ? COLORS.panelBorder : "rgba(245,158,11,0.6)"}`, color: COLORS.text, borderRadius: 5, fontFamily: "inherit", outline: "none", animation: mapCenter ? "none" : "tcp-addr-pulse 1.5s ease-in-out infinite" }}
             />
             <button onClick={doAddressSearch} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)", whiteSpace: "nowrap" }}>
               {searchLoading ? "…" : "🔍 Go"}
@@ -3592,6 +3600,42 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
           <NorthArrow visible={showNorthArrow} />
           <LegendBox objects={objects} visible={showLegend} />
+
+          {/* Blank canvas overlay — shown until user enters an address */}
+          {!mapCenter && (
+            <div data-testid="blank-canvas-overlay" style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", gap: 12 }}>
+              <div style={{ fontSize: 48, opacity: 0.25 }}>📍</div>
+              <div style={{ fontSize: 15, color: COLORS.textMuted, opacity: 0.6, textAlign: "center", lineHeight: 1.5 }}>
+                Enter a job site address in the toolbar above<br />to load the map
+              </div>
+            </div>
+          )}
+
+          {/* Address-required modal — shown when user clicks a drawing tool without an address */}
+          {showAddressRequired && (
+            <div data-testid="address-required-modal" role="dialog" aria-modal="true" aria-label="Address required" onClick={() => setShowAddressRequired(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 10, padding: "28px 32px", maxWidth: 340, width: "90%", textAlign: "center", boxShadow: "0 12px 48px rgba(0,0,0,0.6)" }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📍</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.text, marginBottom: 8 }}>Address Required</div>
+                <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 20, lineHeight: 1.6 }}>
+                  Enter a job site address to load the map before drawing.
+                </div>
+                <button
+                  data-testid="address-required-go-button"
+                  onClick={() => { setShowAddressRequired(false); searchInputRef.current?.focus(); searchInputRef.current?.select(); }}
+                  style={{ background: COLORS.accent, color: "#111", border: "none", borderRadius: 6, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Enter address →
+                </button>
+                <button
+                  onClick={() => setShowAddressRequired(false)}
+                  style={{ display: "block", margin: "10px auto 0", background: "transparent", border: "none", color: COLORS.textDim, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Status bar */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>

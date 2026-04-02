@@ -8,6 +8,8 @@ import * as analytics from '../analytics'
 
 beforeEach(() => {
   localStorage.clear()
+  // Seed a mapCenter so drawing tools are not blocked by the address guard in any test
+  localStorage.setItem('tcp_autosave', JSON.stringify({ mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 15 } }))
   vi.restoreAllMocks()
 })
 

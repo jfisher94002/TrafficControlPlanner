@@ -2256,6 +2256,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const addrModalGoRef = useRef<HTMLButtonElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddressRequired, setShowAddressRequired] = useState(false);
@@ -2439,14 +2440,28 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     }
   }, []);
 
-  // Dismiss address-required modal on Escape
+  // Address-required modal: auto-focus, focus trap, Escape, and focus restore
   useEffect(() => {
     if (!showAddressRequired) return;
+    const prev = document.activeElement as HTMLElement | null;
+    addrModalGoRef.current?.focus();
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); setShowAddressRequired(false); }
+      if (e.key === 'Escape') { e.preventDefault(); setShowAddressRequired(false); return; }
+      if (e.key === 'Tab') {
+        const modal = addrModalGoRef.current?.closest('[data-testid="address-required-modal"]');
+        if (!modal) return;
+        const focusable = Array.from(modal.querySelectorAll<HTMLElement>('button,input,[tabindex]:not([tabindex="-1"])'));
+        if (!focusable.length) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     };
     document.addEventListener('keydown', handler, true);
-    return () => document.removeEventListener('keydown', handler, true);
+    return () => {
+      document.removeEventListener('keydown', handler, true);
+      prev?.focus();
+    };
   }, [showAddressRequired]);
 
   // Keyboard shortcuts
@@ -3635,6 +3650,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   Enter a job site address to load the map before drawing.
                 </div>
                 <button
+                  ref={addrModalGoRef}
                   data-testid="address-required-go-button"
                   onClick={() => { setShowAddressRequired(false); searchInputRef.current?.focus(); searchInputRef.current?.select(); }}
                   style={{ background: COLORS.accent, color: "#111", border: "none", borderRadius: 6, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}

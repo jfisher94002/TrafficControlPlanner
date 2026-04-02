@@ -2,22 +2,24 @@
  * Address UX E2E tests — blank canvas state, tool-blocking modal.
  * Runs with stored auth state.
  */
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/app')
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 })
 
+/** Click a drawing tool via JS to bypass overflow:hidden clipping. */
+async function clickTool(page: Page, testId: string) {
+  await page.evaluate((tid) => {
+    (document.querySelector(`[data-testid="${tid}"]`) as HTMLElement | null)?.click()
+  }, testId)
+}
+
 test.describe('Blank canvas state (no address)', () => {
   test('shows blank canvas overlay when no address is set', async ({ page }) => {
-    // On a fresh session, mapCenter may already be set from autosave — skip if so
     const overlay = page.getByTestId('blank-canvas-overlay')
-    const isVisible = await overlay.isVisible()
-    if (!isVisible) {
-      // Canvas already has an address loaded — skip gracefully
-      test.skip()
-    }
+    if (!(await overlay.isVisible())) test.skip()
     await expect(overlay).toBeVisible()
   })
 
@@ -25,7 +27,6 @@ test.describe('Blank canvas state (no address)', () => {
     const input = page.getByTestId('address-search-input')
     await expect(input).toBeVisible()
     const placeholder = await input.getAttribute('placeholder')
-    // Either the prominent placeholder (no address) or the default (address loaded)
     expect(
       placeholder === 'Enter job site address to load the map' || placeholder === 'Search address…'
     ).toBe(true)
@@ -34,107 +35,42 @@ test.describe('Blank canvas state (no address)', () => {
 
 test.describe('Address-required modal', () => {
   test('shows modal when drawing tool clicked without address', async ({ page }) => {
-    // Only meaningful when mapCenter is null
-    const overlay = page.getByTestId('blank-canvas-overlay')
-    if (!(await overlay.isVisible())) {
-      test.skip()
-    }
-
-    // Click the Road tool via JS (may be in overflow)
-    await page.evaluate(() => {
-      const btn = Array.from(document.querySelectorAll('[data-testid]')).find(
-        (el) => el.getAttribute('title')?.toLowerCase().includes('road')
-      ) as HTMLButtonElement | undefined
-      btn?.click()
-    })
-
-    // Try all TOOLS buttons — at least one drawing tool should trigger the modal
-    // Use switchTool pathway: click any ToolButton that is not select/pan
-    // The quickest reliable way is to click a ToolButton by its title attribute
-    // Fall back: look for any button with title containing 'Road' or use direct evaluate
-    await page.evaluate(() => {
-      // Find a ToolButton for a drawing tool and click it
-      const buttons = Array.from(document.querySelectorAll('button[title]')) as HTMLButtonElement[]
-      const drawBtn = buttons.find((b) => {
-        const t = b.title.toLowerCase()
-        return t.includes('road') || t.includes('sign') || t.includes('zone')
-      })
-      drawBtn?.click()
-    })
-
+    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
+    await clickTool(page, 'tool-road')
     await expect(page.getByTestId('address-required-modal')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('modal "Enter address →" button focuses address input', async ({ page }) => {
-    const overlay = page.getByTestId('blank-canvas-overlay')
-    if (!(await overlay.isVisible())) {
-      test.skip()
-    }
+  test('auto-focuses primary button on open', async ({ page }) => {
+    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
+    await clickTool(page, 'tool-sign')
+    await expect(page.getByTestId('address-required-modal')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByTestId('address-required-go-button')).toBeFocused()
+  })
 
-    // Trigger modal
-    await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button[title]')) as HTMLButtonElement[]
-      const drawBtn = buttons.find((b) => {
-        const t = b.title.toLowerCase()
-        return t.includes('road') || t.includes('sign') || t.includes('zone')
-      })
-      drawBtn?.click()
-    })
-
+  test('"Enter address →" button focuses address input', async ({ page }) => {
+    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
+    await clickTool(page, 'tool-road')
     const modal = page.getByTestId('address-required-modal')
     await expect(modal).toBeVisible({ timeout: 5_000 })
-
     await modal.getByTestId('address-required-go-button').click()
-
-    // Modal should close
     await expect(modal).not.toBeVisible()
-
-    // Address input should be focused
-    const input = page.getByTestId('address-search-input')
-    await expect(input).toBeFocused()
+    await expect(page.getByTestId('address-search-input')).toBeFocused()
   })
 
-  test('modal closes on Escape', async ({ page }) => {
-    const overlay = page.getByTestId('blank-canvas-overlay')
-    if (!(await overlay.isVisible())) {
-      test.skip()
-    }
-
-    await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button[title]')) as HTMLButtonElement[]
-      const drawBtn = buttons.find((b) => {
-        const t = b.title.toLowerCase()
-        return t.includes('road') || t.includes('sign') || t.includes('zone')
-      })
-      drawBtn?.click()
-    })
-
+  test('closes on Escape', async ({ page }) => {
+    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
+    await clickTool(page, 'tool-road')
     const modal = page.getByTestId('address-required-modal')
     await expect(modal).toBeVisible({ timeout: 5_000 })
-
     await page.keyboard.press('Escape')
-    await expect(modal).not.toBeVisible()
+    await expect(modal).not.toBeVisible({ timeout: 2_000 })
   })
 
-  test('modal closes on backdrop click', async ({ page }) => {
-    const overlay = page.getByTestId('blank-canvas-overlay')
-    if (!(await overlay.isVisible())) {
-      test.skip()
-    }
-
-    await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button[title]')) as HTMLButtonElement[]
-      const drawBtn = buttons.find((b) => {
-        const t = b.title.toLowerCase()
-        return t.includes('road') || t.includes('sign') || t.includes('zone')
-      })
-      drawBtn?.click()
-    })
-
+  test('closes on backdrop click', async ({ page }) => {
+    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
+    await clickTool(page, 'tool-road')
     const modal = page.getByTestId('address-required-modal')
     await expect(modal).toBeVisible({ timeout: 5_000 })
-
-    // Click the backdrop (the outermost div of the modal)
     await modal.click({ position: { x: 5, y: 5 } })
     await expect(modal).not.toBeVisible()
   })

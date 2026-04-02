@@ -3642,10 +3642,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
           {/* Address-required modal — shown when user clicks a drawing tool without an address */}
           {showAddressRequired && (
-            <div data-testid="address-required-modal" role="dialog" aria-modal="true" aria-label="Address required" onClick={() => setShowAddressRequired(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+            <div data-testid="address-required-modal" role="dialog" aria-modal="true" aria-labelledby="addr-modal-title" onClick={() => setShowAddressRequired(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
               <div onClick={(e) => e.stopPropagation()} style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 10, padding: "28px 32px", maxWidth: 340, width: "90%", textAlign: "center", boxShadow: "0 12px 48px rgba(0,0,0,0.6)" }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>📍</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.text, marginBottom: 8 }}>Address Required</div>
+                <div id="addr-modal-title" style={{ fontSize: 15, fontWeight: 600, color: COLORS.text, marginBottom: 8 }}>Address Required</div>
                 <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 20, lineHeight: 1.6 }}>
                   Enter a job site address to load the map before drawing.
                 </div>

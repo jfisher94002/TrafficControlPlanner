@@ -45,93 +45,7 @@
     z-index: 0;
   }
 
-  /* ─── PASSWORD GATE ─────────────────────────────────────── */
-
-  #gate {
-    position: fixed; inset: 0;
-    background: var(--dark);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100;
-  }
-
-  #gate.hidden { display: none; }
-
-  .gate-card {
-    background: var(--dark-2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 40px 36px;
-    width: 100%; max-width: 380px;
-    animation: fadeUp 0.4s ease both;
-  }
-
-  .gate-logo-row {
-    display: flex; align-items: center; gap: 10px;
-    margin-bottom: 28px;
-  }
-
-  .gate-logo-icon {
-    width: 36px; height: 36px;
-    background: var(--orange); border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 800; font-size: 15px; color: white; letter-spacing: -1px;
-  }
-
-  .gate-logo-text {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700; font-size: 18px; color: var(--text);
-  }
-  .gate-logo-text span { color: var(--orange); }
-
-  .gate-card h2 {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 26px; font-weight: 800; margin-bottom: 6px;
-  }
-
-  .gate-card p {
-    color: var(--text-muted); font-size: 13px; margin-bottom: 24px; line-height: 1.5;
-  }
-
-  .gate-field label {
-    display: block; font-size: 11px; font-weight: 600;
-    letter-spacing: 0.8px; text-transform: uppercase;
-    color: var(--text-muted); margin-bottom: 8px;
-    font-family: 'Barlow Condensed', sans-serif;
-  }
-
-  .gate-field input {
-    width: 100%; background: var(--dark-3);
-    border: 1px solid var(--border); border-radius: 8px;
-    color: var(--text); font-family: 'Barlow', sans-serif;
-    font-size: 14px; padding: 12px 14px;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    outline: none; -webkit-appearance: none;
-    margin-bottom: 16px;
-  }
-  .gate-field input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-glow); }
-  .gate-field input::placeholder { color: #555; }
-
-  .gate-btn {
-    width: 100%; background: var(--orange); color: white;
-    border: none; border-radius: 8px; padding: 13px 24px;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 16px; font-weight: 700; letter-spacing: 0.5px;
-    cursor: pointer; transition: all 0.15s ease;
-  }
-  .gate-btn:hover { background: var(--orange-dark); }
-
-  .gate-error {
-    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
-    border-radius: 6px; padding: 10px 14px;
-    font-size: 13px; color: #FCA5A5; margin-top: 14px; display: none;
-  }
-  .gate-error.visible { display: block; }
-
   /* ─── MAIN CONTENT ──────────────────────────────────────── */
-
-  #main { display: none; }
-  #main.visible { display: block; }
 
   .container {
     max-width: 680px;
@@ -180,7 +94,7 @@
 
   .subtitle { color: var(--text-muted); font-size: 15px; line-height: 1.6; }
 
-  .auth-notice {
+  .user-notice {
     background: var(--dark-3);
     border: 1px solid var(--border);
     border-left: 3px solid var(--orange);
@@ -191,7 +105,7 @@
     animation: fadeDown 0.5s 0.1s ease both;
   }
 
-  .auth-notice .badge {
+  .user-notice .badge {
     background: var(--orange); color: white;
     font-size: 10px; font-weight: 700; padding: 2px 7px;
     border-radius: 3px; white-space: nowrap;
@@ -240,6 +154,8 @@
   }
   input:focus, textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-glow); }
   input::placeholder, textarea::placeholder { color: #555; }
+  input[readonly] { opacity: 0.6; cursor: default; }
+  input[readonly]:focus { border-color: var(--border); box-shadow: none; }
   textarea { resize: vertical; min-height: 120px; line-height: 1.6; }
 
   .priority-row { display: flex; gap: 8px; }
@@ -342,26 +258,6 @@
 </head>
 <body>
 
-<!-- ─── PASSWORD GATE ──────────────────────────────────────────────────────── -->
-<div id="gate">
-  <div class="gate-card">
-    <div class="gate-logo-row">
-      <div class="gate-logo-icon">TCP</div>
-      <div class="gate-logo-text">Traffic Control <span>Planner</span></div>
-    </div>
-    <h2>Alpha Access</h2>
-    <p>This feedback portal is restricted to alpha testers. Enter the access password to continue.</p>
-    <div class="gate-field">
-      <label>Password</label>
-      <input type="password" id="gatePassword" placeholder="Enter access password" onkeydown="if(event.key==='Enter') checkPassword()" autofocus />
-    </div>
-    <button class="gate-btn" onclick="checkPassword()">Enter Portal →</button>
-    <div class="gate-error" id="gateError">Incorrect password. Please try again.</div>
-  </div>
-</div>
-
-<!-- ─── MAIN CONTENT ───────────────────────────────────────────────────────── -->
-<div id="main">
 <div class="container">
 
   <div class="header">
@@ -374,9 +270,9 @@
     <p class="subtitle">Help us build a better tool. Bug reports, feature ideas, and questions all go directly into our development backlog.</p>
   </div>
 
-  <div class="auth-notice">
-    <span class="badge">ALPHA</span>
-    <span>Access is currently gated by a shared alpha password (client-side only). Server-side auth for tcplanpro.com accounts will replace this before public launch.</span>
+  <div class="user-notice" id="userNotice" style="display:none">
+    <span class="badge">LOGGED IN</span>
+    <span id="userNoticeText"></span>
   </div>
 
   <details class="config-panel">
@@ -440,8 +336,8 @@
       </div>
 
       <div class="field">
-        <label>Your Name <span class="required">*</span></label>
-        <input type="text" id="submitterName" placeholder="Pulled from account — placeholder for now" />
+        <label>Your Name <span class="required" id="nameRequired">*</span></label>
+        <input type="text" id="submitterName" placeholder="Your name" />
       </div>
 
       <hr class="divider">
@@ -471,30 +367,34 @@
 
   </div>
 </div>
-</div>
 
 <script>
-  // ─── PASSWORD GATE ────────────────────────────────────────────────────────
-  const SESSION_KEY = 'tcp_feedback_auth';
-
-  function checkPassword() {
-    const input = document.getElementById('gatePassword').value;
-    if (input === 'TCP-alpha-2026') {
-      sessionStorage.setItem(SESSION_KEY, '1');
-      document.getElementById('gate').classList.add('hidden');
-      document.getElementById('main').classList.add('visible');
-    } else {
-      const err = document.getElementById('gateError');
-      err.classList.add('visible');
-      document.getElementById('gatePassword').value = '';
-      document.getElementById('gatePassword').focus();
+  // ─── AUTH GUARD ───────────────────────────────────────────────────────────
+  // feedback.html must only be reached via the app (which passes uid= in the
+  // URL after authentication). Direct URL access without uid redirects to app.
+  (function() {
+    const _p = new URLSearchParams(window.location.search);
+    if (!_p.get('uid')) {
+      window.location.replace('/app');
     }
-  }
+  })();
 
-  // Persist auth within the session so refreshing doesn't re-prompt
-  if (sessionStorage.getItem(SESSION_KEY) === '1') {
-    document.getElementById('gate').classList.add('hidden');
-    document.getElementById('main').classList.add('visible');
+  // ─── USER IDENTITY FROM URL PARAMS ───────────────────────────────────────
+  const params = new URLSearchParams(window.location.search);
+  const userEmail = params.get('email') || '';
+  const userId = params.get('uid') || '';
+
+  if (userEmail || userId) {
+    const noticeText = userEmail
+      ? `Submitting as ${userEmail}. Your account info will be included in the report.`
+      : `Submitting as user ${userId}. Your account info will be included in the report.`;
+    document.getElementById('userNoticeText').textContent = noticeText;
+    document.getElementById('userNotice').style.display = 'flex';
+
+    // Pre-fill name field with email (editable — user may prefer a display name)
+    if (userEmail) {
+      document.getElementById('submitterName').value = userEmail;
+    }
   }
 
   // ─── FORM LOGIC ───────────────────────────────────────────────────────────
@@ -545,6 +445,8 @@
           body,
           priority: selectedPriority,
           submitter_name: name,
+          submitter_email: userEmail || null,
+          submitter_id: userId || null,
         })
       });
 
@@ -587,7 +489,7 @@
   function resetForm() {
     document.getElementById('issueTitle').value = '';
     document.getElementById('issueBody').value = '';
-    document.getElementById('submitterName').value = '';
+    document.getElementById('submitterName').value = userEmail || '';
     document.getElementById('formContent').classList.remove('hidden');
     document.getElementById('successState').classList.remove('visible');
     document.getElementById('errorMsg').classList.remove('visible');

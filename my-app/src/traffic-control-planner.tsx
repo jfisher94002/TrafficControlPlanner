@@ -224,20 +224,20 @@ const ROAD_TYPES: RoadType[] = [
 
 
 const TOOLS: ToolDef[] = [
-  { id: "select",  label: "Select",    icon: "↖", shortcut: "V" },
-  { id: "pan",     label: "Pan",       icon: "✋", shortcut: "H" },
-  { id: "road",    label: "Road",      icon: "━", shortcut: "R" },
-  { id: "sign",    label: "Sign",      icon: "⬡", shortcut: "S" },
-  { id: "device",  label: "Device",    icon: "▲", shortcut: "D" },
-  { id: "zone",    label: "Work Zone", icon: "▨", shortcut: "Z" },
-  { id: "text",    label: "Text",      icon: "T", shortcut: "T" },
-  { id: "measure", label: "Measure",   icon: "📏", shortcut: "U" },
-  { id: "arrow",   label: "Arrow",     icon: "→", shortcut: "A" },
-  { id: "taper",     label: "Taper",     icon: "⋈", shortcut: "P" },
-  { id: "lane_mask", label: "Lane Mask", icon: "▧", shortcut: "M" },
-  { id: "crosswalk", label: "Crosswalk", icon: "⊟", shortcut: "C" },
-  { id: "turn_lane", label: "Turn Lane", icon: "↰", shortcut: "L" },
-  { id: "erase",     label: "Erase",     icon: "✕", shortcut: "X" },
+  { id: "select",    label: "Select",    icon: "↖", shortcut: "V", helpText: "Click an object to select it. Drag to move. Delete/Backspace to remove." },
+  { id: "pan",       label: "Pan",       icon: "✋", shortcut: "H", helpText: "Click and drag to pan the canvas. Middle-click drag also pans." },
+  { id: "road",      label: "Road",      icon: "━", shortcut: "R", helpText: "Click and drag to draw a straight road. Choose draw mode in the left panel (straight, polyline, curve, cubic, intersection)." },
+  { id: "sign",      label: "Sign",      icon: "⬡", shortcut: "S", helpText: "Click on the canvas to place the selected sign. Choose a sign from the Signs tab." },
+  { id: "device",    label: "Device",    icon: "▲", shortcut: "D", helpText: "Click to place a traffic control device (cones, barrels, etc.). Choose a device from the Devices tab." },
+  { id: "zone",      label: "Work Zone", icon: "▨", shortcut: "Z", helpText: "Click and drag to draw a work zone boundary rectangle." },
+  { id: "text",      label: "Text",      icon: "T", shortcut: "T", helpText: "Click on the canvas to place a text label. Edit content and style in the Properties panel." },
+  { id: "measure",   label: "Measure",   icon: "📏", shortcut: "U", helpText: "Click and drag to draw a measurement line. Distance is shown in the Properties panel." },
+  { id: "arrow",     label: "Arrow",     icon: "→", shortcut: "A", helpText: "Click and drag to draw a directional arrow. Customize color in the Properties panel." },
+  { id: "taper",     label: "Taper",     icon: "⋈", shortcut: "P", helpText: "Click to place a lane closure taper. Set speed, lane width, and taper length in Properties." },
+  { id: "lane_mask", label: "Lane Mask", icon: "▧", shortcut: "M", helpText: "Click and drag along a road to mark a closed lane with a hatch or solid overlay." },
+  { id: "crosswalk", label: "Crosswalk", icon: "⊟", shortcut: "C", helpText: "Click and drag across a road to place a striped crosswalk." },
+  { id: "turn_lane", label: "Turn Lane", icon: "↰", shortcut: "L", helpText: "Click to place a turn lane offset from a road. Set direction and geometry in Properties." },
+  { id: "erase",     label: "Erase",     icon: "✕", shortcut: "X", helpText: "Click any object to delete it immediately." },
 ];
 
 // ─── AUTOSAVE ────────────────────────────────────────────────────────────────
@@ -1063,6 +1063,169 @@ function ToolButton({ tool, active, onClick }: ToolButtonProps) {
         {tool.shortcut}
       </span>
     </button>
+  );
+}
+
+// ─── HELP MODAL ──────────────────────────────────────────────────────────────
+
+const KEYBOARD_SHORTCUTS: { key: string; description: string }[] = [
+  { key: "V", description: "Select tool" },
+  { key: "H", description: "Pan tool" },
+  { key: "R", description: "Road tool" },
+  { key: "S", description: "Sign tool" },
+  { key: "D", description: "Device tool" },
+  { key: "Z", description: "Work Zone tool" },
+  { key: "T", description: "Text tool" },
+  { key: "U", description: "Measure tool" },
+  { key: "A", description: "Arrow tool" },
+  { key: "P", description: "Taper tool" },
+  { key: "M", description: "Lane Mask tool" },
+  { key: "C", description: "Crosswalk tool" },
+  { key: "L", description: "Turn Lane tool" },
+  { key: "X", description: "Erase tool" },
+  { key: "?", description: "Toggle this help panel" },
+  { key: "Ctrl+Z", description: "Undo" },
+  { key: "Ctrl+Shift+Z", description: "Redo" },
+  { key: "Ctrl+C", description: "Copy selected object" },
+  { key: "Ctrl+V", description: "Paste copied object" },
+  { key: "Del / Bksp", description: "Delete selected object" },
+  { key: "Enter / DblClick", description: "Finish polyline" },
+];
+
+interface HelpModalProps { onClose: () => void; }
+function HelpModal({ onClose }: HelpModalProps) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Auto-focus the close button on open; restore focus to the trigger on close.
+  // We also focus the backdrop itself (tabIndex=-1) so that if the button focus
+  // doesn't stick (e.g. headless Chrome timing), Escape still has a target inside
+  // the modal.
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    // Focus close button first; fall back to backdrop so the modal always holds focus
+    closeRef.current?.focus();
+    if (document.activeElement !== closeRef.current) {
+      backdropRef.current?.focus();
+    }
+    return () => { prev?.focus(); };
+  }, []);
+
+  // Esc closes (listened on document so it fires regardless of where focus is);
+  // Tab/Shift+Tab are trapped inside the dialog via the backdrop listener.
+  useEffect(() => {
+    const onDocKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+    };
+    document.addEventListener('keydown', onDocKeyDown, true); // capture phase
+    return () => document.removeEventListener('keydown', onDocKeyDown, true);
+  }, [onClose]);
+
+  useEffect(() => {
+    const el = backdropRef.current;
+    if (!el) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        const focusable = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    };
+    el.addEventListener('keydown', onKeyDown);
+    return () => el.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={backdropRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Help"
+      data-testid="help-modal"
+      tabIndex={-1}
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9000,
+        background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`,
+          borderRadius: 10, width: "min(680px, 100vw - 32px)", maxHeight: "80vh", overflow: "hidden",
+          display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${COLORS.panelBorder}` }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, fontFamily: "'JetBrains Mono', monospace" }}>Help — Keyboard Shortcuts &amp; Tool Guide</span>
+          <button
+            ref={closeRef}
+            onClick={onClose}
+            data-testid="help-modal-close"
+            style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}
+            aria-label="Close help"
+          >✕</button>
+        </div>
+
+        {/* Body — two columns */}
+        <div style={{ overflow: "auto", padding: "16px 20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 32px" }}>
+
+          {/* Left: keyboard shortcuts */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10, fontFamily: "'JetBrains Mono', monospace" }}>Keyboard Shortcuts</div>
+            {KEYBOARD_SHORTCUTS.map(({ key, description }) => (
+              <div key={key} style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                <kbd style={{
+                  display: "inline-block", minWidth: 80, padding: "2px 6px", borderRadius: 4,
+                  background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`,
+                  fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: COLORS.accent,
+                  textAlign: "center", flexShrink: 0,
+                }}>{key}</kbd>
+                <span style={{ fontSize: 11, color: COLORS.textMuted }}>{description}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Right: tool guide */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10, fontFamily: "'JetBrains Mono', monospace" }}>Tool Guide</div>
+            {TOOLS.map((t) => (
+              <div key={t.id} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <span style={{ fontSize: 13 }}>{t.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, fontFamily: "'JetBrains Mono', monospace" }}>{t.label}</span>
+                  <kbd style={{
+                    display: "inline-block", padding: "1px 5px", borderRadius: 3,
+                    background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`,
+                    fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: COLORS.textDim,
+                  }}>{t.shortcut}</kbd>
+                </div>
+                {t.helpText && (
+                  <p style={{ margin: 0, fontSize: 10, color: COLORS.textMuted, lineHeight: 1.5, paddingLeft: 20 }}>{t.helpText}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "10px 20px", borderTop: `1px solid ${COLORS.panelBorder}`, fontSize: 10, color: COLORS.textDim, textAlign: "center" }}>
+          Press <kbd style={{ padding: "1px 5px", borderRadius: 3, background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, fontFamily: "'JetBrains Mono', monospace", color: COLORS.accent }}>?</kbd> or click the <strong style={{ color: COLORS.textMuted }}>?</strong> button in the toolbar to toggle this panel
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2038,6 +2201,8 @@ const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
 export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sessionStartRef = useRef<number>(Date.now());
+  const pdfExportedRef = useRef<boolean>(false);
 
   // Read autosave once — reused by all useState initializers below
   const initialAutosave = useRef(readAutosave()).current;
@@ -2090,7 +2255,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchStatus, setSearchStatus] = useState("");
-  const [mapCenter, setMapCenter] = useState<MapCenter | null>(null);
+  const [mapCenter, setMapCenter] = useState<MapCenter | null>(() => {
+    const raw = initialAutosave?.mapCenter as { lat: number; lng?: number; lon?: number; zoom: number } | null | undefined;
+    const lon = raw?.lng ?? raw?.lon;
+    return raw != null && lon != null ? { lat: raw.lat, lon, zoom: raw.zoom } : null;
+  });
   const [mapRenderTick, setMapRenderTick] = useState(0);
   const mapTileCacheRef = useRef<Record<string, MapTileEntry>>({});
 
@@ -2100,6 +2269,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [curvePoints, setCurvePoints] = useState<Point[]>([]);
   const [cubicPoints, setCubicPoints] = useState<Point[]>([]);
   const [snapIndicator, setSnapIndicator] = useState<Point | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [signSubTab, setSignSubTab] = useState("library");
   const [signSearch, setSignSearch] = useState("");
   const [customSigns, setCustomSigns] = useState<SignData[]>(() => {
@@ -2158,6 +2328,25 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     return () => ro.disconnect();
   }, []);
 
+  // Session duration tracking
+  useEffect(() => {
+    const initialObjectCount = initialAutosave?.canvasState?.objects?.length ?? 0;
+    track('app_session_started', {
+      resumed_plan: initialObjectCount > 0,
+      object_count: initialObjectCount,
+    });
+    const handleUnload = () => {
+      const duration_seconds = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      track('app_session_ended', {
+        duration_seconds,
+        pdf_exported: pdfExportedRef.current,
+      });
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Clear poly/curve/cubic in-progress when tool or draw mode changes
   useEffect(() => {
     if (tool !== "road") { setPolyPoints([]); setCurvePoints([]); setCubicPoints([]); }
@@ -2180,6 +2369,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         userId: userId,
         canvasOffset: offset, canvasZoom: zoom,
         canvasState: { objects }, metadata: planMeta,
+        mapCenter,
       }));
       setAutosaveError(null);
     } catch (err) {
@@ -2187,7 +2377,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       console.warn("[TCP] Auto-save failed:", msg);
       setAutosaveError(msg);
     }
-  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset]);
+  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset, mapCenter, userId]);
 
   // Passive wheel listener to prevent page scroll
   useEffect(() => {
@@ -2292,6 +2482,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           const newObjs = objects.filter((o) => o.id !== selected);
           setObjects(newObjs); pushHistory(newObjs); setSelected(null);
         }
+        return;
+      }
+
+      if (key === "?") {
+        setShowHelp((v) => !v);
         return;
       }
 
@@ -2790,8 +2985,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     const newMeta = (data.metadata as PlanMeta | undefined) ?? { projectNumber: '', client: '', location: '', notes: '' };
     const newOffset = (data.canvasOffset as Point | undefined) ?? { x: 0, y: 0 };
     const newZoom = typeof data.canvasZoom === 'number' ? data.canvasZoom : 1;
-    const rawMC = data.mapCenter as { lat: number; lng: number; zoom: number } | null | undefined;
-    const newMapCenter: MapCenter | null = rawMC ? { lat: rawMC.lat, lon: rawMC.lng, zoom: rawMC.zoom } : null;
+    const rawMC = data.mapCenter as { lat: number; lng?: number; lon?: number; zoom: number } | null | undefined;
+    const rawLon = rawMC?.lng ?? rawMC?.lon;
+    const newMapCenter: MapCenter | null = rawMC != null && rawLon != null ? { lat: rawMC.lat, lon: rawLon, zoom: rawMC.zoom } : null;
     setPlanId(newId);
     setPlanTitle(newTitle);
     setPlanCreatedAt(newCreatedAt);
@@ -2855,6 +3051,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const url = URL.createObjectURL(blob);
       triggerDownload(url, `${safePlanTitle}.pdf`);
       URL.revokeObjectURL(url);
+      pdfExportedRef.current = true;
       track('plan_exported_pdf', { object_count: objects.length });
     } catch (err) {
       console.error("PDF export failed:", err);
@@ -2955,7 +3152,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
       {/* ─── TOP BAR ─── */}
       <div style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
-        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 320px", minWidth: 0, overflow: "hidden" }}>
           <a href="/" data-testid="home-link" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }} title="Back to home">
             <span style={{ fontSize: 20, color: COLORS.accent }}>◆</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, letterSpacing: 1 }}>TCP</span>
@@ -2977,14 +3174,21 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
           </>)}
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
-          <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export plan as PDF">↓ PDF</button>
+          <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: "#1A6EFF", color: "#fff", borderColor: "#1A6EFF", fontSize: 11, fontWeight: 700, padding: "7px 14px", letterSpacing: "0.3px" }} title="Export plan as PDF">⬇ Export PDF</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
 
         {/* Right-side user controls — flexShrink:0 so toolbar overflow never pushes these off screen */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, borderLeft: `1px solid ${COLORS.panelBorder}`, paddingLeft: 12, marginLeft: 4 }}>
-          <button onClick={() => window.open("/feedback.html", "_blank", "noopener,noreferrer")} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
-          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap" }} title="Email support">{CONTACT_EMAIL}</a>
+          <button onClick={() => setShowHelp(true)} data-testid="help-button" style={panelBtnStyle(false)} title="Help — keyboard shortcuts &amp; tool guide (?)">? Help</button>
+          <button onClick={() => {
+            const params = new URLSearchParams();
+            if (userId) params.set('uid', userId);
+            if (userEmail) params.set('email', userEmail);
+            const qs = params.toString();
+            window.open(`/feedback.html${qs ? `?${qs}` : ''}`, '_blank', 'noopener,noreferrer');
+          }} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
+          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }} title="Email support">{CONTACT_EMAIL}</a>
           {onSignOut && (<>
             {(userEmail || userId) && (
               <span data-testid="user-identity" style={{ fontSize: 10, color: COLORS.textMuted, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={userEmail ?? userId ?? ''}>
@@ -2995,7 +3199,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           </>)}
         </div>
 
-        <div style={{ position: "relative", flex: "0 1 420px" }}>
+        <div style={{ position: "relative", flex: "0 1 300px" }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input
               value={searchQuery}
@@ -3394,6 +3598,45 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                   Cubic: {cubicPoints.length === 1 ? "click cp1" : cubicPoints.length === 2 ? "click cp2" : "click end"} · Esc cancel
                 </span>
               )}
+              {tool === "select" && !selected && (
+                <span style={{ color: COLORS.textMuted }}>Click an object to select · Drag to move · Del to delete</span>
+              )}
+              {tool === "pan" && (
+                <span style={{ color: COLORS.textMuted }}>Click and drag to pan the canvas · Scroll to zoom</span>
+              )}
+              {tool === "road" && !drawStart && !polyInProgress && !curveInProgress && !cubicInProgress && (
+                <span style={{ color: COLORS.textMuted }}>
+                  {roadDrawMode === "straight" && "Click and drag to draw a road"}
+                  {roadDrawMode === "poly" && "Click to start a polyline road · Enter/DblClick to finish"}
+                  {roadDrawMode === "smooth" && "Click to add smooth road points · Enter/DblClick to finish"}
+                  {roadDrawMode === "curve" && "Click start, then control point, then end"}
+                  {roadDrawMode === "cubic" && "Click start, cp1, cp2, end"}
+                </span>
+              )}
+              {tool === "intersection" && (
+                <span style={{ color: COLORS.textMuted }}>Click to stamp an intersection</span>
+              )}
+              {tool === "sign" && (
+                <span style={{ color: COLORS.textMuted }}>Click to place the selected sign</span>
+              )}
+              {tool === "device" && (
+                <span style={{ color: COLORS.textMuted }}>Click to place the selected device</span>
+              )}
+              {tool === "zone" && !drawStart && (
+                <span style={{ color: COLORS.textMuted }}>Click and drag to draw a work zone boundary</span>
+              )}
+              {tool === "text" && (
+                <span style={{ color: COLORS.textMuted }}>Click to place a text label</span>
+              )}
+              {tool === "measure" && !drawStart && (
+                <span style={{ color: COLORS.textMuted }}>Click and drag to measure a distance</span>
+              )}
+              {tool === "arrow" && !drawStart && (
+                <span style={{ color: COLORS.textMuted }}>Click and drag to draw a directional arrow</span>
+              )}
+              {tool === "taper" && (
+                <span style={{ color: COLORS.textMuted }}>Click to place a lane closure taper</span>
+              )}
               {tool === "lane_mask" && !drawStart && (
                 <span style={{ color: COLORS.danger }}>Click and drag to draw a lane closure mask</span>
               )}
@@ -3402,6 +3645,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               )}
               {tool === "turn_lane" && (
                 <span style={{ color: COLORS.info }}>Click to place a turn lane</span>
+              )}
+              {tool === "erase" && (
+                <span style={{ color: COLORS.danger }}>Click any object to delete it</span>
               )}
               <span data-testid="object-count">{objects.length} objects</span>
               <span>Tool: {tool.toUpperCase()}{tool === "road" ? ` (${roadDrawMode})` : tool === "intersection" ? ` (${intersectionType})` : ""}</span>
@@ -3486,6 +3732,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           </button>
         )}
       </div>
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {showDashboard && userId && CLOUD_ENABLED && (
         <PlanDashboard
           userId={userId}

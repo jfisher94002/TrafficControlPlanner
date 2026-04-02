@@ -984,6 +984,98 @@ describe('Cloud Save / Load', () => {
   })
 })
 
+// ─── Map tiles / mapCenter ────────────────────────────────────────────────────
+describe('Map tiles — mapCenter persistence', () => {
+  it('mapCenter is restored from autosave on remount', () => {
+    localStorage.setItem('tcp_autosave', JSON.stringify({
+      canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lon: -122.4194, zoom: 14 },
+    }))
+    setup()
+    // After mount, autosave should be written back with mapCenter preserved
+    const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+    expect(saved.mapCenter).toMatchObject({ lat: 37.7749, lon: -122.4194, zoom: 14 })
+  })
+
+  it('mapCenter with legacy lng field is restored correctly from autosave', () => {
+    localStorage.setItem('tcp_autosave', JSON.stringify({
+      canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 14 },
+    }))
+    setup()
+    const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+    // After restoration the internal format uses lon; autosave should reflect that
+    expect(saved.mapCenter).toMatchObject({ lat: 37.7749, zoom: 14 })
+    expect(saved.mapCenter.lon ?? saved.mapCenter.lng).toBe(-122.4194)
+  })
+
+  it('loading a cloud plan with lng field sets mapCenter correctly', async () => {
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([
+      { path: 'plans/u/p.json', planId: 'plan-1', name: 'Geo Plan', lastModified: '2026-01-01T00:00:00.000Z', size: 100 },
+    ])
+    vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue({
+      id: 'plan-1', name: 'Geo Plan', canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 14 },
+    })
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    await user.click(await screen.findByTestId('dashboard-open-btn'))
+    await waitFor(() => expect(screen.queryByTestId('plan-dashboard')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('plan-title')).toHaveValue('Geo Plan'))
+    // mapCenter should be written to autosave with lon (not undefined)
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+      expect(saved.mapCenter?.lon ?? saved.mapCenter?.lng).toBe(-122.4194)
+    })
+  })
+
+  it('loading a cloud plan with lon field (cloud-to-cloud) sets mapCenter correctly', async () => {
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([
+      { path: 'plans/u/p.json', planId: 'plan-1', name: 'Geo Plan', lastModified: '2026-01-01T00:00:00.000Z', size: 100 },
+    ])
+    vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue({
+      id: 'plan-1', name: 'Geo Plan', canvasState: { objects: [] },
+      mapCenter: { lat: 37.7749, lon: -122.4194, zoom: 14 },
+    })
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+    await user.click(screen.getByTestId('cloud-plans-button'))
+    await user.click(await screen.findByTestId('dashboard-open-btn'))
+    await waitFor(() => expect(screen.queryByTestId('plan-dashboard')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('plan-title')).toHaveValue('Geo Plan'))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+      expect(saved.mapCenter?.lon ?? saved.mapCenter?.lng).toBe(-122.4194)
+    })
+  })
+})
+
+// ─── Status bar road mode hints ───────────────────────────────────────────────
+describe('Status bar road mode hints', () => {
+  it('shows polyline hint when road tool is active with poly mode', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /Polyline/i }))
+    expect(screen.getByText(/polyline road/i)).toBeInTheDocument()
+  })
+
+  it('shows smooth hint when road tool is active with smooth mode', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /Smooth/i }))
+    expect(screen.getByText(/smooth road/i)).toBeInTheDocument()
+  })
+
+  it('shows intersection hint when intersection tool is active', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    // Switch to intersection tool via a 4-Way button
+    await user.click(screen.getByRole('button', { name: /4-Way/i }))
+    expect(screen.getByText(/stamp an intersection/i)).toBeInTheDocument()
+  })
+})
+
 // ─── Analytics — canvas events ────────────────────────────────────────────────
 describe('Analytics — canvas events', () => {
   it('placing a sign fires sign_placed with sign_id and sign_source', () => {
@@ -1110,6 +1202,63 @@ describe('Analytics — canvas events', () => {
     const confirmBtn = await screen.findByTestId('export-preview-confirm')
     await user.click(confirmBtn)
     expect(trackSpy).toHaveBeenCalledWith('plan_exported_pdf', expect.any(Object))
+    vi.unstubAllGlobals()
+  })
+})
+
+// ─── Session analytics ────────────────────────────────────────────────────────
+describe('Session analytics', () => {
+  it('fires app_session_started on mount', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    expect(trackSpy).toHaveBeenCalledWith('app_session_started', expect.objectContaining({
+      resumed_plan: expect.any(Boolean),
+      object_count: expect.any(Number),
+    }))
+  })
+
+  it('app_session_started reports resumed_plan: false for a fresh canvas', () => {
+    localStorage.clear()
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    expect(trackSpy).toHaveBeenCalledWith('app_session_started', expect.objectContaining({
+      resumed_plan: false,
+      object_count: 0,
+    }))
+  })
+
+  it('fires app_session_ended with duration_seconds on beforeunload', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent(window, new Event('beforeunload'))
+    expect(trackSpy).toHaveBeenCalledWith('app_session_ended', expect.objectContaining({
+      duration_seconds: expect.any(Number),
+      pdf_exported: expect.any(Boolean),
+    }))
+  })
+
+  it('app_session_ended reports pdf_exported: false when no PDF was generated', () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    setup()
+    fireEvent(window, new Event('beforeunload'))
+    const call = trackSpy.mock.calls.find(([event]) => event === 'app_session_ended')
+    expect(call?.[1]).toMatchObject({ pdf_exported: false })
+  })
+
+  it('app_session_ended reports pdf_exported: true after a successful PDF export', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['%PDF'], { type: 'application/pdf' })),
+    }))
+    const { user } = setup()
+    await user.click(screen.getByTestId('export-pdf-button'))
+    const confirmBtn = await screen.findByTestId('export-preview-confirm')
+    await user.click(confirmBtn)
+    fireEvent(window, new Event('beforeunload'))
+    const call = trackSpy.mock.calls.find(([event]) => event === 'app_session_ended')
+    expect(call?.[1]).toMatchObject({ pdf_exported: true })
+    vi.unstubAllGlobals()
   })
 })
 
@@ -1431,5 +1580,71 @@ describe('New Beta Tools — Lane Mask, Crosswalk, Turn Lane, Shoulders', () => 
     expect(shoulderLabel).toBeInTheDocument()
     const rangeInput = shoulderLabel.closest('label')?.querySelector('input[type="range"]')
     expect(rangeInput).toBeInTheDocument()
+  })
+})
+
+// ─── Help Modal ───────────────────────────────────────────────────────────────
+describe('Help Modal', () => {
+  it('clicking the ? Help button opens the help modal', async () => {
+    const { user } = setup()
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('help-button'))
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+  })
+
+  it('pressing ? toggles the help modal open', () => {
+    setup()
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+  })
+
+  it('pressing ? again closes the help modal', () => {
+    setup()
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: '?' })
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+  })
+
+  it('clicking the backdrop closes the help modal', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+    await user.click(screen.getByTestId('help-modal'))
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+  })
+
+  it('clicking the close button dismisses the help modal', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    expect(screen.getByTestId('help-modal')).toBeInTheDocument()
+    await user.click(screen.getByTestId('help-modal-close'))
+    expect(screen.queryByTestId('help-modal')).not.toBeInTheDocument()
+  })
+
+  it('help modal shows keyboard shortcuts section', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    const modal = screen.getByTestId('help-modal')
+    expect(within(modal).getAllByText(/keyboard shortcuts/i).length).toBeGreaterThan(0)
+  })
+
+  it('help modal shows tool guide section', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    const modal = screen.getByTestId('help-modal')
+    expect(within(modal).getAllByText(/tool guide/i).length).toBeGreaterThan(0)
+  })
+
+  it('help modal lists all tools', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('help-button'))
+    const modal = screen.getByTestId('help-modal')
+    expect(within(modal).getByText('Road')).toBeInTheDocument()
+    expect(within(modal).getByText('Taper')).toBeInTheDocument()
+    expect(within(modal).getByText('Lane Mask')).toBeInTheDocument()
+    expect(within(modal).getByText('Crosswalk')).toBeInTheDocument()
+    expect(within(modal).getByText('Turn Lane')).toBeInTheDocument()
   })
 })

@@ -36,6 +36,26 @@ jobs:
           E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: npm run test:e2e
 
+      - name: Clean up E2E signup user from Cognito
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    us-west-1
+        run: |
+          CREATED_USER_FILE="my-app/.e2e-created-user"
+          if [ ! -f "$CREATED_USER_FILE" ]; then
+            echo "No signup user file found — skipping cleanup"
+            exit 0
+          fi
+          EMAIL=$(cat "$CREATED_USER_FILE")
+          echo "Deleting E2E signup user: $EMAIL"
+          aws cognito-idp admin-delete-user \
+            --user-pool-id us-west-1_6NB2hiHif \
+            --username "$EMAIL" \
+            && echo "Deleted successfully" \
+            || echo "Delete failed or user already gone — continuing"
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

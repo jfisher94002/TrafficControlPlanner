@@ -97,6 +97,8 @@ class CreateIssueRequest(BaseModel):
     body: str = Field(max_length=5000)
     priority: Literal["low", "medium", "high", "critical"]
     submitter_name: str = Field(max_length=100)
+    submitter_email: str | None = Field(default=None, max_length=200)
+    submitter_id: str | None = Field(default=None, max_length=200)
 
 
 # ─── EXPORT REQUEST ───────────────────────────────────────────────────────────

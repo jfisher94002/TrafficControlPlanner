@@ -113,12 +113,6 @@ test.describe('Address-required modal', () => {
     await expect(modal).toBeVisible({ timeout: 5_000 })
 
     await page.keyboard.press('Escape')
-    // The backdrop click handler closes it; Escape closes via the existing global handler
-    // In case neither fires (modal doesn't trap Escape itself), click dismiss
-    const isDismissed = await modal.isVisible().then(v => !v)
-    if (!isDismissed) {
-      await modal.getByText('Dismiss').click()
-    }
     await expect(modal).not.toBeVisible()
   })
 

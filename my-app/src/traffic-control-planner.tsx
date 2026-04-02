@@ -2198,6 +2198,10 @@ const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.
 const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) || 'jfisher@fisherconsulting.org';
 const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
 const PDF_SEEN_KEY = 'tcp_pdf_export_seen';
+const GLOBAL_KEYFRAMES = `
+@keyframes tcp-pdf-pulse { 0%,100%{box-shadow:0 0 0 3px rgba(26,110,255,0.35)} 50%{box-shadow:0 0 0 6px rgba(26,110,255,0.0)} }
+@keyframes tcp-addr-pulse { 0%,100%{border-color:rgba(245,158,11,0.6)} 50%{border-color:rgba(245,158,11,1)} }
+`;
 
 export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
@@ -2434,6 +2438,16 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       (next === "properties" ? propertiesTabRef : next === "manifest" ? manifestTabRef : qcTabRef).current?.focus();
     }
   }, []);
+
+  // Dismiss address-required modal on Escape
+  useEffect(() => {
+    if (!showAddressRequired) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); setShowAddressRequired(false); }
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
+  }, [showAddressRequired]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -3146,7 +3160,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-      <style>{`@keyframes tcp-pdf-pulse { 0%,100%{box-shadow:0 0 0 3px rgba(26,110,255,0.35)} 50%{box-shadow:0 0 0 6px rgba(26,110,255,0.0)} } @keyframes tcp-addr-pulse { 0%,100%{border-color:rgba(245,158,11,0.6)} 50%{border-color:rgba(245,158,11,1)} }`}</style>
+      <style>{GLOBAL_KEYFRAMES}</style>
 
       {/* ─── PRE-BETA BANNER ─── */}
       {!bannerDismissed && (

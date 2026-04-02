@@ -2197,6 +2197,7 @@ interface PlannerProps {
 const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID);
 const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) || 'jfisher@fisherconsulting.org';
 const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
+const PDF_SEEN_KEY = 'tcp_pdf_export_seen';
 
 export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
@@ -2208,6 +2209,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const initialAutosave = useRef(readAutosave()).current;
 
   const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem(BANNER_KEY) === '1');
+  const [pdfSeen, setPdfSeen] = useState(() => sessionStorage.getItem(PDF_SEEN_KEY) === '1');
 
   const dismissBanner = () => { sessionStorage.setItem(BANNER_KEY, '1'); setBannerDismissed(true); };
 
@@ -3138,6 +3140,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+      <style>{`@keyframes tcp-pdf-pulse { 0%,100%{box-shadow:0 0 0 3px rgba(26,110,255,0.35)} 50%{box-shadow:0 0 0 6px rgba(26,110,255,0.0)} }`}</style>
 
       {/* ─── PRE-BETA BANNER ─── */}
       {!bannerDismissed && (
@@ -3174,9 +3177,24 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
           </>)}
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
-          <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: "#1A6EFF", color: "#fff", borderColor: "#1A6EFF", fontSize: 11, fontWeight: 700, padding: "7px 14px", letterSpacing: "0.3px" }} title="Export plan as PDF">⬇ Export PDF</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
+
+        {/* ── Export PDF — always visible, primary CTA ── */}
+        <button
+          onClick={() => { if (!pdfSeen) { sessionStorage.setItem(PDF_SEEN_KEY, '1'); setPdfSeen(true); } exportPDF(); }}
+          data-testid="export-pdf-button"
+          title="Export plan as PDF"
+          style={{
+            flexShrink: 0,
+            background: "#1A6EFF", color: "#fff", border: "2px solid #1A6EFF",
+            borderRadius: 6, fontSize: 12, fontWeight: 700, padding: "8px 16px",
+            cursor: "pointer", letterSpacing: "0.3px", whiteSpace: "nowrap",
+            fontFamily: "inherit",
+            boxShadow: pdfSeen ? "none" : "0 0 0 3px rgba(26,110,255,0.35)",
+            animation: pdfSeen ? "none" : "tcp-pdf-pulse 1.8s ease-in-out 3",
+          }}
+        >⬇ Export PDF</button>
 
         {/* Right-side user controls — flexShrink:0 so toolbar overflow never pushes these off screen */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, borderLeft: `1px solid ${COLORS.panelBorder}`, paddingLeft: 12, marginLeft: 4 }}>

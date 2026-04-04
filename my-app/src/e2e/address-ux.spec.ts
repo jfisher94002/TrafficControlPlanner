@@ -1,10 +1,15 @@
 /**
  * Address UX E2E tests — blank canvas state, tool-blocking modal.
  * Runs with stored auth state.
+ *
+ * beforeEach clears tcp_autosave before the app boots via addInitScript, so
+ * the app always starts in a blank/no-address state and tests never skip.
  */
 import { test, expect, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
+  // Clear autosave before page scripts run so the app always boots without an address
+  await page.addInitScript(() => localStorage.removeItem('tcp_autosave'))
   await page.goto('/app')
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 })
@@ -18,37 +23,29 @@ async function clickTool(page: Page, testId: string) {
 
 test.describe('Blank canvas state (no address)', () => {
   test('shows blank canvas overlay when no address is set', async ({ page }) => {
-    const overlay = page.getByTestId('blank-canvas-overlay')
-    if (!(await overlay.isVisible())) test.skip()
-    await expect(overlay).toBeVisible()
+    await expect(page.getByTestId('blank-canvas-overlay')).toBeVisible()
   })
 
   test('address search input has prominent placeholder when no address', async ({ page }) => {
     const input = page.getByTestId('address-search-input')
     await expect(input).toBeVisible()
-    const placeholder = await input.getAttribute('placeholder')
-    expect(
-      placeholder === 'Enter job site address to load the map' || placeholder === 'Search address…'
-    ).toBe(true)
+    await expect(input).toHaveAttribute('placeholder', 'Enter job site address to load the map')
   })
 })
 
 test.describe('Address-required modal', () => {
   test('shows modal when drawing tool clicked without address', async ({ page }) => {
-    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
     await clickTool(page, 'tool-road')
     await expect(page.getByTestId('address-required-modal')).toBeVisible({ timeout: 5_000 })
   })
 
   test('auto-focuses primary button on open', async ({ page }) => {
-    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
     await clickTool(page, 'tool-sign')
     await expect(page.getByTestId('address-required-modal')).toBeVisible({ timeout: 5_000 })
     await expect(page.getByTestId('address-required-go-button')).toBeFocused()
   })
 
   test('"Enter address →" button focuses address input', async ({ page }) => {
-    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
     await clickTool(page, 'tool-road')
     const modal = page.getByTestId('address-required-modal')
     await expect(modal).toBeVisible({ timeout: 5_000 })
@@ -58,7 +55,6 @@ test.describe('Address-required modal', () => {
   })
 
   test('closes on Escape', async ({ page }) => {
-    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
     await clickTool(page, 'tool-road')
     const modal = page.getByTestId('address-required-modal')
     await expect(modal).toBeVisible({ timeout: 5_000 })
@@ -67,7 +63,6 @@ test.describe('Address-required modal', () => {
   })
 
   test('closes on backdrop click', async ({ page }) => {
-    if (!(await page.getByTestId('blank-canvas-overlay').isVisible())) test.skip()
     await clickTool(page, 'tool-road')
     const modal = page.getByTestId('address-required-modal')
     await expect(modal).toBeVisible({ timeout: 5_000 })

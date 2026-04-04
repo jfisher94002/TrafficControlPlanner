@@ -241,6 +241,11 @@ const TOOLS: ToolDef[] = [
 ];
 
 // ─── AUTOSAVE ────────────────────────────────────────────────────────────────
+/** Tools that require a map address before they can be activated. */
+const TOOLS_REQUIRING_MAP = new Set(
+  TOOLS.filter(t => t.id !== 'select' && t.id !== 'pan').map(t => t.id)
+);
+
 const AUTOSAVE_KEY = "tcp_autosave";
 function readAutosave() {
   try { return JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || "null"); }
@@ -2198,10 +2203,6 @@ const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.
 const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) || 'jfisher@fisherconsulting.org';
 const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
 const PDF_SEEN_KEY = 'tcp_pdf_export_seen';
-const GLOBAL_KEYFRAMES = `
-@keyframes tcp-pdf-pulse { 0%,100%{box-shadow:0 0 0 3px rgba(26,110,255,0.35)} 50%{box-shadow:0 0 0 6px rgba(26,110,255,0.0)} }
-@keyframes tcp-addr-pulse { 0%,100%{border-color:rgba(245,158,11,0.6)} 50%{border-color:rgba(245,158,11,1)} }
-`;
 
 export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
@@ -2414,15 +2415,20 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   }, [history, historyIndex]);
 
   const switchTool = useCallback((newTool: string) => {
-    if (!mapCenter && newTool !== 'select' && newTool !== 'pan') {
-      setShowAddressRequired(true);
-      return;
-    }
     setTool(newTool);
     setPolyPoints([]);
     setCurvePoints([]);
     setCubicPoints([]);
-  }, [mapCenter]);
+  }, []);
+
+  /** Switches tool, showing the address-required modal if a map is needed. */
+  const requestTool = useCallback((newTool: string) => {
+    if (!mapCenter && TOOLS_REQUIRING_MAP.has(newTool)) {
+      setShowAddressRequired(true);
+      return;
+    }
+    switchTool(newTool);
+  }, [mapCenter, switchTool]);
 
   const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest" | "qc") => {
     const tabs: Array<"properties" | "manifest" | "qc"> = ["properties", "manifest", "qc"];
@@ -2528,11 +2534,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       }
 
       const t = TOOLS.find((t) => t.shortcut === key);
-      if (t) switchTool(t.id);
+      if (t) requestTool(t.id);
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [selected, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, switchTool]);
+  }, [selected, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, requestTool]);
 
   // toWorld: uses Konva Stage pointer position
   const toWorld = useCallback((): Point => {
@@ -3175,8 +3181,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-      <style>{GLOBAL_KEYFRAMES}</style>
-
       {/* ─── PRE-BETA BANNER ─── */}
       {!bannerDismissed && (
         <div data-testid="prebeta-banner" style={{ background: "rgba(245,158,11,0.15)", borderBottom: `1px solid rgba(245,158,11,0.35)`, padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -3312,7 +3316,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {sectionTitle("Drawing Tools")}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4 }}>
                   {TOOLS.map((t) => (
-                    <ToolButton key={t.id} tool={t} active={tool === t.id} onClick={() => switchTool(t.id)} />
+                    <ToolButton key={t.id} tool={t} active={tool === t.id} onClick={() => requestTool(t.id)} />
                   ))}
                 </div>
 
@@ -3385,7 +3389,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                             {sectionTitle(`${signSearchResults.length} result${signSearchResults.length !== 1 ? "s" : ""}`)}
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                               {signSearchResults.map(({ sign, catLabel, catColor }) => (
-                                <button key={sign.id} onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                                <button key={sign.id} onClick={() => { setSelectedSign(sign); requestTool("sign"); }}
                                   style={{ padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                                   <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : sign.shape === "diamond" ? 0 : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none", transform: sign.shape === "diamond" ? "rotate(45deg)" : "none" }}>
                                     <span style={{ transform: sign.shape === "diamond" ? "rotate(-45deg)" : "none", fontSize: 8 }}>{sign.label.slice(0, 3)}</span>
@@ -3415,7 +3419,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                     {sectionTitle("Signs")}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                       {SIGN_CATEGORIES[signCategory].signs.map((sign) => (
-                        <button key={sign.id} onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                        <button key={sign.id} onClick={() => { setSelectedSign(sign); requestTool("sign"); }}
                           style={{ padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                           <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : sign.shape === "diamond" ? 0 : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none", transform: sign.shape === "diamond" ? "rotate(45deg)" : "none" }}>
                             <span style={{ transform: sign.shape === "diamond" ? "rotate(-45deg)" : "none", fontSize: 8 }}>{sign.label.slice(0, 3)}</span>
@@ -3432,7 +3436,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                           {customSigns.map((sign) => (
                             <div key={sign.id} style={{ position: "relative" }}>
-                              <button onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                              <button onClick={() => { setSelectedSign(sign); requestTool("sign"); }}
                                 style={{ width: "100%", padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                                 <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none" }}>
                                   {sign.label.slice(0, 4)}
@@ -3457,7 +3461,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {signSubTab === "editor" && (
                   <SignEditorPanel
                     onSignChange={setSelectedSign}
-                    onUseSign={() => switchTool("sign")}
+                    onUseSign={() => requestTool("sign")}
                     onSaveToLibrary={(signData) => {
                       const existing = customSigns.find((s) =>
                         s.label === signData.label && s.shape === signData.shape &&
@@ -3481,7 +3485,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {sectionTitle("Traffic Devices")}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                   {DEVICES.map((dev) => (
-                    <button key={dev.id} onClick={() => { setSelectedDevice(dev); switchTool("device"); }}
+                    <button key={dev.id} onClick={() => { setSelectedDevice(dev); requestTool("device"); }}
                       style={{ padding: "10px 6px", background: selectedDevice?.id === dev.id && tool === "device" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedDevice?.id === dev.id && tool === "device" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                       <span style={{ fontSize: 20 }}>{dev.icon}</span>
                       <span style={{ fontSize: 8, color: COLORS.textMuted }}>{dev.label}</span>
@@ -3503,7 +3507,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                     { id: "cubic",    label: "Cubic",    icon: "⌣" },
                   ].map((mode) => (
                     <button key={mode.id}
-                      onClick={() => { setRoadDrawMode(mode.id); switchTool("road"); }}
+                      onClick={() => { setRoadDrawMode(mode.id); requestTool("road"); }}
                       style={{ flex: 1, padding: "8px 4px", fontSize: 9, background: roadDrawMode === mode.id && tool === "road" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: `1px solid ${roadDrawMode === mode.id && tool === "road" ? COLORS.accent : COLORS.panelBorder}`, color: roadDrawMode === mode.id && tool === "road" ? COLORS.accent : COLORS.textMuted, borderRadius: 5, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ fontSize: 16 }}>{mode.icon}</span>
                       <span>{mode.label}</span>
@@ -3514,7 +3518,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {sectionTitle("Road Types")}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {ROAD_TYPES.map((rt) => (
-                    <button key={rt.id} onClick={() => { setSelectedRoadType(rt); switchTool("road"); }}
+                    <button key={rt.id} onClick={() => { setSelectedRoadType(rt); requestTool("road"); }}
                       style={{ padding: "10px 12px", background: selectedRoadType?.id === rt.id && tool === "road" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedRoadType?.id === rt.id && tool === "road" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left" }}>
                       <div>
                         <div style={{ fontSize: 11, color: COLORS.text, fontWeight: 500 }}>{rt.label}</div>
@@ -3531,7 +3535,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {sectionTitle("Turn Lane")}
                 <button
-                  onClick={() => switchTool("turn_lane")}
+                  onClick={() => requestTool("turn_lane")}
                   style={{ width: "100%", padding: "10px 12px", background: tool === "turn_lane" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: tool === "turn_lane" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: tool === "turn_lane" ? COLORS.accent : COLORS.textMuted, fontSize: 11 }}>
                   <span style={{ fontSize: 16 }}>↰</span>
                   <span>Place Turn Lane</span>
@@ -3544,7 +3548,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                     { id: '4way' as const, label: '4-Way', icon: '✛' },
                   ]).map((itype) => (
                     <button key={itype.id}
-                      onClick={() => { setIntersectionType(itype.id); switchTool("intersection"); }}
+                      onClick={() => { setIntersectionType(itype.id); requestTool("intersection"); }}
                       style={{ flex: 1, padding: "8px 4px", fontSize: 9, background: intersectionType === itype.id && tool === "intersection" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: `1px solid ${intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.panelBorder}`, color: intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.textMuted, borderRadius: 5, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ fontSize: 16 }}>{itype.icon}</span>
                       <span>{itype.label}</span>

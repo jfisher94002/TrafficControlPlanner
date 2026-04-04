@@ -2,19 +2,22 @@
  * Address UX E2E tests — blank canvas state, tool-blocking modal.
  * Runs with stored auth state.
  *
- * beforeEach clears tcp_autosave before the app boots via addInitScript, so
- * the app always starts in a blank/no-address state and tests never skip.
+ * These tests require mapCenter to be null (no address set). We force that
+ * by clearing localStorage before loading the app, which removes any autosaved
+ * address from previous sessions.
  */
 import { test, expect, type Page } from '@playwright/test'
 
-test.beforeEach(async ({ page }) => {
-  // Clear autosave before page scripts run so the app always boots without an address
-  await page.addInitScript(() => localStorage.removeItem('tcp_autosave'))
+/** Load the app with a clean slate (no autosave) so mapCenter starts null. */
+async function gotoFresh(page: Page) {
+  // Clear storage before navigating so no autosaved address is present
   await page.goto('/app')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
-})
+}
 
-/** Click a drawing tool via JS to bypass overflow:hidden clipping. */
+/** Click a tool button via JS to bypass overflow:hidden clipping. */
 async function clickTool(page: Page, testId: string) {
   await page.evaluate((tid) => {
     (document.querySelector(`[data-testid="${tid}"]`) as HTMLElement | null)?.click()
@@ -23,10 +26,12 @@ async function clickTool(page: Page, testId: string) {
 
 test.describe('Blank canvas state (no address)', () => {
   test('shows blank canvas overlay when no address is set', async ({ page }) => {
+    await gotoFresh(page)
     await expect(page.getByTestId('blank-canvas-overlay')).toBeVisible()
   })
 
   test('address search input has prominent placeholder when no address', async ({ page }) => {
+    await gotoFresh(page)
     const input = page.getByTestId('address-search-input')
     await expect(input).toBeVisible()
     await expect(input).toHaveAttribute('placeholder', 'Enter job site address to load the map')
@@ -34,6 +39,10 @@ test.describe('Blank canvas state (no address)', () => {
 })
 
 test.describe('Address-required modal', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoFresh(page)
+  })
+
   test('shows modal when drawing tool clicked without address', async ({ page }) => {
     await clickTool(page, 'tool-road')
     await expect(page.getByTestId('address-required-modal')).toBeVisible({ timeout: 5_000 })

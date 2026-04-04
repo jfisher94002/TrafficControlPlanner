@@ -2,20 +2,17 @@
  * Address UX E2E tests — blank canvas state, tool-blocking modal.
  * Runs with stored auth state.
  *
- * These tests require mapCenter to be null (no address set). We force that
- * by clearing localStorage before loading the app, which removes any autosaved
- * address from previous sessions.
+ * addInitScript removes tcp_autosave before page scripts run so the app
+ * always boots without an address — tests never need to skip.
  */
 import { test, expect, type Page } from '@playwright/test'
 
-/** Load the app with a clean slate (no autosave) so mapCenter starts null. */
-async function gotoFresh(page: Page) {
-  // Clear storage before navigating so no autosaved address is present
+test.beforeEach(async ({ page }) => {
+  // Remove autosave before the page loads so mapCenter initialises as null
+  await page.addInitScript(() => localStorage.removeItem('tcp_autosave'))
   await page.goto('/app')
-  await page.evaluate(() => localStorage.clear())
-  await page.reload()
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
-}
+})
 
 /** Click a tool button via JS to bypass overflow:hidden clipping. */
 async function clickTool(page: Page, testId: string) {
@@ -26,12 +23,10 @@ async function clickTool(page: Page, testId: string) {
 
 test.describe('Blank canvas state (no address)', () => {
   test('shows blank canvas overlay when no address is set', async ({ page }) => {
-    await gotoFresh(page)
     await expect(page.getByTestId('blank-canvas-overlay')).toBeVisible()
   })
 
   test('address search input has prominent placeholder when no address', async ({ page }) => {
-    await gotoFresh(page)
     const input = page.getByTestId('address-search-input')
     await expect(input).toBeVisible()
     await expect(input).toHaveAttribute('placeholder', 'Enter job site address to load the map')
@@ -39,9 +34,6 @@ test.describe('Blank canvas state (no address)', () => {
 })
 
 test.describe('Address-required modal', () => {
-  test.beforeEach(async ({ page }) => {
-    await gotoFresh(page)
-  })
 
   test('shows modal when drawing tool clicked without address', async ({ page }) => {
     await clickTool(page, 'tool-road')

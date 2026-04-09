@@ -18,23 +18,16 @@ frontend:
 
 # ─── API PROXY ────────────────────────────────────────────────────────────────
 # Routes backend API calls from the Amplify frontend to the Lambda API Gateway.
-# After running `sam deploy`, replace <API_GATEWAY_URL> with the ApiUrl output:
-#   e.g. https://abc123def.execute-api.us-west-2.amazonaws.com
-#
-# To apply: commit this file and trigger an Amplify redeploy, or update the
-# rewrite rules directly in the Amplify console (App settings → Rewrites).
+# Staging API Gateway URL: https://b38nnen9xg.execute-api.us-west-1.amazonaws.com
 customRules:
-  # API proxy — <API_GATEWAY_URL> is a placeholder; replace with the actual
-  # API Gateway URL from `sam deploy` outputs before these rules go live.
-  # Until replaced, /export-pdf, /create-issue, and /health will 404.
   - source: /export-pdf
-    target: <API_GATEWAY_URL>/export-pdf
+    target: https://b38nnen9xg.execute-api.us-west-1.amazonaws.com/export-pdf
     status: "200"
   - source: /create-issue
-    target: <API_GATEWAY_URL>/create-issue
+    target: https://b38nnen9xg.execute-api.us-west-1.amazonaws.com/create-issue
     status: "200"
   - source: /health
-    target: <API_GATEWAY_URL>/health
+    target: https://b38nnen9xg.execute-api.us-west-1.amazonaws.com/health
     status: "200"
   # React SPA — all /app/* routes served by app.html
   - source: /app

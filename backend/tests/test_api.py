@@ -1,6 +1,7 @@
 import os
 import re
 import pytest
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from main import app
@@ -456,3 +457,105 @@ def test_pdf_legend_with_signs_and_devices(sample_plan):
     res = client.post("/export-pdf", json=sample_plan)
     assert res.status_code == 200
     assert res.content[:4] == b"%PDF"
+
+
+# ─── SES email notification tests ────────────────────────────────────────────
+
+def _mock_urlopen_success():
+    mock_resp = MagicMock()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_resp.read.return_value = b'{"number": 42, "html_url": "https://github.com/x/y/issues/42"}'
+    return mock_resp
+
+
+def test_ses_not_called_when_sender_not_configured(monkeypatch):
+    """When SES_SENDER_EMAIL is unset, no boto3 call should be made."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    monkeypatch.delenv("SES_SENDER_EMAIL", raising=False)
+    with patch("urllib.request.urlopen", return_value=_mock_urlopen_success()), \
+         patch("boto3.client") as mock_boto:
+        res = client.post("/create-issue", json={
+            "issue_type": "bug", "title": "t", "body": "b",
+            "priority": "medium", "submitter_name": "Tester",
+            "submitter_email": "user@example.com", "submitter_id": "u-1",
+        })
+    assert res.status_code == 200
+    mock_boto.assert_not_called()
+
+
+def test_ses_sends_email_with_reply_to_when_email_provided(monkeypatch):
+    """When submitter_email is present, Reply-To should be set to that address."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    monkeypatch.setenv("SES_SENDER_EMAIL", "jfisher@fisherconsulting.org")
+    mock_ses = MagicMock()
+    with patch("urllib.request.urlopen", return_value=_mock_urlopen_success()), \
+         patch("boto3.client", return_value=mock_ses):
+        res = client.post("/create-issue", json={
+            "issue_type": "bug", "title": "t", "body": "b",
+            "priority": "medium", "submitter_name": "Tester",
+            "submitter_email": "user@example.com", "submitter_id": "u-1",
+        })
+    assert res.status_code == 200
+    mock_ses.send_email.assert_called_once()
+    call_kwargs = mock_ses.send_email.call_args[1]
+    assert call_kwargs["ReplyToAddresses"] == ["user@example.com"]
+    assert call_kwargs["Source"] == "jfisher@fisherconsulting.org"
+    assert call_kwargs["Destination"]["ToAddresses"] == ["jfisher@fisherconsulting.org"]
+
+
+def test_ses_no_reply_to_when_no_submitter_email(monkeypatch):
+    """When submitter_email is absent, no Reply-To header should be set."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    monkeypatch.setenv("SES_SENDER_EMAIL", "jfisher@fisherconsulting.org")
+    mock_ses = MagicMock()
+    with patch("urllib.request.urlopen", return_value=_mock_urlopen_success()), \
+         patch("boto3.client", return_value=mock_ses):
+        res = client.post("/create-issue", json={
+            "issue_type": "bug", "title": "t", "body": "b",
+            "priority": "medium", "submitter_name": "Tester",
+            "submitter_id": "u-1",
+        })
+    assert res.status_code == 200
+    mock_ses.send_email.assert_called_once()
+    call_kwargs = mock_ses.send_email.call_args[1]
+    assert "ReplyToAddresses" not in call_kwargs
+
+
+def test_ses_failure_does_not_break_issue_creation(monkeypatch):
+    """SES errors must be swallowed — issue creation should still return 200."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    monkeypatch.setenv("SES_SENDER_EMAIL", "jfisher@fisherconsulting.org")
+    mock_ses = MagicMock()
+    from botocore.exceptions import ClientError
+    mock_ses.send_email.side_effect = ClientError(
+        {"Error": {"Code": "MessageRejected", "Message": "Email address not verified"}}, "SendEmail"
+    )
+    with patch("urllib.request.urlopen", return_value=_mock_urlopen_success()), \
+         patch("boto3.client", return_value=mock_ses):
+        res = client.post("/create-issue", json={
+            "issue_type": "bug", "title": "t", "body": "b",
+            "priority": "medium", "submitter_name": "Tester",
+            "submitter_email": "user@example.com", "submitter_id": "u-1",
+        })
+    assert res.status_code == 200
+    assert res.json()["issue_number"] == 42
+
+
+def test_ses_email_subject_contains_issue_number_and_title(monkeypatch):
+    """Email subject should reference the GitHub issue number and feedback title."""
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+    monkeypatch.setenv("SES_SENDER_EMAIL", "jfisher@fisherconsulting.org")
+    mock_ses = MagicMock()
+    with patch("urllib.request.urlopen", return_value=_mock_urlopen_success()), \
+         patch("boto3.client", return_value=mock_ses):
+        res = client.post("/create-issue", json={
+            "issue_type": "bug", "title": "Map crashes on zoom", "body": "b",
+            "priority": "high", "submitter_name": "Tester",
+            "submitter_email": "user@example.com", "submitter_id": "u-1",
+        })
+    assert res.status_code == 200
+    call_kwargs = mock_ses.send_email.call_args[1]
+    subject = call_kwargs["Message"]["Subject"]["Data"]
+    assert "42" in subject
+    assert "Map crashes on zoom" in subject

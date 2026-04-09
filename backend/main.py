@@ -4,6 +4,9 @@ import os
 import urllib.error
 import urllib.request
 
+import boto3
+from botocore.exceptions import ClientError
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -121,7 +124,52 @@ def create_issue(payload: CreateIssueRequest):
         logger.error("GitHub API error: %s", body)
         raise HTTPException(status_code=502, detail="Failed to create GitHub issue.")
 
+    _send_feedback_email(payload, issue["number"], issue["html_url"])
+
     return {"issue_number": issue["number"], "html_url": issue["html_url"]}
+
+
+def _send_feedback_email(payload: CreateIssueRequest, issue_number: int, issue_url: str) -> None:
+    """Send a notification email via SES. Non-fatal — logs errors but never raises."""
+    sender = os.getenv("SES_SENDER_EMAIL", "")
+    if not sender:
+        return
+
+    subject = f"[TCP Feedback #{issue_number}] {payload.title}"
+    body_lines = [
+        f"New feedback submitted via TCP Plan Pro.",
+        "",
+        f"Issue: {issue_url}",
+        f"Type: {payload.issue_type}",
+        f"Priority: {payload.priority}",
+        f"Submitted by: {payload.submitter_name}",
+    ]
+    if payload.submitter_email:
+        body_lines.append(f"Submitter email: {payload.submitter_email}")
+    body_lines += [
+        "",
+        "--- Feedback ---",
+        payload.body,
+    ]
+    body_text = "\n".join(body_lines)
+
+    message: dict = {
+        "Subject": {"Data": subject, "Charset": "UTF-8"},
+        "Body": {"Text": {"Data": body_text, "Charset": "UTF-8"}},
+    }
+    send_kwargs: dict = {
+        "Source": sender,
+        "Destination": {"ToAddresses": [sender]},
+        "Message": message,
+    }
+    if payload.submitter_email:
+        send_kwargs["ReplyToAddresses"] = [payload.submitter_email]
+
+    try:
+        ses = boto3.client("ses", region_name=os.getenv("AWS_SES_REGION", "us-west-1"))
+        ses.send_email(**send_kwargs)
+    except ClientError:
+        logger.exception("SES email failed — continuing")
 
 
 # AWS Lambda entrypoint

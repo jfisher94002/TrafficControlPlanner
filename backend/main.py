@@ -4,6 +4,9 @@ import os
 import urllib.error
 import urllib.request
 
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -163,8 +166,6 @@ def _send_feedback_email(payload: CreateIssueRequest, issue_number: int, issue_u
         send_kwargs["ReplyToAddresses"] = [payload.submitter_email]
 
     try:
-        import boto3
-        from botocore.exceptions import BotoCoreError, ClientError
         ses_kwargs: dict = {}
         ses_region = os.getenv("AWS_SES_REGION")
         if ses_region:

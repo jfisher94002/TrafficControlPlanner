@@ -64,7 +64,7 @@ Resources:
         - Statement:
             - Effect: Allow
               Action: ses:SendEmail
-              Resource: "*"
+              Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SesSenderEmail}"
 
   TcpAssetsBucket:
     Type: AWS::S3::Bucket

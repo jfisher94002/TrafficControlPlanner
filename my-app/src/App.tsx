@@ -16,7 +16,7 @@ export default function App() {
   const { userId, userEmail, showSignIn, openSignIn, closeSignIn, handleSignOut } = useAuthSession(AUTH_ENABLED)
 
   if (!AUTH_ENABLED) {
-    return <TrafficControlPlanner userId={null} />
+    return <TrafficControlPlanner userId={null} userEmail={null} />
   }
 
   return (

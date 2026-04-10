@@ -511,22 +511,24 @@ describe('Auth props', () => {
     expect(screen.getByTestId('sign-out-button')).toBeInTheDocument()
   })
 
-  it('user-identity label shows the userId when no email is provided', () => {
-    render(<TrafficControlPlanner userId="alice@example.com" onSignOut={vi.fn()} />)
-    expect(screen.getByTestId('user-identity').textContent).toContain('alice@example.com')
-  })
-
-  it('user-identity label prefers userEmail over userId', () => {
+  it('sign-out button title shows userEmail when provided', () => {
     render(<TrafficControlPlanner userId="cognito-uuid" userEmail="alice@example.com" onSignOut={vi.fn()} />)
-    const el = screen.getByTestId('user-identity')
-    expect(el.textContent).toContain('alice@example.com')
-    expect(el.textContent).not.toContain('cognito-uuid')
-    expect(el.title).toBe('alice@example.com')
+    expect(screen.getByTestId('sign-out-button').title).toBe('alice@example.com')
   })
 
-  it('user-identity label is not rendered when neither userId nor userEmail is provided', () => {
+  it('sign-out button does not expose email in visible text', () => {
+    render(<TrafficControlPlanner userId="cognito-uuid" userEmail="alice@example.com" onSignOut={vi.fn()} />)
+    expect(screen.getByTestId('sign-out-button').textContent).not.toContain('alice@example.com')
+  })
+
+  it('sign-out button title falls back to userId when no email provided', () => {
+    render(<TrafficControlPlanner userId="cognito-uuid" onSignOut={vi.fn()} />)
+    expect(screen.getByTestId('sign-out-button').title).toBe('cognito-uuid')
+  })
+
+  it('sign-out button title shows "Signed in" when neither userId nor userEmail provided', () => {
     render(<TrafficControlPlanner onSignOut={vi.fn()} />)
-    expect(screen.queryByTestId('user-identity')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sign-out-button').title).toBe('Signed in')
   })
 
   it('clicking sign-out button calls onSignOut', async () => {
@@ -593,11 +595,9 @@ describe('Pre-beta banner', () => {
     expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
   })
 
-  it('contact email link is present in the toolbar', () => {
+  it('contact email link is not shown in the toolbar', () => {
     render(<TrafficControlPlanner />)
-    const link = screen.getByTestId('contact-email')
-    expect(link).toBeInTheDocument()
-    expect(link.getAttribute('href')).toMatch(/^mailto:/)
+    expect(screen.queryByTestId('contact-email')).not.toBeInTheDocument()
   })
 })
 

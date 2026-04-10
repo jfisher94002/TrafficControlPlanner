@@ -516,9 +516,19 @@ describe('Auth props', () => {
     expect(screen.getByTestId('sign-out-button').title).toBe('alice@example.com')
   })
 
+  it('sign-out button does not expose email in visible text', () => {
+    render(<TrafficControlPlanner userId="cognito-uuid" userEmail="alice@example.com" onSignOut={vi.fn()} />)
+    expect(screen.getByTestId('sign-out-button').textContent).not.toContain('alice@example.com')
+  })
+
   it('sign-out button title falls back to userId when no email provided', () => {
     render(<TrafficControlPlanner userId="cognito-uuid" onSignOut={vi.fn()} />)
     expect(screen.getByTestId('sign-out-button').title).toBe('cognito-uuid')
+  })
+
+  it('sign-out button title shows "Signed in" when neither userId nor userEmail provided', () => {
+    render(<TrafficControlPlanner onSignOut={vi.fn()} />)
+    expect(screen.getByTestId('sign-out-button').title).toBe('Signed in')
   })
 
   it('clicking sign-out button calls onSignOut', async () => {

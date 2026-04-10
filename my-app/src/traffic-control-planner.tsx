@@ -2197,6 +2197,7 @@ interface PlannerProps {
   userId?: string | null;
   userEmail?: string | null;
   onSignOut?: () => void;
+  onRequestSignIn?: () => void;
 }
 
 const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID);
@@ -2204,7 +2205,7 @@ const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined)
 const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
 const PDF_SEEN_KEY = 'tcp_pdf_export_seen';
 
-export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
+export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut, onRequestSignIn }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionStartRef = useRef<number>(Date.now());
@@ -3060,6 +3061,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const exportPDF = () => {
+    if (!userId && onRequestSignIn) {
+      onRequestSignIn();
+      return;
+    }
     const stage = stageRef.current;
     if (!stage) return;
     const canvas = stage.toCanvas({ pixelRatio: 2 });

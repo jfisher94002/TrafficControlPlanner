@@ -58,6 +58,11 @@ vi.mock('./traffic-control-planner', () => ({
   ),
 }))
 
+vi.mock('./auth/SignInModal', () => ({
+  SignInModal: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? <div data-testid="sign-in-modal"><button onClick={onClose}>Close</button></div> : null,
+}))
+
 import App from './App'
 import { Hub } from 'aws-amplify/utils'
 
@@ -88,7 +93,6 @@ describe('App — auth enabled', () => {
   beforeEach(() => {
     mockAwsExports.aws_user_pools_id = 'us-east-1_TESTPOOL'
     mockAwsExports.aws_user_pools_web_client_id = 'testclientid123'
-    // Default: no active session
     mockGetCurrentUser.mockRejectedValue(new Error('not signed in'))
   })
 
@@ -121,7 +125,7 @@ describe('App — auth enabled', () => {
     })
   })
 
-  it('shows sign-out button only after user is identified', async () => {
+  it('shows sign-out button after session is restored', async () => {
     mockGetCurrentUser.mockResolvedValue({
       username: 'cognito-uuid-abc123',
       signInDetails: { loginId: 'user@example.com' },
@@ -130,6 +134,17 @@ describe('App — auth enabled', () => {
     await waitFor(() => {
       expect(screen.getByTestId('sign-out-btn')).toBeInTheDocument()
     })
+  })
+
+  it('registers a Hub auth listener on mount', () => {
+    render(<App />)
+    expect(Hub.listen).toHaveBeenCalledWith('auth', expect.any(Function))
+  })
+
+  it('unsubscribes Hub listener on unmount', () => {
+    const { unmount } = render(<App />)
+    unmount()
+    expect(mockHubUnsubscribe).toHaveBeenCalled()
   })
 
   it('updates userId/userEmail on Hub signedIn event', async () => {
@@ -145,17 +160,6 @@ describe('App — auth enabled', () => {
       expect(screen.getByTestId('prop-userId').textContent).toBe('hub-user-id')
       expect(screen.getByTestId('prop-userEmail').textContent).toBe('hub@example.com')
     })
-  })
-
-  it('registers a Hub auth listener on mount', () => {
-    render(<App />)
-    expect(Hub.listen).toHaveBeenCalledWith('auth', expect.any(Function))
-  })
-
-  it('unsubscribes Hub listener on unmount', () => {
-    const { unmount } = render(<App />)
-    unmount()
-    expect(mockHubUnsubscribe).toHaveBeenCalled()
   })
 
   it('calls amplifySignOut on tokenRefresh_failure', async () => {
@@ -175,6 +179,13 @@ describe('App — auth enabled', () => {
   it('shows sign-in modal when onRequestSignIn is called', async () => {
     render(<App />)
     await userEvent.click(screen.getByTestId('request-sign-in-btn'))
-    expect(screen.getByText('Sign in to export your plan as PDF')).toBeInTheDocument()
+    expect(screen.getByTestId('sign-in-modal')).toBeInTheDocument()
+  })
+
+  it('hides sign-in modal after sign-out button is clicked inside modal', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByTestId('request-sign-in-btn'))
+    await userEvent.click(screen.getByText('Close'))
+    expect(screen.queryByTestId('sign-in-modal')).not.toBeInTheDocument()
   })
 })

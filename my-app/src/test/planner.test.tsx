@@ -546,6 +546,29 @@ describe('Auth props', () => {
     expect(signOutIdx).toBeGreaterThan(pngIdx)
     expect(signOutIdx).toBeGreaterThan(pdfIdx)
   })
+
+  it('clicking Export PDF when anonymous calls onRequestSignIn instead of opening the preview', async () => {
+    const onRequestSignIn = vi.fn()
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId={null} onRequestSignIn={onRequestSignIn} />)
+    await user.click(screen.getByTestId('export-pdf-button'))
+    expect(onRequestSignIn).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('export-preview-modal')).not.toBeInTheDocument()
+  })
+
+  it('clicking Export PDF when signed in does NOT call onRequestSignIn', async () => {
+    const onRequestSignIn = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['%PDF'], { type: 'application/pdf' })),
+    }))
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" onRequestSignIn={onRequestSignIn} />)
+    await user.click(screen.getByTestId('export-pdf-button'))
+    expect(onRequestSignIn).not.toHaveBeenCalled()
+    expect(await screen.findByTestId('export-preview-modal')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
 })
 
 // ─── Pre-beta banner ──────────────────────────────────────────────────────────

@@ -2084,7 +2084,7 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
       for (let ty = tyStart; ty <= tyEnd; ty++) {
         if (ty < 0 || ty >= maxT) continue;
         const wx = ((tx % maxT) + maxT) % maxT;
-        const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+        const url = TILE_URL_TEMPLATE.replace('{z}', String(ovZoom)).replace('{x}', String(wx)).replace('{y}', String(ty));
         if (tileCache.current[url]) continue;
         const img = new Image(); img.crossOrigin = "anonymous";
         img.onload = () => setTileTick(t => t + 1);
@@ -2115,7 +2115,7 @@ function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps)
         for (let ty = tyStart; ty <= tyEnd; ty++) {
           if (ty < 0 || ty >= maxT) continue;
           const wx = ((tx % maxT) + maxT) % maxT;
-          const url = `https://tile.openstreetmap.org/${ovZoom}/${wx}/${ty}.png`;
+          const url = TILE_URL_TEMPLATE.replace('{z}', String(ovZoom)).replace('{x}', String(wx)).replace('{y}', String(ty));
           const img = tileCache.current[url];
           if (!img?.complete || !img.naturalWidth) continue;
           ctx.drawImage(img, tx * TILE - left, ty * TILE - top, TILE, TILE);
@@ -2201,6 +2201,7 @@ interface PlannerProps {
 }
 
 const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID);
+const TILE_URL_TEMPLATE = (import.meta.env.VITE_TILE_URL as string | undefined) || 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png';
 const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) || 'jfisher@fisherconsulting.org';
 const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
 const PDF_SEEN_KEY = 'tcp_pdf_export_seen';
@@ -2309,7 +2310,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       if (ty < 0 || ty >= maxTile) continue;
       for (let tx = startTileX; tx <= endTileX; tx++) {
         const wrappedX = ((tx % maxTile) + maxTile) % maxTile;
-        tiles.push({ url: `https://tile.openstreetmap.org/${zoomLevel}/${wrappedX}/${ty}.png`, x: tx * tileSize - left, y: ty * tileSize - top, size: tileSize });
+        tiles.push({ url: TILE_URL_TEMPLATE.replace('{z}', String(zoomLevel)).replace('{x}', String(wrappedX)).replace('{y}', String(ty)), x: tx * tileSize - left, y: ty * tileSize - top, size: tileSize });
       }
     }
     return tiles;

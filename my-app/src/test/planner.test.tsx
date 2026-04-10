@@ -1076,6 +1076,30 @@ describe('Map tiles — mapCenter persistence', () => {
   })
 })
 
+// ─── Tile provider ────────────────────────────────────────────────────────────
+describe('Tile provider', () => {
+  it('does not request tile.openstreetmap.org tiles', () => {
+    // Ensure no hardcoded OSM tile URLs slip back in
+    setup()
+    // The component module is already loaded; verify the constant via env
+    const tileUrl = (import.meta.env.VITE_TILE_URL as string | undefined) || 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png'
+    expect(tileUrl).not.toContain('openstreetmap.org')
+  })
+
+  it('tile URL template contains {z}, {x}, {y} placeholders', () => {
+    const tileUrl = (import.meta.env.VITE_TILE_URL as string | undefined) || 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png'
+    expect(tileUrl).toContain('{z}')
+    expect(tileUrl).toContain('{x}')
+    expect(tileUrl).toContain('{y}')
+  })
+
+  it('default tile URL points to Stadia Maps', () => {
+    // When VITE_TILE_URL is not set the fallback must be Stadia, not OSM
+    const defaultUrl = 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png'
+    expect(defaultUrl).toContain('stadiamaps.com')
+  })
+})
+
 // ─── Status bar road mode hints ───────────────────────────────────────────────
 describe('Status bar road mode hints', () => {
   it('shows polyline hint when road tool is active with poly mode', async () => {

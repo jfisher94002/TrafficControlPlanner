@@ -3250,15 +3250,15 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             const qs = params.toString();
             window.open(`/feedback.html${qs ? `?${qs}` : ''}`, '_blank', 'noopener,noreferrer');
           }} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
-          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }} title="Email support">{CONTACT_EMAIL}</a>
-          {onSignOut && (<>
-            {(userEmail || userId) && (
-              <span data-testid="user-identity" style={{ fontSize: 10, color: COLORS.textMuted, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={userEmail ?? userId ?? ''}>
-                {userEmail ?? userId}
-              </span>
-            )}
-            <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)}>Sign Out</button>
-          </>)}
+          {onSignOut && (
+            <button onClick={onSignOut} data-testid="sign-out-button" style={{ ...panelBtnStyle(false), display: "flex", alignItems: "center", gap: 5 }} title={userEmail ?? userId ?? 'Signed in'}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              Sign Out
+            </button>
+          )}
         </div>
 
         <div style={{ position: "relative", flex: "0 1 300px" }}>

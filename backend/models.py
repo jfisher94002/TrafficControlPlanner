@@ -99,6 +99,10 @@ class CreateIssueRequest(BaseModel):
     submitter_name: str = Field(max_length=100)
     submitter_email: str | None = Field(default=None, max_length=200)
     submitter_id: str | None = Field(default=None, max_length=200)
+    # Honeypot — must be empty; bots fill it, humans never see it
+    website: str = Field(default="", max_length=200)
+    # Seconds the form was open before submission; set by frontend JS
+    time_on_form: float = Field(default=0.0)
 
 
 # ─── EXPORT REQUEST ───────────────────────────────────────────────────────────

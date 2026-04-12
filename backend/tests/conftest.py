@@ -1,5 +1,6 @@
 import copy
 import pytest
+import main
 
 
 SAMPLE_PLAN_PAYLOAD: dict = {
@@ -69,11 +70,36 @@ SAMPLE_PLAN_PAYLOAD: dict = {
 }
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Clear in-memory rate limit state between tests so tests don't interfere."""
+    main._ip_submissions.clear()
+    yield
+    main._ip_submissions.clear()
+
+
 @pytest.fixture
 def sample_plan() -> dict:
     """Deterministic sample plan payload used in tests."""
     # Return a deep copy so tests can mutate the plan without side effects.
     return copy.deepcopy(SAMPLE_PLAN_PAYLOAD)
+
+
+VALID_ISSUE_PAYLOAD: dict = {
+    "issue_type": "bug",
+    "title": "Test issue",
+    "body": "Test body",
+    "priority": "medium",
+    "submitter_name": "Tester",
+    "submitter_id": "user-123",
+    "time_on_form": 10.0,  # satisfies the >= 3s check
+}
+
+
+@pytest.fixture
+def valid_issue() -> dict:
+    """Minimal valid /create-issue payload, deep-copied so tests can mutate it."""
+    return copy.deepcopy(VALID_ISSUE_PAYLOAD)
 
 
 @pytest.fixture

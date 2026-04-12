@@ -5,6 +5,7 @@ import TrafficControlPlanner from '../traffic-control-planner'
 import { stageStub, mockCanvas } from './konva-stub'
 import * as planStorage from '../planStorage'
 import * as analytics from '../analytics'
+import { DEFAULT_TILE_URL, resolveTileUrl, buildTileUrl } from '../utils'
 
 beforeEach(() => {
   localStorage.clear()
@@ -1077,26 +1078,51 @@ describe('Map tiles — mapCenter persistence', () => {
 })
 
 // ─── Tile provider ────────────────────────────────────────────────────────────
-describe('Tile provider', () => {
-  it('does not request tile.openstreetmap.org tiles', () => {
-    // Ensure no hardcoded OSM tile URLs slip back in
-    setup()
-    // The component module is already loaded; verify the constant via env
-    const tileUrl = (import.meta.env.VITE_TILE_URL as string | undefined) || 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png'
-    expect(tileUrl).not.toContain('openstreetmap.org')
+describe('Tile provider — resolveTileUrl', () => {
+  it('returns the default Stadia URL when no env value is provided', () => {
+    expect(resolveTileUrl(undefined)).toBe(DEFAULT_TILE_URL)
+    expect(resolveTileUrl('')).toBe(DEFAULT_TILE_URL)
+    expect(resolveTileUrl('   ')).toBe(DEFAULT_TILE_URL)
   })
 
-  it('tile URL template contains {z}, {x}, {y} placeholders', () => {
-    const tileUrl = (import.meta.env.VITE_TILE_URL as string | undefined) || 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png'
-    expect(tileUrl).toContain('{z}')
-    expect(tileUrl).toContain('{x}')
-    expect(tileUrl).toContain('{y}')
+  it('default URL does not reference openstreetmap.org', () => {
+    expect(DEFAULT_TILE_URL).not.toContain('openstreetmap.org')
+    expect(DEFAULT_TILE_URL).toContain('stadiamaps.com')
   })
 
-  it('default tile URL points to Stadia Maps', () => {
-    // When VITE_TILE_URL is not set the fallback must be Stadia, not OSM
-    const defaultUrl = 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png'
-    expect(defaultUrl).toContain('stadiamaps.com')
+  it('returns a valid custom URL when all placeholders are present', () => {
+    const custom = 'https://example.com/tiles/{z}/{x}/{y}.png'
+    expect(resolveTileUrl(custom)).toBe(custom)
+  })
+
+  it('falls back to default and warns when {z} is missing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(resolveTileUrl('https://example.com/{x}/{y}.png')).toBe(DEFAULT_TILE_URL)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('{z}'))
+    warn.mockRestore()
+  })
+
+  it('falls back to default and warns when multiple placeholders are missing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(resolveTileUrl('https://example.com/tiles.png')).toBe(DEFAULT_TILE_URL)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('{z}'))
+    warn.mockRestore()
+  })
+})
+
+describe('Tile provider — buildTileUrl', () => {
+  it('substitutes z, x, y into the template', () => {
+    expect(buildTileUrl('https://example.com/{z}/{x}/{y}.png', 14, 3, 7))
+      .toBe('https://example.com/14/3/7.png')
+  })
+
+  it('produces a Stadia URL with correct coordinates', () => {
+    const url = buildTileUrl(DEFAULT_TILE_URL, 12, 100, 200)
+    expect(url).toContain('stadiamaps.com')
+    expect(url).toContain('/12/100/200')
+    expect(url).not.toContain('{z}')
+    expect(url).not.toContain('{x}')
+    expect(url).not.toContain('{y}')
   })
 })
 

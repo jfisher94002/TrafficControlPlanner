@@ -369,16 +369,6 @@
 </div>
 
 <script>
-  // ─── AUTH GUARD ───────────────────────────────────────────────────────────
-  // feedback.html must only be reached via the app (which passes uid= in the
-  // URL after authentication). Direct URL access without uid redirects to app.
-  (function() {
-    const _p = new URLSearchParams(window.location.search);
-    if (!_p.get('uid')) {
-      window.location.replace('/app');
-    }
-  })();
-
   // ─── USER IDENTITY FROM URL PARAMS ───────────────────────────────────────
   const params = new URLSearchParams(window.location.search);
   const userEmail = params.get('email') || '';

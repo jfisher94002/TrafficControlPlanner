@@ -55,6 +55,7 @@ describe('SignInModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
 
     const dialog = screen.getByRole('dialog')
+    dialog.focus()
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(2)
     expect(dialog).toBeInTheDocument()

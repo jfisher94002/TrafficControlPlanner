@@ -1,0 +1,175 @@
+/** MUTCD sign library, devices, road presets, and tool definitions (extracted from the main planner component). */
+import type { DeviceData, RoadType, SignData, SignShape, ToolDef } from "../../types";
+
+export const SIGN_SHAPES: Array<{ id: SignShape; label: string; preview: string }> = [
+  { id: "diamond",  label: "Diamond",   preview: "◆" },
+  { id: "rect",     label: "Rectangle", preview: "▬" },
+  { id: "octagon",  label: "Octagon",   preview: "⬡" },
+  { id: "circle",   label: "Circle",    preview: "●" },
+  { id: "triangle", label: "Triangle",  preview: "▲" },
+  { id: "shield",   label: "Shield",    preview: "⊲" },
+];
+
+export const SIGN_CATEGORIES: Record<string, { label: string; color: string; signs: SignData[] }> = {
+  regulatory: {
+    label: "Regulatory",
+    color: "#ef4444",
+    signs: [
+      { id: "stop",          label: "STOP",         shape: "octagon",  color: "#ef4444", textColor: "#fff", mutcd: "R1-1" },
+      { id: "yield",         label: "YIELD",        shape: "triangle", color: "#ef4444", textColor: "#fff", mutcd: "R1-2" },
+      { id: "speed15",       label: "15 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed20",       label: "20 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed25",       label: "25 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed30",       label: "30 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed35",       label: "35 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed40",       label: "40 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed45",       label: "45 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed50",       label: "50 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed55",       label: "55 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "speed65",       label: "65 MPH",       shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R2-1" },
+      { id: "noentry",       label: "NO ENTRY",     shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R5-1" },
+      { id: "oneway",        label: "ONE WAY",      shape: "rect",     color: "#111",    textColor: "#fff", mutcd: "R6-1" },
+      { id: "donotenter",    label: "DO NOT ENTER", shape: "rect",     color: "#ef4444", textColor: "#fff", mutcd: "R5-1" },
+      { id: "noleftturn",    label: "NO LEFT TRN",  shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R3-2" },
+      { id: "norightturn",   label: "NO RIGHT TRN", shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R3-1" },
+      { id: "noparking",     label: "NO PARKING",   shape: "circle",   color: "#ef4444", textColor: "#fff", mutcd: "R7-1" },
+      { id: "nopassing",     label: "NO PASSING",   shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R4-1" },
+      { id: "wrongway",      label: "WRONG WAY",    shape: "rect",     color: "#ef4444", textColor: "#fff", mutcd: "R5-1a" },
+    ],
+  },
+  warning: {
+    label: "Warning",
+    color: "#f59e0b",
+    signs: [
+      { id: "roadwork",       label: "ROAD WORK",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "flagahead",      label: "FLAGGER",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
+      { id: "merge",          label: "MERGE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-2" },
+      { id: "curve",          label: "CURVE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2" },
+      { id: "narrow",         label: "NARROW",       shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-1" },
+      { id: "bump",           label: "BUMP",         shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-1" },
+      { id: "pedestrian",     label: "PED XING",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-2" },
+      { id: "signal",         label: "SIGNAL AHEAD", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W3-3" },
+      { id: "schoolzone",     label: "SCHOOL ZONE",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-2" },
+      { id: "schoolxing",     label: "SCHOOL XING",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "S1-1" },
+      { id: "bikexing",       label: "BIKE XING",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-15" },
+      { id: "deerxing",       label: "DEER XING",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W11-3" },
+      { id: "slippery",       label: "SLIPPERY",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-5" },
+      { id: "loosegravel",    label: "LOOSE GRAVEL", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-7" },
+      { id: "dividedroad",    label: "DIVIDED RD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W6-1" },
+      { id: "endsdivided",    label: "ENDS DIVIDED", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W6-2" },
+      { id: "lowclearance",   label: "LOW CLEAR",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W12-2" },
+      { id: "rightcurve",     label: "RIGHT CURVE",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2R" },
+      { id: "leftcurve",      label: "LEFT CURVE",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2L" },
+      { id: "winding",        label: "WINDING RD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-5" },
+      { id: "hillgrade",      label: "HILL/GRADE",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W7-1" },
+      { id: "workers",        label: "WORKERS",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-1a" },
+      { id: "trafficcontrols",label: "TRAF CTRL",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7" },
+    ],
+  },
+  temporary: {
+    label: "Temp Traffic Control",
+    color: "#f97316",
+    signs: [
+      { id: "roadclosed",   label: "ROAD CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2" },
+      { id: "detour",       label: "DETOUR",        shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "M4-8" },
+      { id: "laneclosed",   label: "LANE CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2a" },
+      { id: "endwork",      label: "END ROAD WORK", shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
+      { id: "slowtraffic",  label: "SLOW TRAFFIC",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "workzone",     label: "WORK ZONE",     shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "workahead",    label: "WORK AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "preparestop",  label: "PREP TO STOP",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "onelane",      label: "ONE LANE RD",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4a" },
+      { id: "surveyors",    label: "SURVEYORS",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-5" },
+      { id: "rightlane",    label: "RIGHT LANE",    shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-1" },
+      { id: "leftlane",     label: "LEFT LANE",     shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-2" },
+      { id: "centerlane",   label: "CENTER LANE",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W9-3" },
+      { id: "flaggerahead", label: "FLAGGER AHD",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
+      { id: "reducespeed",  label: "REDUCE SPEED",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
+      { id: "endworkahead", label: "END WORK AHD",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
+    ],
+  },
+  guide: {
+    label: "Guide & Info",
+    color: "#22c55e",
+    signs: [
+      { id: "parking",       label: "P",           shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "D4-1" },
+      { id: "hospital",      label: "H",           shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "H-1" },
+      { id: "info",          label: "INFO",        shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "I-2" },
+      { id: "interstate",    label: "I-95",        shape: "shield", color: "#3b82f6", textColor: "#fff", mutcd: "M1-1" },
+      { id: "exitramp",      label: "EXIT",        shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "E5-1" },
+      { id: "speedadvisory", label: "ADVISORY",    shape: "rect",   color: "#f59e0b", textColor: "#111", mutcd: "R2-3" },
+      { id: "distanceahead", label: "1 MILE",      shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "W16-2" },
+      { id: "noparkingnorth",label: "NO PARKING",  shape: "rect",   color: "#fff",    textColor: "#111", border: "#111", mutcd: "R7-1" },
+      { id: "restarea",      label: "REST AREA",   shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "D5-1" },
+      { id: "foodgas",       label: "FOOD/GAS",    shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "I-2" },
+    ],
+  },
+  school: {
+    label: "School Zone",
+    color: "#f59e0b",
+    signs: [
+      { id: "school",       label: "SCHOOL",      shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S4-3" },
+      { id: "schoolspeed",  label: "15 SCHOOL",   shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S5-1" },
+      { id: "slowschool",   label: "SLOW SCHOOL", shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S4-3a" },
+      { id: "schoolbus",    label: "SCHOOL BUS",  shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "S3-1" },
+      { id: "schoolbusxing",label: "BUS XING",    shape: "diamond", color: "#f59e0b", textColor: "#111", mutcd: "S3-1" },
+      { id: "crosswalk",    label: "CROSSWALK",   shape: "rect",    color: "#f59e0b", textColor: "#111", mutcd: "R7-9" },
+      { id: "pedxing",      label: "PED XING",    shape: "diamond", color: "#f59e0b", textColor: "#111", mutcd: "W11-2" },
+    ],
+  },
+  bicycle: {
+    label: "Bicycle & Pedestrian",
+    color: "#22c55e",
+    signs: [
+      { id: "bikeroute",   label: "BIKE ROUTE",  shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
+      { id: "bikexingped", label: "BIKE XING",   shape: "diamond", color: "#22c55e", textColor: "#111", mutcd: "W11-15" },
+      { id: "pedxingbike", label: "PED XING",    shape: "diamond", color: "#22c55e", textColor: "#111", mutcd: "W11-2" },
+      { id: "sharedpath",  label: "SHARED PATH", shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "R9-7" },
+      { id: "hikerbiker",  label: "HIKE/BIKE",   shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
+      { id: "bikepath",    label: "BIKE PATH",   shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-1" },
+    ],
+  },
+};
+
+export const DEVICES: DeviceData[] = [
+  { id: "cone",        label: "Traffic Cone",  icon: "▲",  color: "#f97316" },
+  { id: "barrel",      label: "Drum/Barrel",   icon: "◉",  color: "#f97316" },
+  { id: "barrier",     label: "Barrier",       icon: "▬",  color: "#fbbf24" },
+  { id: "delineator",  label: "Delineator",    icon: "│",  color: "#f97316" },
+  { id: "arrow_board", label: "Arrow Board",   icon: "⟹", color: "#fbbf24" },
+  { id: "message_sign",label: "Message Sign",  icon: "▣",  color: "#fbbf24" },
+  { id: "flagman",     label: "Flagger",       icon: "🏴", color: "#22c55e" },
+  { id: "temp_signal", label: "Temp Signal",   icon: "🚦", color: "#ef4444" },
+  { id: "crashcush",   label: "Crash Cushion", icon: "⟐",  color: "#ef4444" },
+  { id: "water_barrel",label: "Water Barrel",  icon: "⊚",  color: "#3b82f6" },
+];
+
+// realWidth = diagram-scale meters (≈3× real-world so roads are wide enough to work with on screen)
+export const ROAD_TYPES: RoadType[] = [
+  { id: "2lane",   label: "2-Lane Road",     lanes: 2, width: 80,  realWidth: 22 },
+  { id: "4lane",   label: "4-Lane Road",     lanes: 4, width: 150, realWidth: 44 },
+  { id: "6lane",   label: "6-Lane Divided",  lanes: 6, width: 220, realWidth: 66 },
+  { id: "highway", label: "Highway",         lanes: 4, width: 180, realWidth: 58 },
+];
+
+export const TOOLS: ToolDef[] = [
+  { id: "select",    label: "Select",    icon: "↖", shortcut: "V", helpText: "Click an object to select it. Drag to move. Delete/Backspace to remove." },
+  { id: "pan",       label: "Pan",       icon: "✋", shortcut: "H", helpText: "Click and drag to pan the canvas. Middle-click drag also pans." },
+  { id: "road",      label: "Road",      icon: "━", shortcut: "R", helpText: "Click and drag to draw a straight road. Choose draw mode in the left panel (straight, polyline, curve, cubic, intersection)." },
+  { id: "sign",      label: "Sign",      icon: "⬡", shortcut: "S", helpText: "Click on the canvas to place the selected sign. Choose a sign from the Signs tab." },
+  { id: "device",    label: "Device",    icon: "▲", shortcut: "D", helpText: "Click to place a traffic control device (cones, barrels, etc.). Choose a device from the Devices tab." },
+  { id: "zone",      label: "Work Zone", icon: "▨", shortcut: "Z", helpText: "Click and drag to draw a work zone boundary rectangle." },
+  { id: "text",      label: "Text",      icon: "T", shortcut: "T", helpText: "Click on the canvas to place a text label. Edit content and style in the Properties panel." },
+  { id: "measure",   label: "Measure",   icon: "📏", shortcut: "U", helpText: "Click and drag to draw a measurement line. Distance is shown in the Properties panel." },
+  { id: "arrow",     label: "Arrow",     icon: "→", shortcut: "A", helpText: "Click and drag to draw a directional arrow. Customize color in the Properties panel." },
+  { id: "taper",     label: "Taper",     icon: "⋈", shortcut: "P", helpText: "Click to place a lane closure taper. Set speed, lane width, and taper length in Properties." },
+  { id: "lane_mask", label: "Lane Mask", icon: "▧", shortcut: "M", helpText: "Click and drag along a road to mark a closed lane with a hatch or solid overlay." },
+  { id: "crosswalk", label: "Crosswalk", icon: "⊟", shortcut: "C", helpText: "Click and drag across a road to place a striped crosswalk." },
+  { id: "turn_lane", label: "Turn Lane", icon: "↰", shortcut: "L", helpText: "Click to place a turn lane offset from a road. Set direction and geometry in Properties." },
+  { id: "erase",     label: "Erase",     icon: "✕", shortcut: "X", helpText: "Click any object to delete it immediately." },
+];
+
+/** Tools that require a map address before they can be activated. */
+export const TOOLS_REQUIRING_MAP = new Set(
+  TOOLS.filter((t) => t.id !== "select" && t.id !== "pan").map((t) => t.id),
+);

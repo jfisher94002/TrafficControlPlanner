@@ -14,6 +14,10 @@ Globals:
         GITHUB_TOKEN: !Ref GitHubToken
         GITHUB_REPO: !Ref GitHubRepo
         ASSETS_BUCKET: !Ref TcpAssetsBucket
+        SES_SENDER_EMAIL: !Ref SesSenderEmail
+
+Conditions:
+  HasSesSenderEmail: !Not [!Equals [!Ref SesSenderEmail, ""]]
 
 Parameters:
   Stage:
@@ -33,6 +37,10 @@ Parameters:
     Type: String
     Default: "jfisher94002/TrafficControlPlanner"
     Description: "GitHub repo for feedback issue creation (owner/repo)"
+  SesSenderEmail:
+    Type: String
+    Default: ""
+    Description: "SES-verified From/To address for feedback notifications (e.g. jfisher@fisherconsulting.org)"
 
 Resources:
 
@@ -56,6 +64,13 @@ Resources:
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref TcpAssetsBucket
+        - !If
+          - HasSesSenderEmail
+          - Statement:
+              - Effect: Allow
+                Action: ses:SendEmail
+                Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SesSenderEmail}"
+          - !Ref AWS::NoValue
 
   TcpAssetsBucket:
     Type: AWS::S3::Bucket

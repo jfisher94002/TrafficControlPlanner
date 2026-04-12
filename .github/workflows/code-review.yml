@@ -10,6 +10,8 @@ jobs:
   build-check:
     name: Build & Lint
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +38,8 @@ jobs:
     name: Version bump check
     runs-on: ubuntu-latest
     if: "${{ startsWith(github.event.pull_request.title, 'chore: release') }}"
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
         with:

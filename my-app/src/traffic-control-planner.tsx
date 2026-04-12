@@ -241,6 +241,11 @@ const TOOLS: ToolDef[] = [
 ];
 
 // ─── AUTOSAVE ────────────────────────────────────────────────────────────────
+/** Tools that require a map address before they can be activated. */
+const TOOLS_REQUIRING_MAP = new Set(
+  TOOLS.filter(t => t.id !== 'select' && t.id !== 'pan').map(t => t.id)
+);
+
 const AUTOSAVE_KEY = "tcp_autosave";
 function readAutosave() {
   try { return JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || "null"); }
@@ -2192,13 +2197,15 @@ interface PlannerProps {
   userId?: string | null;
   userEmail?: string | null;
   onSignOut?: () => void;
+  onRequestSignIn?: () => void;
 }
 
 const CLOUD_ENABLED = Boolean(import.meta.env.VITE_S3_BUCKET && import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID);
 const CONTACT_EMAIL = (import.meta.env.VITE_CONTACT_EMAIL as string | undefined) || 'jfisher@fisherconsulting.org';
 const BANNER_KEY = 'tcp_prebeta_banner_dismissed';
+const PDF_SEEN_KEY = 'tcp_pdf_export_seen';
 
-export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut }: PlannerProps = {}) {
+export default function TrafficControlPlanner({ userId = null, userEmail = null, onSignOut, onRequestSignIn }: PlannerProps = {}) {
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionStartRef = useRef<number>(Date.now());
@@ -2208,6 +2215,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const initialAutosave = useRef(readAutosave()).current;
 
   const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem(BANNER_KEY) === '1');
+  const [pdfSeen, setPdfSeen] = useState(() => sessionStorage.getItem(PDF_SEEN_KEY) === '1');
 
   const dismissBanner = () => { sessionStorage.setItem(BANNER_KEY, '1'); setBannerDismissed(true); };
 
@@ -2249,8 +2257,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const addrModalGoRef = useRef<HTMLButtonElement>(null);
   const [cursorPos, setCursorPos] = useState<Point>({ x: 0, y: 0 });
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAddressRequired, setShowAddressRequired] = useState(false);
   const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -2411,6 +2422,15 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setCubicPoints([]);
   }, []);
 
+  /** Switches tool, showing the address-required modal if a map is needed. */
+  const requestTool = useCallback((newTool: string) => {
+    if (!mapCenter && TOOLS_REQUIRING_MAP.has(newTool)) {
+      setShowAddressRequired(true);
+      return;
+    }
+    switchTool(newTool);
+  }, [mapCenter, switchTool]);
+
   const handleRightTabKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, current: "properties" | "manifest" | "qc") => {
     const tabs: Array<"properties" | "manifest" | "qc"> = ["properties", "manifest", "qc"];
     const idx = tabs.indexOf(current);
@@ -2426,6 +2446,30 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       (next === "properties" ? propertiesTabRef : next === "manifest" ? manifestTabRef : qcTabRef).current?.focus();
     }
   }, []);
+
+  // Address-required modal: auto-focus, focus trap, Escape, and focus restore
+  useEffect(() => {
+    if (!showAddressRequired) return;
+    const prev = document.activeElement as HTMLElement | null;
+    addrModalGoRef.current?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); setShowAddressRequired(false); return; }
+      if (e.key === 'Tab') {
+        const modal = addrModalGoRef.current?.closest('[data-testid="address-required-modal"]');
+        if (!modal) return;
+        const focusable = Array.from(modal.querySelectorAll<HTMLElement>('button,input,[tabindex]:not([tabindex="-1"])'));
+        if (!focusable.length) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => {
+      document.removeEventListener('keydown', handler, true);
+      prev?.focus();
+    };
+  }, [showAddressRequired]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -2491,11 +2535,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       }
 
       const t = TOOLS.find((t) => t.shortcut === key);
-      if (t) switchTool(t.id);
+      if (t) requestTool(t.id);
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [selected, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, switchTool]);
+  }, [selected, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, requestTool]);
 
   // toWorld: uses Konva Stage pointer position
   const toWorld = useCallback((): Point => {
@@ -3017,6 +3061,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const exportPDF = () => {
+    if (!userId && onRequestSignIn) {
+      onRequestSignIn();
+      return;
+    }
     const stage = stageRef.current;
     if (!stage) return;
     const canvas = stage.toCanvas({ pixelRatio: 2 });
@@ -3138,7 +3186,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-
       {/* ─── PRE-BETA BANNER ─── */}
       {!bannerDismissed && (
         <div data-testid="prebeta-banner" style={{ background: "rgba(245,158,11,0.15)", borderBottom: `1px solid rgba(245,158,11,0.35)`, padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -3174,9 +3221,24 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
           </>)}
           <button onClick={exportPNG} data-testid="export-png-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Export canvas as PNG (2×)">↓ PNG</button>
-          <button onClick={exportPDF} data-testid="export-pdf-button" style={{ ...panelBtnStyle(false), background: "#1A6EFF", color: "#fff", borderColor: "#1A6EFF", fontSize: 11, fontWeight: 700, padding: "7px 14px", letterSpacing: "0.3px" }} title="Export plan as PDF">⬇ Export PDF</button>
           <input ref={fileInputRef} type="file" accept=".json,.tcp.json" onChange={loadPlan} style={{ display: "none" }} />
         </div>
+
+        {/* ── Export PDF — always visible, primary CTA ── */}
+        <button
+          onClick={() => { if (!pdfSeen) { sessionStorage.setItem(PDF_SEEN_KEY, '1'); setPdfSeen(true); } exportPDF(); }}
+          data-testid="export-pdf-button"
+          title="Export plan as PDF"
+          style={{
+            flexShrink: 0,
+            background: "#1A6EFF", color: "#fff", border: "2px solid #1A6EFF",
+            borderRadius: 6, fontSize: 12, fontWeight: 700, padding: "8px 16px",
+            cursor: "pointer", letterSpacing: "0.3px", whiteSpace: "nowrap",
+            fontFamily: "inherit",
+            boxShadow: pdfSeen ? "none" : "0 0 0 3px rgba(26,110,255,0.35)",
+            animation: pdfSeen ? "none" : "tcp-pdf-pulse 1.8s ease-in-out 3",
+          }}
+        >⬇ Export PDF</button>
 
         {/* Right-side user controls — flexShrink:0 so toolbar overflow never pushes these off screen */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, borderLeft: `1px solid ${COLORS.panelBorder}`, paddingLeft: 12, marginLeft: 4 }}>
@@ -3188,25 +3250,27 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             const qs = params.toString();
             window.open(`/feedback.html${qs ? `?${qs}` : ''}`, '_blank', 'noopener,noreferrer');
           }} style={panelBtnStyle(false)} title="Report an issue or submit feedback">Report Issue</button>
-          <a href={`mailto:${CONTACT_EMAIL}`} data-testid="contact-email" style={{ fontSize: 10, color: COLORS.textDim, textDecoration: "none", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }} title="Email support">{CONTACT_EMAIL}</a>
-          {onSignOut && (<>
-            {(userEmail || userId) && (
-              <span data-testid="user-identity" style={{ fontSize: 10, color: COLORS.textMuted, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={userEmail ?? userId ?? ''}>
-                {userEmail ?? userId}
-              </span>
-            )}
-            <button onClick={onSignOut} data-testid="sign-out-button" style={panelBtnStyle(false)}>Sign Out</button>
-          </>)}
+          {onSignOut && (
+            <button onClick={onSignOut} data-testid="sign-out-button" style={{ ...panelBtnStyle(false), display: "flex", alignItems: "center", gap: 5 }} title={userEmail ?? userId ?? 'Signed in'}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              Sign Out
+            </button>
+          )}
         </div>
 
         <div style={{ position: "relative", flex: "0 1 300px" }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input
+              ref={searchInputRef}
+              data-testid="address-search-input"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setSearchStatus(""); }}
               onKeyDown={(e) => e.key === "Enter" && doAddressSearch()}
-              placeholder="Search address…"
-              style={{ flex: 1, padding: "5px 10px", fontSize: 11, background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`, color: COLORS.text, borderRadius: 5, fontFamily: "inherit", outline: "none" }}
+              placeholder={mapCenter ? "Search address…" : "Enter job site address to load the map"}
+              style={{ flex: 1, padding: "5px 10px", fontSize: 11, background: COLORS.bg, border: `1px solid ${mapCenter ? COLORS.panelBorder : "rgba(245,158,11,0.6)"}`, color: COLORS.text, borderRadius: 5, fontFamily: "inherit", outline: "none", animation: mapCenter ? "none" : "tcp-addr-pulse 1.5s ease-in-out infinite" }}
             />
             <button onClick={doAddressSearch} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)", whiteSpace: "nowrap" }}>
               {searchLoading ? "…" : "🔍 Go"}
@@ -3257,7 +3321,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {sectionTitle("Drawing Tools")}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4 }}>
                   {TOOLS.map((t) => (
-                    <ToolButton key={t.id} tool={t} active={tool === t.id} onClick={() => switchTool(t.id)} />
+                    <ToolButton key={t.id} tool={t} active={tool === t.id} onClick={() => requestTool(t.id)} />
                   ))}
                 </div>
 
@@ -3330,7 +3394,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                             {sectionTitle(`${signSearchResults.length} result${signSearchResults.length !== 1 ? "s" : ""}`)}
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                               {signSearchResults.map(({ sign, catLabel, catColor }) => (
-                                <button key={sign.id} onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                                <button key={sign.id} onClick={() => { setSelectedSign(sign); requestTool("sign"); }}
                                   style={{ padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                                   <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : sign.shape === "diamond" ? 0 : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none", transform: sign.shape === "diamond" ? "rotate(45deg)" : "none" }}>
                                     <span style={{ transform: sign.shape === "diamond" ? "rotate(-45deg)" : "none", fontSize: 8 }}>{sign.label.slice(0, 3)}</span>
@@ -3360,7 +3424,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                     {sectionTitle("Signs")}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                       {SIGN_CATEGORIES[signCategory].signs.map((sign) => (
-                        <button key={sign.id} onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                        <button key={sign.id} onClick={() => { setSelectedSign(sign); requestTool("sign"); }}
                           style={{ padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                           <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : sign.shape === "diamond" ? 0 : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none", transform: sign.shape === "diamond" ? "rotate(45deg)" : "none" }}>
                             <span style={{ transform: sign.shape === "diamond" ? "rotate(-45deg)" : "none", fontSize: 8 }}>{sign.label.slice(0, 3)}</span>
@@ -3377,7 +3441,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                           {customSigns.map((sign) => (
                             <div key={sign.id} style={{ position: "relative" }}>
-                              <button onClick={() => { setSelectedSign(sign); switchTool("sign"); }}
+                              <button onClick={() => { setSelectedSign(sign); requestTool("sign"); }}
                                 style={{ width: "100%", padding: "10px 6px", background: selectedSign?.id === sign.id && tool === "sign" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedSign?.id === sign.id && tool === "sign" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                                 <div style={{ width: 28, height: 28, borderRadius: sign.shape === "circle" ? "50%" : 4, background: sign.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: sign.textColor, border: sign.border ? `2px solid ${sign.border}` : "none" }}>
                                   {sign.label.slice(0, 4)}
@@ -3402,7 +3466,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {signSubTab === "editor" && (
                   <SignEditorPanel
                     onSignChange={setSelectedSign}
-                    onUseSign={() => switchTool("sign")}
+                    onUseSign={() => requestTool("sign")}
                     onSaveToLibrary={(signData) => {
                       const existing = customSigns.find((s) =>
                         s.label === signData.label && s.shape === signData.shape &&
@@ -3426,7 +3490,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {sectionTitle("Traffic Devices")}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                   {DEVICES.map((dev) => (
-                    <button key={dev.id} onClick={() => { setSelectedDevice(dev); switchTool("device"); }}
+                    <button key={dev.id} onClick={() => { setSelectedDevice(dev); requestTool("device"); }}
                       style={{ padding: "10px 6px", background: selectedDevice?.id === dev.id && tool === "device" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedDevice?.id === dev.id && tool === "device" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                       <span style={{ fontSize: 20 }}>{dev.icon}</span>
                       <span style={{ fontSize: 8, color: COLORS.textMuted }}>{dev.label}</span>
@@ -3448,7 +3512,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                     { id: "cubic",    label: "Cubic",    icon: "⌣" },
                   ].map((mode) => (
                     <button key={mode.id}
-                      onClick={() => { setRoadDrawMode(mode.id); switchTool("road"); }}
+                      onClick={() => { setRoadDrawMode(mode.id); requestTool("road"); }}
                       style={{ flex: 1, padding: "8px 4px", fontSize: 9, background: roadDrawMode === mode.id && tool === "road" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: `1px solid ${roadDrawMode === mode.id && tool === "road" ? COLORS.accent : COLORS.panelBorder}`, color: roadDrawMode === mode.id && tool === "road" ? COLORS.accent : COLORS.textMuted, borderRadius: 5, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ fontSize: 16 }}>{mode.icon}</span>
                       <span>{mode.label}</span>
@@ -3459,7 +3523,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 {sectionTitle("Road Types")}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {ROAD_TYPES.map((rt) => (
-                    <button key={rt.id} onClick={() => { setSelectedRoadType(rt); switchTool("road"); }}
+                    <button key={rt.id} onClick={() => { setSelectedRoadType(rt); requestTool("road"); }}
                       style={{ padding: "10px 12px", background: selectedRoadType?.id === rt.id && tool === "road" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: selectedRoadType?.id === rt.id && tool === "road" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left" }}>
                       <div>
                         <div style={{ fontSize: 11, color: COLORS.text, fontWeight: 500 }}>{rt.label}</div>
@@ -3476,7 +3540,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
                 {sectionTitle("Turn Lane")}
                 <button
-                  onClick={() => switchTool("turn_lane")}
+                  onClick={() => requestTool("turn_lane")}
                   style={{ width: "100%", padding: "10px 12px", background: tool === "turn_lane" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: tool === "turn_lane" ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.panelBorder}`, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, color: tool === "turn_lane" ? COLORS.accent : COLORS.textMuted, fontSize: 11 }}>
                   <span style={{ fontSize: 16 }}>↰</span>
                   <span>Place Turn Lane</span>
@@ -3489,7 +3553,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                     { id: '4way' as const, label: '4-Way', icon: '✛' },
                   ]).map((itype) => (
                     <button key={itype.id}
-                      onClick={() => { setIntersectionType(itype.id); switchTool("intersection"); }}
+                      onClick={() => { setIntersectionType(itype.id); requestTool("intersection"); }}
                       style={{ flex: 1, padding: "8px 4px", fontSize: 9, background: intersectionType === itype.id && tool === "intersection" ? COLORS.accentDim : "rgba(255,255,255,0.03)", border: `1px solid ${intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.panelBorder}`, color: intersectionType === itype.id && tool === "intersection" ? COLORS.accent : COLORS.textMuted, borderRadius: 5, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ fontSize: 16 }}>{itype.icon}</span>
                       <span>{itype.label}</span>
@@ -3574,6 +3638,43 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
           <NorthArrow visible={showNorthArrow} />
           <LegendBox objects={objects} visible={showLegend} />
+
+          {/* Blank canvas overlay — shown until user enters an address */}
+          {!mapCenter && (
+            <div data-testid="blank-canvas-overlay" style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", gap: 12 }}>
+              <div style={{ fontSize: 48, opacity: 0.25 }}>📍</div>
+              <div style={{ fontSize: 15, color: COLORS.textMuted, opacity: 0.6, textAlign: "center", lineHeight: 1.5 }}>
+                Enter a job site address in the toolbar above<br />to load the map
+              </div>
+            </div>
+          )}
+
+          {/* Address-required modal — shown when user clicks a drawing tool without an address */}
+          {showAddressRequired && (
+            <div data-testid="address-required-modal" role="dialog" aria-modal="true" aria-labelledby="addr-modal-title" onClick={() => setShowAddressRequired(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 10, padding: "28px 32px", maxWidth: 340, width: "90%", textAlign: "center", boxShadow: "0 12px 48px rgba(0,0,0,0.6)" }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📍</div>
+                <div id="addr-modal-title" style={{ fontSize: 15, fontWeight: 600, color: COLORS.text, marginBottom: 8 }}>Address Required</div>
+                <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 20, lineHeight: 1.6 }}>
+                  Enter a job site address to load the map before drawing.
+                </div>
+                <button
+                  ref={addrModalGoRef}
+                  data-testid="address-required-go-button"
+                  onClick={() => { setShowAddressRequired(false); searchInputRef.current?.focus(); searchInputRef.current?.select(); }}
+                  style={{ background: COLORS.accent, color: "#111", border: "none", borderRadius: 6, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Enter address →
+                </button>
+                <button
+                  onClick={() => setShowAddressRequired(false)}
+                  style={{ display: "block", margin: "10px auto 0", background: "transparent", border: "none", color: COLORS.textDim, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Status bar */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>

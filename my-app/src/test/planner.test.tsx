@@ -8,6 +8,8 @@ import * as analytics from '../analytics'
 
 beforeEach(() => {
   localStorage.clear()
+  // Seed a mapCenter so drawing tools are not blocked by the address guard in any test
+  localStorage.setItem('tcp_autosave', JSON.stringify({ mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 15 } }))
   vi.restoreAllMocks()
 })
 
@@ -509,22 +511,24 @@ describe('Auth props', () => {
     expect(screen.getByTestId('sign-out-button')).toBeInTheDocument()
   })
 
-  it('user-identity label shows the userId when no email is provided', () => {
-    render(<TrafficControlPlanner userId="alice@example.com" onSignOut={vi.fn()} />)
-    expect(screen.getByTestId('user-identity').textContent).toContain('alice@example.com')
-  })
-
-  it('user-identity label prefers userEmail over userId', () => {
+  it('sign-out button title shows userEmail when provided', () => {
     render(<TrafficControlPlanner userId="cognito-uuid" userEmail="alice@example.com" onSignOut={vi.fn()} />)
-    const el = screen.getByTestId('user-identity')
-    expect(el.textContent).toContain('alice@example.com')
-    expect(el.textContent).not.toContain('cognito-uuid')
-    expect(el.title).toBe('alice@example.com')
+    expect(screen.getByTestId('sign-out-button').title).toBe('alice@example.com')
   })
 
-  it('user-identity label is not rendered when neither userId nor userEmail is provided', () => {
+  it('sign-out button does not expose email in visible text', () => {
+    render(<TrafficControlPlanner userId="cognito-uuid" userEmail="alice@example.com" onSignOut={vi.fn()} />)
+    expect(screen.getByTestId('sign-out-button').textContent).not.toContain('alice@example.com')
+  })
+
+  it('sign-out button title falls back to userId when no email provided', () => {
+    render(<TrafficControlPlanner userId="cognito-uuid" onSignOut={vi.fn()} />)
+    expect(screen.getByTestId('sign-out-button').title).toBe('cognito-uuid')
+  })
+
+  it('sign-out button title shows "Signed in" when neither userId nor userEmail provided', () => {
     render(<TrafficControlPlanner onSignOut={vi.fn()} />)
-    expect(screen.queryByTestId('user-identity')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sign-out-button').title).toBe('Signed in')
   })
 
   it('clicking sign-out button calls onSignOut', async () => {
@@ -543,6 +547,29 @@ describe('Auth props', () => {
     const signOutIdx = allButtons.findIndex(b => b.getAttribute('data-testid') === 'sign-out-button')
     expect(signOutIdx).toBeGreaterThan(pngIdx)
     expect(signOutIdx).toBeGreaterThan(pdfIdx)
+  })
+
+  it('clicking Export PDF when anonymous calls onRequestSignIn instead of opening the preview', async () => {
+    const onRequestSignIn = vi.fn()
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId={null} onRequestSignIn={onRequestSignIn} />)
+    await user.click(screen.getByTestId('export-pdf-button'))
+    expect(onRequestSignIn).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('export-preview-modal')).not.toBeInTheDocument()
+  })
+
+  it('clicking Export PDF when signed in does NOT call onRequestSignIn', async () => {
+    const onRequestSignIn = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['%PDF'], { type: 'application/pdf' })),
+    }))
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" onRequestSignIn={onRequestSignIn} />)
+    await user.click(screen.getByTestId('export-pdf-button'))
+    expect(onRequestSignIn).not.toHaveBeenCalled()
+    expect(await screen.findByTestId('export-preview-modal')).toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 })
 
@@ -568,11 +595,9 @@ describe('Pre-beta banner', () => {
     expect(screen.queryByTestId('prebeta-banner')).not.toBeInTheDocument()
   })
 
-  it('contact email link is present in the toolbar', () => {
+  it('contact email link is not shown in the toolbar', () => {
     render(<TrafficControlPlanner />)
-    const link = screen.getByTestId('contact-email')
-    expect(link).toBeInTheDocument()
-    expect(link.getAttribute('href')).toMatch(/^mailto:/)
+    expect(screen.queryByTestId('contact-email')).not.toBeInTheDocument()
   })
 })
 

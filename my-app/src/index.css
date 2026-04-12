@@ -11,3 +11,13 @@ body {
   width: 100%;
   height: 100vh;
 }
+
+@keyframes tcp-pdf-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(26, 110, 255, 0.35); }
+  50%       { box-shadow: 0 0 0 6px rgba(26, 110, 255, 0.0); }
+}
+
+@keyframes tcp-addr-pulse {
+  0%, 100% { border-color: rgba(245, 158, 11, 0.6); }
+  50%      { border-color: rgba(245, 158, 11, 1); }
+}

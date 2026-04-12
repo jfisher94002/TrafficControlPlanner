@@ -237,7 +237,8 @@ export function resolveTileUrl(envValue: string | undefined): string {
   if (!candidate) return DEFAULT_TILE_URL
   const missing = ['{z}', '{x}', '{y}'].filter(t => !candidate.includes(t))
   if (missing.length > 0) {
-    console.warn(`[TCP] Invalid VITE_TILE_URL "${candidate}": missing ${missing.join(', ')}. Falling back to default.`)
+    const safe = candidate.split('?')[0]  // omit query params that may contain API keys
+    console.warn(`[TCP] Invalid VITE_TILE_URL "${safe}": missing ${missing.join(', ')}. Falling back to default.`)
     return DEFAULT_TILE_URL
   }
   return candidate
@@ -245,7 +246,7 @@ export function resolveTileUrl(envValue: string | undefined): string {
 
 /** Substitutes {z}, {x}, {y} placeholders in a tile URL template. */
 export function buildTileUrl(template: string, z: number, x: number, y: number): string {
-  return template.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y))
+  return template.replaceAll('{z}', String(z)).replaceAll('{x}', String(x)).replaceAll('{y}', String(y))
 }
 
 // ─── GEOCODING ────────────────────────────────────────────────────────────────

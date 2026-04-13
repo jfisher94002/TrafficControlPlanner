@@ -162,6 +162,28 @@ describe('App — auth enabled', () => {
     })
   })
 
+  it('clears user state on Hub signedOut event', async () => {
+    render(<App />)
+    const hubListener = vi.mocked(Hub.listen).mock.calls[0][1] as (e: { payload: { event: string; data?: unknown } }) => void
+    hubListener({
+      payload: {
+        event: 'signedIn',
+        data: { username: 'hub-user-id', signInDetails: { loginId: 'hub@example.com' } },
+      },
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('prop-userId').textContent).toBe('hub-user-id')
+      expect(screen.getByTestId('sign-out-btn')).toBeInTheDocument()
+    })
+
+    hubListener({ payload: { event: 'signedOut' } })
+    await waitFor(() => {
+      expect(screen.getByTestId('prop-userId').textContent).toBe('null')
+      expect(screen.getByTestId('prop-userEmail').textContent).toBe('null')
+      expect(screen.queryByTestId('sign-out-btn')).not.toBeInTheDocument()
+    })
+  })
+
   it('calls amplifySignOut on tokenRefresh_failure', async () => {
     render(<App />)
     const hubListener = vi.mocked(Hub.listen).mock.calls[0][1] as (e: { payload: { event: string } }) => void
@@ -180,6 +202,25 @@ describe('App — auth enabled', () => {
     render(<App />)
     await userEvent.click(screen.getByTestId('request-sign-in-btn'))
     expect(screen.getByTestId('sign-in-modal')).toBeInTheDocument()
+  })
+
+  it('closes sign-in modal after Hub signedIn event', async () => {
+    render(<App />)
+    await userEvent.click(screen.getByTestId('request-sign-in-btn'))
+    expect(screen.getByTestId('sign-in-modal')).toBeInTheDocument()
+
+    const hubListener = vi.mocked(Hub.listen).mock.calls[0][1] as (e: { payload: { event: string; data?: unknown } }) => void
+    hubListener({
+      payload: {
+        event: 'signedIn',
+        data: { username: 'hub-user-id', signInDetails: { loginId: 'hub@example.com' } },
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('sign-in-modal')).not.toBeInTheDocument()
+      expect(screen.getByTestId('sign-out-btn')).toBeInTheDocument()
+    })
   })
 
   it('hides sign-in modal after sign-out button is clicked inside modal', async () => {

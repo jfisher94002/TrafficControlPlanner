@@ -9,16 +9,24 @@ import { join } from 'path'
 const E2E_EMAIL    = process.env.E2E_TEST_EMAIL    ?? 'e2e-test@tcplanpro.com'
 const E2E_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'E2eTestPass2026!'
 
+/** Opens the sign-in modal by clicking Export PDF. */
+async function openSignInModal(page: Parameters<Parameters<typeof test>[1]>[0]) {
+  await page.goto('/app')
+  await expect(page.getByTestId('export-pdf-button')).toBeVisible({ timeout: 15_000 })
+  await page.getByTestId('export-pdf-button').click()
+  await expect(page.getByRole('tab', { name: 'Sign In' })).toBeVisible({ timeout: 15_000 })
+}
+
 test.describe('Sign In', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app')
-    await expect(page.getByRole('tab', { name: 'Sign In' })).toBeVisible({ timeout: 15_000 })
+    await openSignInModal(page)
   })
 
   test('signs in with valid credentials and lands on app', async ({ page }) => {
     await page.getByLabel('Email').fill(E2E_EMAIL)
     await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
+    // Modal closes; canvas is already visible underneath
     await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
   })
 
@@ -32,7 +40,7 @@ test.describe('Sign In', () => {
 
 test.describe('Create Account', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app')
+    await openSignInModal(page)
     await page.getByRole('tab', { name: 'Create Account' }).click()
     await expect(page.getByRole('button', { name: 'Create Account' })).toBeVisible({ timeout: 15_000 })
   })
@@ -79,16 +87,17 @@ test.describe('Create Account', () => {
 })
 
 test.describe('Sign Out', () => {
-  test('sign out redirects to landing page', async ({ page }) => {
-    // Sign in first
-    await page.goto('/app')
+  test('sign out returns to anonymous canvas — no redirect', async ({ page }) => {
+    // Sign in via modal
+    await openSignInModal(page)
     await page.getByLabel('Email').fill(E2E_EMAIL)
     await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 
-    // Sign out
+    // Sign out — stays on /app, sign-out button disappears
     await page.getByTestId('sign-out-button').click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL(/\/app/)
+    await expect(page.getByTestId('sign-out-button')).not.toBeVisible()
   })
 })

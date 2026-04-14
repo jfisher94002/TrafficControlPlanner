@@ -16,14 +16,19 @@ setup('sign in as E2E test user', async ({ page }) => {
 
   await page.goto('/app')
 
-  // Wait for the Amplify Authenticator to mount
+  // Canvas loads immediately — no sign-in gate at app entry.
+  // Trigger the sign-in modal via the Export PDF button.
+  await expect(page.getByTestId('export-pdf-button')).toBeVisible({ timeout: 15_000 })
+  await page.getByTestId('export-pdf-button').click()
+
+  // Wait for the sign-in modal
   await expect(page.getByRole('tab', { name: 'Sign In' })).toBeVisible({ timeout: 15_000 })
 
   await page.getByLabel('Email').fill(email)
   await page.getByRole('textbox', { name: 'Password' }).fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  // Wait until the app canvas is visible — confirms successful sign-in
+  // Modal closes on success — canvas-container confirms we're in
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 
   await page.context().storageState({ path: AUTH_FILE })

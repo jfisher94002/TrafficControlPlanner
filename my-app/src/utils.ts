@@ -246,7 +246,7 @@ export function resolveTileUrl(envValue: string | undefined): string {
 
 /** Substitutes {z}, {x}, {y} placeholders in a tile URL template. */
 export function buildTileUrl(template: string, z: number, x: number, y: number): string {
-  return template.replaceAll('{z}', String(z)).replaceAll('{x}', String(x)).replaceAll('{y}', String(y))
+  return template.replace(/\{z\}/g, String(z)).replace(/\{x\}/g, String(x)).replace(/\{y\}/g, String(y))
 }
 
 // ─── GEOCODING ────────────────────────────────────────────────────────────────

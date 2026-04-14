@@ -1,13 +1,15 @@
 import json
 import logging
 import os
+import time
 import urllib.error
 import urllib.request
+from collections import defaultdict
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from mangum import Mangum
@@ -16,6 +18,26 @@ from models import CreateIssueRequest, ExportRequest
 from pdf_generator import build_pdf
 
 logger = logging.getLogger(__name__)
+
+# ─── IP RATE LIMITER ─────────────────────────────────────────────────────────
+# In-memory per Lambda instance: max 3 submissions per IP per hour.
+# Not perfectly global (Lambda has many instances) but catches unsophisticated
+# flooding from a single source without requiring DynamoDB.
+_RATE_LIMIT_MAX = 3
+_RATE_LIMIT_WINDOW = 3600  # seconds
+
+_ip_submissions: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(ip: str) -> None:
+    now = time.time()
+    window_start = now - _RATE_LIMIT_WINDOW
+    hits = [t for t in _ip_submissions[ip] if t > window_start]
+    if len(hits) >= _RATE_LIMIT_MAX:
+        logger.warning("Rate limit hit for IP %s", ip)
+        raise HTTPException(status_code=429, detail="Too many submissions. Please try again later.")
+    hits.append(now)
+    _ip_submissions[ip] = hits
 
 # Comma-separated list of allowed origins.  Set ALLOWED_ORIGINS in the
 # deployment environment to restrict access (e.g. "https://example.com").
@@ -67,9 +89,19 @@ _PRIORITY_EMOJI = {"low": "🟢", "medium": "🟡", "high": "🟠", "critical": 
 
 
 @app.post("/create-issue")
-def create_issue(payload: CreateIssueRequest):
-    if not payload.submitter_id:
-        raise HTTPException(status_code=403, detail="Forbidden: must submit from the app.")
+def create_issue(payload: CreateIssueRequest, request: Request):
+    # Honeypot — should always be empty for real users
+    if payload.website:
+        logger.warning("Honeypot triggered — dropping submission")
+        raise HTTPException(status_code=400, detail="Invalid submission.")
+
+    # Time-on-form check — bots submit instantly
+    if payload.time_on_form < 3:
+        logger.warning("Submission too fast (%.1fs) — dropping", payload.time_on_form)
+        raise HTTPException(status_code=400, detail="Invalid submission.")
+
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+    _check_rate_limit(ip)
 
     token = os.getenv("GITHUB_TOKEN", "")
     repo = os.getenv("GITHUB_REPO", "jfisher94002/TrafficControlPlanner")

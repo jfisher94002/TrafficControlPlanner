@@ -3,8 +3,12 @@
  * All tests run with stored auth state from auth.setup.ts.
  */
 import { test, expect } from '@playwright/test'
+import { seedMapCenter } from './openSignInModal'
 
 test.beforeEach(async ({ page }) => {
+  // Pre-seed a mapCenter so tools that require a map activate directly
+  // instead of showing the address-required modal.
+  await seedMapCenter(page)
   await page.goto('/app')
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 })

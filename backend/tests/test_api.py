@@ -124,12 +124,12 @@ def test_rate_limit_window_allows_after_expiry(monkeypatch, valid_issue):
     """Old hits outside the 1-hour window should no longer count."""
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     headers = {"x-forwarded-for": "192.0.2.44"}
-    # First three requests fill the bucket at times 1000, 1001, 1002.
-    # At time 4605, prior hits are outside the rolling 1-hour window.
-    with patch("main.time.time", side_effect=[1000, 1001, 1002, 4605]):
-        for _ in range(4):
-            res = client.post("/create-issue", json=valid_issue, headers=headers)
-            assert res.status_code == 503
+    # Seed three old hits; at time 4605 they're all outside the rolling window.
+    with patch("main.time.time", return_value=4605):
+        import main
+        main._ip_submissions["192.0.2.44"] = [1000, 1001, 1002]
+        res = client.post("/create-issue", json=valid_issue, headers=headers)
+        assert res.status_code == 503
 
 
 def test_rate_limit_uses_first_forwarded_ip(monkeypatch, valid_issue):

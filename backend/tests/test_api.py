@@ -93,6 +93,58 @@ def test_exactly_3s_is_accepted(monkeypatch, valid_issue):
     assert res.status_code == 503  # token missing, not rejected for timing
 
 
+def test_rate_limit_blocks_fourth_submission_from_same_ip(monkeypatch, valid_issue):
+    """After 3 hits in the window, the 4th submission from same IP is rejected."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    headers = {"x-forwarded-for": "203.0.113.10"}
+    for _ in range(3):
+        res = client.post("/create-issue", json=valid_issue, headers=headers)
+        assert res.status_code == 503  # token missing means request reached token check
+
+    blocked = client.post("/create-issue", json=valid_issue, headers=headers)
+    assert blocked.status_code == 429
+    assert blocked.json()["detail"] == "Too many submissions. Please try again later."
+
+
+def test_rate_limit_scoped_per_ip(monkeypatch, valid_issue):
+    """Rate limiting one client IP must not block another IP."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    ip_one = {"x-forwarded-for": "198.51.100.8"}
+    ip_two = {"x-forwarded-for": "198.51.100.9"}
+
+    for _ in range(3):
+        assert client.post("/create-issue", json=valid_issue, headers=ip_one).status_code == 503
+    assert client.post("/create-issue", json=valid_issue, headers=ip_one).status_code == 429
+
+    # Different IP should still proceed beyond rate limit check.
+    assert client.post("/create-issue", json=valid_issue, headers=ip_two).status_code == 503
+
+
+def test_rate_limit_window_allows_after_expiry(monkeypatch, valid_issue):
+    """Old hits outside the 1-hour window should no longer count."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    headers = {"x-forwarded-for": "192.0.2.44"}
+    # First three requests fill the bucket at times 1000, 1001, 1002.
+    # At time 4605, prior hits are outside the rolling 1-hour window.
+    with patch("main.time.time", side_effect=[1000, 1001, 1002, 4605]):
+        for _ in range(4):
+            res = client.post("/create-issue", json=valid_issue, headers=headers)
+            assert res.status_code == 503
+
+
+def test_rate_limit_uses_first_forwarded_ip(monkeypatch, valid_issue):
+    """When x-forwarded-for has multiple IPs, limiter should use the first one."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    first_ip_chain = {"x-forwarded-for": "203.0.113.20, 10.0.0.4"}
+    same_first_new_proxy = {"x-forwarded-for": "203.0.113.20, 10.0.0.99"}
+
+    for _ in range(3):
+        assert client.post("/create-issue", json=valid_issue, headers=first_ip_chain).status_code == 503
+
+    # Same first IP should still be blocked even when downstream proxy IP changes.
+    assert client.post("/create-issue", json=valid_issue, headers=same_first_new_proxy).status_code == 429
+
+
 def test_anonymous_submission_accepted_without_uid(monkeypatch):
     """Submissions without submitter_id (anonymous users) should no longer be blocked."""
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)

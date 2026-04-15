@@ -3,15 +3,12 @@
  * Runs against staging with stored auth state.
  */
 import { test, expect } from '@playwright/test'
+import { seedMapCenter } from './openSignInModal'
 
 test.beforeEach(async ({ page }) => {
   // Pre-seed a mapCenter so tools that require a map (lane_mask, crosswalk,
   // turn_lane) activate directly instead of showing the address-required modal.
-  await page.addInitScript(() => {
-    const autosave = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
-    autosave.mapCenter = { lat: 37.77, lon: -122.41, zoom: 16 }
-    localStorage.setItem('tcp_autosave', JSON.stringify(autosave))
-  })
+  await seedMapCenter(page)
   await page.goto('/app')
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 })

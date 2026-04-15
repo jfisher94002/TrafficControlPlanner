@@ -1,5 +1,18 @@
 import { expect, type Page } from '@playwright/test'
 
+/**
+ * Seeds a mapCenter into tcp_autosave localStorage before page load so that
+ * tools in TOOLS_REQUIRING_MAP activate directly without showing the
+ * address-required modal. Call via page.addInitScript() before page.goto().
+ */
+export function seedMapCenter(page: Page): Promise<void> {
+  return page.addInitScript(() => {
+    const autosave = JSON.parse(localStorage.getItem('tcp_autosave') || '{}')
+    autosave.mapCenter = { lat: 37.77, lon: -122.41, zoom: 16 }
+    localStorage.setItem('tcp_autosave', JSON.stringify(autosave))
+  })
+}
+
 /** Opens the sign-in modal by clicking Export PDF on /app. */
 export async function openSignInModal(page: Page) {
   await page.goto('/app')

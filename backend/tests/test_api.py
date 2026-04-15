@@ -51,16 +51,9 @@ def test_export_pdf_no_signs(plan_no_signs):
     assert res.content[:4] == b"%PDF"
 
 
-def test_create_issue_returns_503_when_token_missing(monkeypatch):
+def test_create_issue_returns_503_when_token_missing(monkeypatch, valid_issue):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-    res = client.post("/create-issue", json={
-        "issue_type": "bug",
-        "title": "Test issue",
-        "body": "Test body",
-        "priority": "medium",
-        "submitter_name": "Tester",
-        "submitter_id": "user-123",
-    })
+    res = client.post("/create-issue", json=valid_issue)
     assert res.status_code == 503
 
 
@@ -71,20 +64,47 @@ def test_create_issue_validates_input():
         "body": "x",
         "priority": "medium",
         "submitter_name": "x",
+        "time_on_form": 10.0,
     })
     assert res.status_code == 422
 
 
-def test_create_issue_missing_submitter_id_returns_403():
-    """Requests without a submitter_id (i.e. not coming through the app) are rejected."""
+# ─── Spam protection tests ────────────────────────────────────────────────────
+
+def test_honeypot_rejects_submission(valid_issue):
+    """Requests with the honeypot field filled in are rejected with 400."""
+    valid_issue["website"] = "http://spammer.example.com"
+    res = client.post("/create-issue", json=valid_issue)
+    assert res.status_code == 400
+
+
+def test_too_fast_submission_rejected(valid_issue):
+    """Submissions under 3 seconds on-form are rejected."""
+    valid_issue["time_on_form"] = 1.5
+    res = client.post("/create-issue", json=valid_issue)
+    assert res.status_code == 400
+
+
+def test_exactly_3s_is_accepted(monkeypatch, valid_issue):
+    """Exactly 3 seconds on-form should pass the time check."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    valid_issue["time_on_form"] = 3.0
+    res = client.post("/create-issue", json=valid_issue)
+    assert res.status_code == 503  # token missing, not rejected for timing
+
+
+def test_anonymous_submission_accepted_without_uid(monkeypatch):
+    """Submissions without submitter_id (anonymous users) should no longer be blocked."""
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     res = client.post("/create-issue", json={
         "issue_type": "bug",
         "title": "Test",
         "body": "Test body",
         "priority": "medium",
-        "submitter_name": "Tester",
+        "submitter_name": "Anonymous",
+        "time_on_form": 10.0,
     })
-    assert res.status_code == 403
+    assert res.status_code == 503  # token missing, not 403
 
 
 # ─── Security / Input Sanitization Tests ─────────────────────────────────────
@@ -261,6 +281,7 @@ def test_create_issue_fields_at_limit_accepted(monkeypatch):
         "priority": "medium",
         "submitter_name": "S" * 100,
         "submitter_id": "user-123",
+        "time_on_form": 10.0,
     })
     assert res.status_code == 503  # validation passed; fails only on missing token
 
@@ -282,6 +303,7 @@ def test_md_escape_strips_newlines(monkeypatch):
             "submitter_name": "Line1\nLine2",
             "submitter_email": "evil\r\nhdr@x.com",
             "submitter_id": "user-123",
+            "time_on_form": 10.0,
         })
     assert res.status_code == 200
     call_args = mock_open.call_args[0][0]
@@ -309,6 +331,7 @@ def test_md_escape_escapes_markdown_special_chars(monkeypatch):
             "submitter_name": "[Injection](http://evil.com)",
             "submitter_email": "test@example.com",
             "submitter_id": "user-123",
+            "time_on_form": 10.0,
         })
     assert res.status_code == 200
     call_args = mock_open.call_args[0][0]
@@ -478,7 +501,7 @@ def test_ses_not_called_when_sender_not_configured(monkeypatch):
         res = client.post("/create-issue", json={
             "issue_type": "bug", "title": "t", "body": "b",
             "priority": "medium", "submitter_name": "Tester",
-            "submitter_email": "user@example.com", "submitter_id": "u-1",
+            "submitter_email": "user@example.com", "submitter_id": "u-1", "time_on_form": 10.0,
         })
     assert res.status_code == 200
     mock_boto.assert_not_called()
@@ -494,7 +517,7 @@ def test_ses_sends_email_with_reply_to_when_email_provided(monkeypatch):
         res = client.post("/create-issue", json={
             "issue_type": "bug", "title": "t", "body": "b",
             "priority": "medium", "submitter_name": "Tester",
-            "submitter_email": "user@example.com", "submitter_id": "u-1",
+            "submitter_email": "user@example.com", "submitter_id": "u-1", "time_on_form": 10.0,
         })
     assert res.status_code == 200
     mock_ses.send_email.assert_called_once()
@@ -514,7 +537,7 @@ def test_ses_no_reply_to_when_no_submitter_email(monkeypatch):
         res = client.post("/create-issue", json={
             "issue_type": "bug", "title": "t", "body": "b",
             "priority": "medium", "submitter_name": "Tester",
-            "submitter_id": "u-1",
+            "submitter_id": "u-1", "time_on_form": 10.0,
         })
     assert res.status_code == 200
     mock_ses.send_email.assert_called_once()
@@ -536,7 +559,7 @@ def test_ses_failure_does_not_break_issue_creation(monkeypatch):
         res = client.post("/create-issue", json={
             "issue_type": "bug", "title": "t", "body": "b",
             "priority": "medium", "submitter_name": "Tester",
-            "submitter_email": "user@example.com", "submitter_id": "u-1",
+            "submitter_email": "user@example.com", "submitter_id": "u-1", "time_on_form": 10.0,
         })
     assert res.status_code == 200
     assert res.json()["issue_number"] == 42
@@ -552,7 +575,7 @@ def test_ses_email_subject_and_body_content(monkeypatch):
         res = client.post("/create-issue", json={
             "issue_type": "bug", "title": "Map crashes on zoom", "body": "Steps to repro here",
             "priority": "high", "submitter_name": "Tester",
-            "submitter_email": "user@example.com", "submitter_id": "u-1",
+            "submitter_email": "user@example.com", "submitter_id": "u-1", "time_on_form": 10.0,
         })
     assert res.status_code == 200
     call_kwargs = mock_ses.send_email.call_args[1]
@@ -578,6 +601,7 @@ def test_ses_body_omits_submitter_email_line_when_absent(monkeypatch):
         res = client.post("/create-issue", json={
             "issue_type": "bug", "title": "t", "body": "b",
             "priority": "medium", "submitter_name": "Tester", "submitter_id": "u-1",
+            "time_on_form": 10.0,
         })
     assert res.status_code == 200
     body = mock_ses.send_email.call_args[1]["Message"]["Body"]["Text"]["Data"]
@@ -597,7 +621,7 @@ def test_ses_not_called_when_github_fails(monkeypatch):
         res = client.post("/create-issue", json={
             "issue_type": "bug", "title": "t", "body": "b",
             "priority": "medium", "submitter_name": "Tester",
-            "submitter_email": "user@example.com", "submitter_id": "u-1",
+            "submitter_email": "user@example.com", "submitter_id": "u-1", "time_on_form": 10.0,
         })
     assert res.status_code == 502
     mock_ses.send_email.assert_not_called()

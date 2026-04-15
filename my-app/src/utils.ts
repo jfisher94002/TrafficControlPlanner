@@ -224,6 +224,33 @@ export function formatSearchPrimary(result: GeocodeResult): string {
   return result?.display_name || ''
 }
 
+// ─── TILE URL ─────────────────────────────────────────────────────────────────
+
+export const DEFAULT_TILE_URL = 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png'
+
+/**
+ * Resolves the tile URL template from the env var, falling back to the Stadia
+ * Maps default. Logs a warning and falls back if required placeholders are missing.
+ */
+export function resolveTileUrl(envValue: string | undefined): string {
+  const candidate = envValue?.trim()
+  if (!candidate) return DEFAULT_TILE_URL
+  const missing = ['{z}', '{x}', '{y}'].filter(t => !candidate.includes(t))
+  if (missing.length > 0) {
+    const safe = candidate.split('?')[0]  // omit query params that may contain API keys
+    console.warn(`[TCP] Invalid VITE_TILE_URL "${safe}": missing ${missing.join(', ')}. Falling back to default.`)
+    return DEFAULT_TILE_URL
+  }
+  return candidate
+}
+
+/** Substitutes {z}, {x}, {y} placeholders in a tile URL template. */
+export function buildTileUrl(template: string, z: number, x: number, y: number): string {
+  return template.replace(/\{z\}/g, String(z)).replace(/\{x\}/g, String(x)).replace(/\{y\}/g, String(y))
+}
+
+// ─── GEOCODING ────────────────────────────────────────────────────────────────
+
 export async function geocodeAddress(query: string): Promise<GeocodeResult[]> {
   try {
     const response = await fetch(

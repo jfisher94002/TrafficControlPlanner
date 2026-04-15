@@ -342,6 +342,12 @@
 
       <hr class="divider">
 
+      <!-- Honeypot: hidden from real users, bots fill it in -->
+      <div style="position:absolute;left:-9999px;opacity:0;pointer-events:none" aria-hidden="true">
+        <label for="website">Website (leave blank)</label>
+        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+      </div>
+
       <button class="submit-btn" id="submitBtn" onclick="submitIssue()">
         <span id="btnText">Submit to Backlog</span>
         <span class="spinner" id="spinner"></span>
@@ -369,15 +375,8 @@
 </div>
 
 <script>
-  // ─── AUTH GUARD ───────────────────────────────────────────────────────────
-  // feedback.html must only be reached via the app (which passes uid= in the
-  // URL after authentication). Direct URL access without uid redirects to app.
-  (function() {
-    const _p = new URLSearchParams(window.location.search);
-    if (!_p.get('uid')) {
-      window.location.replace('/app');
-    }
-  })();
+  // ─── SPAM PROTECTION ─────────────────────────────────────────────────────
+  const _formLoadTime = Date.now();
 
   // ─── USER IDENTITY FROM URL PARAMS ───────────────────────────────────────
   const params = new URLSearchParams(window.location.search);
@@ -447,6 +446,8 @@
           submitter_name: name,
           submitter_email: userEmail || null,
           submitter_id: userId || null,
+          website: document.getElementById('website').value,
+          time_on_form: (Date.now() - _formLoadTime) / 1000,
         })
       });
 

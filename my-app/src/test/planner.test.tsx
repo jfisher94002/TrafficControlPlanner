@@ -72,6 +72,44 @@ describe('Undo/Redo', () => {
     await user.click(screen.getByTestId('redo-button'))
     expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
   })
+
+  it('toolbar undo/redo clears selection even when object still exists', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(within(screen.getByTestId('right-panel')).getByLabelText('X')).toBeInTheDocument()
+
+    const xInput = within(screen.getByTestId('right-panel')).getByLabelText('X')
+    await user.clear(xInput)
+    await user.type(xInput, '42')
+
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    expect(within(screen.getByTestId('right-panel')).queryByLabelText('X')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('redo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    expect(within(screen.getByTestId('right-panel')).queryByLabelText('X')).not.toBeInTheDocument()
+  })
+
+  it('keyboard undo/redo clears selection even when object still exists', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(within(screen.getByTestId('right-panel')).getByLabelText('X')).toBeInTheDocument()
+
+    const xInput = within(screen.getByTestId('right-panel')).getByLabelText('X')
+    await user.clear(xInput)
+    await user.type(xInput, '99')
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    expect(within(screen.getByTestId('right-panel')).queryByLabelText('X')).not.toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'y', ctrlKey: true })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    expect(within(screen.getByTestId('right-panel')).queryByLabelText('X')).not.toBeInTheDocument()
+  })
 })
 
 // ─── Plan metadata ────────────────────────────────────────────────────────────

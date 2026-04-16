@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useAutosave } from './useAutosave'
 import { AUTOSAVE_KEY } from '../features/tcp/planUtils'
@@ -44,6 +44,10 @@ function makeParams(objects: CanvasObject[]): Parameters<typeof useAutosave>[0] 
 }
 
 describe('useAutosave', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('writes plan state to localStorage with expected fields', async () => {
     renderHook(() => useAutosave(makeParams(makeObjects(['a', 'b']))))
 
@@ -72,6 +76,7 @@ describe('useAutosave', () => {
     setItemSpy.mockImplementationOnce(() => {
       throw new Error('quota exceeded')
     })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     const { result, rerender } = renderHook(
       ({ objects }) => useAutosave(makeParams(objects)),
@@ -79,7 +84,7 @@ describe('useAutosave', () => {
     )
 
     await waitFor(() => {
-      expect(result.current.autosaveError).toBe('quota exceeded')
+      expect(warnSpy).toHaveBeenCalledWith('[TCP] Auto-save failed:', 'quota exceeded')
     })
 
     rerender({ objects: makeObjects(['a', 'b']) })

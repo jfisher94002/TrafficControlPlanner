@@ -4,10 +4,15 @@ import { useMapTiles } from './useMapTiles'
 import type { MapCenter } from '../types'
 
 class MockImage {
+  static created: MockImage[] = []
   onload: null | (() => void) = null
   onerror: null | (() => void) = null
-  crossOrigin: string | null = null
+  crossOrigin = ''
   src = ''
+
+  constructor() {
+    MockImage.created.push(this)
+  }
 }
 
 function makeCenter(lon = 0): MapCenter {
@@ -15,11 +20,9 @@ function makeCenter(lon = 0): MapCenter {
 }
 
 describe('useMapTiles', () => {
-  const imageCtor = vi.fn(() => new MockImage() as unknown as HTMLImageElement)
-
   beforeEach(() => {
-    vi.stubGlobal('Image', imageCtor as unknown as typeof Image)
-    imageCtor.mockClear()
+    MockImage.created = []
+    vi.stubGlobal('Image', MockImage as unknown as typeof Image)
   })
 
   afterEach(() => {
@@ -33,7 +36,7 @@ describe('useMapTiles', () => {
 
     expect(result.current.mapTiles).toEqual([])
     expect(result.current.mapTileCacheRef.current).toEqual({})
-    expect(imageCtor).not.toHaveBeenCalled()
+    expect(MockImage.created).toHaveLength(0)
   })
 
   it('loads tiles once, marks loaded on onload, and reuses cache on rerender', async () => {
@@ -43,7 +46,7 @@ describe('useMapTiles', () => {
     )
 
     expect(result.current.mapTiles.length).toBeGreaterThan(0)
-    expect(imageCtor.mock.calls.length).toBe(result.current.mapTiles.length)
+    expect(MockImage.created.length).toBe(result.current.mapTiles.length)
 
     const firstTileUrl = result.current.mapTiles[0].url
     const firstEntry = result.current.mapTileCacheRef.current[firstTileUrl]
@@ -60,7 +63,7 @@ describe('useMapTiles', () => {
     })
 
     rerender({ center: makeCenter() })
-    expect(imageCtor.mock.calls.length).toBe(result.current.mapTiles.length)
+    expect(MockImage.created.length).toBe(result.current.mapTiles.length)
   })
 
   it('removes failed tile from cache and retries it on next recalculation', async () => {
@@ -69,7 +72,7 @@ describe('useMapTiles', () => {
       { initialProps: { center: makeCenter() } },
     )
 
-    const initialCreated = imageCtor.mock.calls.length
+    const initialCreated = MockImage.created.length
     const retryUrl = result.current.mapTiles[0].url
     const retryEntry = result.current.mapTileCacheRef.current[retryUrl]
     expect(retryEntry).toBeDefined()
@@ -87,6 +90,6 @@ describe('useMapTiles', () => {
     await waitFor(() => {
       expect(result.current.mapTileCacheRef.current[retryUrl]).toBeDefined()
     })
-    expect(imageCtor.mock.calls.length).toBe(initialCreated + 1)
+    expect(MockImage.created.length).toBe(initialCreated + 1)
   })
 })

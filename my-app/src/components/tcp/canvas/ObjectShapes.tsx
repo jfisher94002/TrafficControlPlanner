@@ -74,12 +74,13 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
     }
   }
 
+  const { id } = obj;
   const shoulderLines = shoulderWidth > 0 ? [
-    <Line key="sl" points={[
+    <Line key={`${id}-sl`} points={[
       x1 + nx * (hw + shoulderWidth / 2), y1 + ny * (hw + shoulderWidth / 2),
       x2 + nx * (hw + shoulderWidth / 2), y2 + ny * (hw + shoulderWidth / 2),
     ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
-    <Line key="sr" points={[
+    <Line key={`${id}-sr`} points={[
       x1 - nx * (hw + shoulderWidth / 2), y1 - ny * (hw + shoulderWidth / 2),
       x2 - nx * (hw + shoulderWidth / 2), y2 - ny * (hw + shoulderWidth / 2),
     ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
@@ -90,11 +91,11 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
   if (sidewalkWidth > 0 && sidewalkSide) {
     if (showLeft) {
       sidewalkLines.push(
-        <Line key="swl-fill" points={[
+        <Line key={`${id}-swl-fill`} points={[
           x1 + nx * swOff, y1 + ny * swOff,
           x2 + nx * swOff, y2 + ny * swOff,
         ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
-        <Line key="swl-edge" points={[
+        <Line key={`${id}-swl-edge`} points={[
           x1 + nx * (swOff + sidewalkWidth / 2), y1 + ny * (swOff + sidewalkWidth / 2),
           x2 + nx * (swOff + sidewalkWidth / 2), y2 + ny * (swOff + sidewalkWidth / 2),
         ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
@@ -102,11 +103,11 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
     }
     if (showRight) {
       sidewalkLines.push(
-        <Line key="swr-fill" points={[
+        <Line key={`${id}-swr-fill`} points={[
           x1 - nx * swOff, y1 - ny * swOff,
           x2 - nx * swOff, y2 - ny * swOff,
         ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
-        <Line key="swr-edge" points={[
+        <Line key={`${id}-swr-edge`} points={[
           x1 - nx * (swOff + sidewalkWidth / 2), y1 - ny * (swOff + sidewalkWidth / 2),
           x2 - nx * (swOff + sidewalkWidth / 2), y2 - ny * (swOff + sidewalkWidth / 2),
         ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
@@ -133,7 +134,7 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
 
 interface PolylineRoadProps { obj: PolylineRoadObject; isSelected: boolean; }
 export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
-  const { points, width, lanes, roadType, smooth } = obj;
+  const { id, points, width, lanes, roadType, smooth } = obj;
   const tension = smooth ? 0.5 : 0;
   if (!points || points.length < 2) return null;
 
@@ -159,14 +160,14 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
       if (isCenter) {
         for (const d of [-2, 2]) {
           laneMarkings.push(
-            <Line key={`c${li}_${si}_${d}`}
+            <Line key={`${id}-c${li}_${si}_${d}`}
               points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
               stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
           );
         }
       } else {
         laneMarkings.push(
-          <Line key={`l${li}_${si}`}
+          <Line key={`${id}-l${li}_${si}`}
             points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
             stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
         );
@@ -192,7 +193,7 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
 
 interface CurveRoadProps { obj: CurveRoadObject; isSelected: boolean; }
 export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
-  const { points, width, lanes, roadType } = obj;
+  const { id, points, width, lanes, roadType } = obj;
   if (!points || points.length < 3) return null;
   const [p0, p1, p2] = points;
 
@@ -212,14 +213,14 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
       if (isCenter) {
         for (const d of [-2, 2]) {
           laneMarkings.push(
-            <Line key={`c${li}_${si}_${d}`}
+            <Line key={`${id}-c${li}_${si}_${d}`}
               points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
               stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
           );
         }
       } else {
         laneMarkings.push(
-          <Line key={`l${li}_${si}`}
+          <Line key={`${id}-l${li}_${si}`}
             points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
             stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
         );
@@ -246,7 +247,7 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
 
 interface CubicBezierRoadProps { obj: CubicBezierRoadObject; isSelected: boolean; }
 export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
-  const { points, width, lanes, roadType } = obj;
+  const { id, points, width, lanes, roadType } = obj;
   if (!points || points.length < 4) return null;
   const [p0, p1, p2, p3] = points;
 
@@ -266,14 +267,14 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
       if (isCenter) {
         for (const d of [-2, 2]) {
           laneMarkings.push(
-            <Line key={`c${li}_${si}_${d}`}
+            <Line key={`${id}-c${li}_${si}_${d}`}
               points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
               stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
           );
         }
       } else {
         laneMarkings.push(
-          <Line key={`l${li}_${si}`}
+          <Line key={`${id}-l${li}_${si}`}
             points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
             stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
         );

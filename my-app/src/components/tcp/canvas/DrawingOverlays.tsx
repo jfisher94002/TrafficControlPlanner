@@ -1,3 +1,4 @@
+import type React from 'react';
 import { Line, Rect, Circle } from 'react-konva';
 import type { DrawStart, Point, LaneMaskObject, CrosswalkObject } from '../../../types';
 import { sampleBezier, sampleCubicBezier } from '../../../utils';
@@ -17,7 +18,7 @@ interface DrawingOverlaysProps {
 
 export function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicator, polyPoints, curvePoints, cubicPoints }: DrawingOverlaysProps) {
   const previewTarget = snapIndicator || cursorPos;
-  const elements = [];
+  const elements: React.ReactNode[] = [];
 
   if (drawStart && tool === "road" && roadDrawMode === "straight") {
     elements.push(
@@ -129,7 +130,7 @@ export function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snap
           stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
       );
       elements.push(
-        <Line key="cubic-tangent-1"
+        <Line key="cubic-tangent-1-2pt"
           points={[q0.x, q0.y, q1.x, q1.y]}
           stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
       );
@@ -140,12 +141,12 @@ export function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snap
           stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
       );
       elements.push(
-        <Line key="cubic-tangent-1"
+        <Line key="cubic-tangent-1-3pt"
           points={[q0.x, q0.y, q1.x, q1.y]}
           stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
       );
       elements.push(
-        <Line key="cubic-tangent-2"
+        <Line key="cubic-tangent-2-3pt"
           points={[q2.x, q2.y, previewTarget.x, previewTarget.y]}
           stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
       );

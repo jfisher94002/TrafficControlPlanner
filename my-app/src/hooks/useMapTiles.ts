@@ -46,6 +46,11 @@ export function useMapTiles(
   }, [mapCenter, canvasSize.w, canvasSize.h]);
 
   useEffect(() => {
+    // Evict tiles no longer in the current viewport to prevent unbounded cache growth
+    const validUrls = new Set(mapTiles.map((t) => t.url));
+    for (const url of Object.keys(mapTileCacheRef.current)) {
+      if (!validUrls.has(url)) delete mapTileCacheRef.current[url];
+    }
     mapTiles.forEach((tile) => {
       if (mapTileCacheRef.current[tile.url]) return;
       const image = new Image();

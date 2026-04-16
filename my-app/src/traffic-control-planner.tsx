@@ -256,9 +256,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const key = e.key.toUpperCase();
 
       if (e.metaKey || e.ctrlKey) {
-        if (key === "Z" && e.shiftKey) { e.preventDefault(); redo(); return; }
-        if (key === "Z") { e.preventDefault(); undo(); return; }
-        if (key === "Y") { e.preventDefault(); redo(); return; }
+        if (key === "Z" && e.shiftKey) { e.preventDefault(); redo(); setSelected(null); return; }
+        if (key === "Z") { e.preventDefault(); undo(); setSelected(null); return; }
+        if (key === "Y") { e.preventDefault(); redo(); setSelected(null); return; }
         if (key === "C" && selected) {
           e.preventDefault();
           const obj = objects.find((o) => o.id === selected);
@@ -269,7 +269,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           e.preventDefault();
           const clone = cloneObject(clipboard);
           const newObjs = [...objects, clone];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(clone.id);
+          pushHistory(newObjs); setSelected(clone.id);
           setClipboard(clone); // shift clipboard so repeated Ctrl+V continues to offset
           return;
         }
@@ -279,7 +279,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           if (obj) {
             const clone = cloneObject(obj);
             const newObjs = [...objects, clone];
-            setObjects(newObjs); pushHistory(newObjs); setSelected(clone.id);
+            pushHistory(newObjs); setSelected(clone.id);
           }
           return;
         }
@@ -293,7 +293,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length >= 2) {
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         }
         return;
@@ -302,7 +302,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       if (key === "DELETE" || key === "BACKSPACE") {
         if (selected) {
           const newObjs = objects.filter((o) => o.id !== selected);
-          setObjects(newObjs); pushHistory(newObjs); setSelected(null);
+          pushHistory(newObjs); setSelected(null);
         }
         return;
       }
@@ -338,12 +338,12 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   // Object helpers
   const updateObject = (id: string, updates: Record<string, unknown>) => {
     const newObjs = objects.map((o) => (o.id === id ? { ...o, ...updates } as CanvasObject : o));
-    setObjects(newObjs); pushHistory(newObjs);
+    pushHistory(newObjs);
   };
 
   const deleteObject = (id: string) => {
     const newObjs = objects.filter((o) => o.id !== id);
-    setObjects(newObjs); pushHistory(newObjs); setSelected(null);
+    pushHistory(newObjs); setSelected(null);
   };
 
   const reorderObject = (id: string, dir: "front" | "forward" | "backward" | "back") => {
@@ -358,18 +358,17 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     else if (dir === "back")     next.unshift(obj);
     else if (dir === "forward")  next.splice(idx + 1, 0, obj);
     else                         next.splice(idx - 1, 0, obj);
-    setObjects(next);
     pushHistory(next);
   };
 
   const clearAll = () => {
-    if (confirm("Clear all objects?")) { setObjects([]); pushHistory([]); setSelected(null); }
+    if (confirm("Clear all objects?")) { pushHistory([]); setSelected(null); }
   };
 
   const newPlan = () => {
     if (objects.length > 0 && !confirm("Start a new plan? Unsaved changes will be lost.")) return;
     localStorage.removeItem(AUTOSAVE_KEY);
-    setObjects([]); pushHistory([]); setSelected(null);
+    pushHistory([]); setSelected(null);
     setPlanTitle("Untitled Traffic Control Plan");
     setPlanId(uid());
     setPlanCreatedAt(new Date().toISOString());
@@ -387,14 +386,12 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setCubicPoints([]);
     setSnapIndicator(null);
     if (mode === 'replace') {
-      setObjects(templateObjects);
       pushHistory(templateObjects);
       setSelected(null);
       setOffset({ x: 0, y: 0 });
       setZoom(1);
     } else {
       const merged = [...objects, ...templateObjects];
-      setObjects(merged);
       pushHistory(merged);
       setSelected(null);
     }
@@ -555,7 +552,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (plan.canvasOffset) setOffset(plan.canvasOffset);
         if (plan.canvasZoom) setZoom(plan.canvasZoom);
         const loaded: CanvasObject[] = plan.canvasState?.objects || [];
-        setObjects(loaded); pushHistory(loaded); setSelected(null);
+        pushHistory(loaded); setSelected(null);
       } catch {
         alert("Failed to load plan. Make sure it's a valid .tcp.json file.");
       }
@@ -725,8 +722,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={undo} style={panelBtnStyle(false)} title="Undo (Ctrl+Z)" data-testid="undo-button">↶ Undo</button>
-          <button onClick={redo} style={panelBtnStyle(false)} title="Redo (Ctrl+Shift+Z)" data-testid="redo-button">↷ Redo</button>
+          <button onClick={() => { undo(); setSelected(null); }} style={panelBtnStyle(false)} title="Undo (Ctrl+Z)" data-testid="undo-button">↶ Undo</button>
+          <button onClick={() => { redo(); setSelected(null); }} style={panelBtnStyle(false)} title="Redo (Ctrl+Shift+Z)" data-testid="redo-button">↷ Redo</button>
           <div style={{ width: 1, height: 20, background: COLORS.panelBorder }} />
           <button onClick={clearAll} style={{ ...panelBtnStyle(false), color: COLORS.danger, borderColor: "rgba(239,68,68,0.3)" }}>Clear All</button>
         </div>

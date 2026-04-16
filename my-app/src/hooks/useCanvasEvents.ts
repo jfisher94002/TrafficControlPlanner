@@ -32,8 +32,8 @@ interface CanvasEventsProps {
   offset: Point;
   mapCenter: MapCenter | null;
   // Palette
-  selectedSign: SignData;
-  selectedDevice: DeviceData;
+  selectedSign: SignData | null;
+  selectedDevice: DeviceData | null;
   selectedRoadType: RoadType;
   // Draw state
   polyPoints: Point[];
@@ -189,17 +189,17 @@ export function useCanvasEvents({
     }
 
     if (tool === "sign") {
+      if (!selectedSign) return;
       const newSign: SignObject = { id: uid(), type: "sign", x: raw.x, y: raw.y, signData: selectedSign, rotation: 0, scale: 1 };
       const newObjs = [...objects, newSign];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newSign.id);
-      if (selectedSign) {
-        const isCustom = selectedSign.id.startsWith('custom_');
-        track('sign_placed', { sign_id: selectedSign.id, sign_source: isCustom ? 'custom' : 'builtin', ...(isCustom ? {} : { sign_label: selectedSign.label }) });
-      }
+      const isCustom = selectedSign.id.startsWith('custom_');
+      track('sign_placed', { sign_id: selectedSign.id, sign_source: isCustom ? 'custom' : 'builtin', ...(isCustom ? {} : { sign_label: selectedSign.label }) });
       return;
     }
 
     if (tool === "device") {
+      if (!selectedDevice) return;
       const newDev: DeviceObject = { id: uid(), type: "device", x: raw.x, y: raw.y, deviceData: selectedDevice, rotation: 0 };
       const newObjs = [...objects, newDev];
       setObjects(newObjs); pushHistory(newObjs); setSelected(newDev.id);

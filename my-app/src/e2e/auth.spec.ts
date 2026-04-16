@@ -5,21 +5,21 @@
 import { test, expect } from '@playwright/test'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
+import { expectSignedIn, openSignInModal } from './openSignInModal'
 
 const E2E_EMAIL    = process.env.E2E_TEST_EMAIL    ?? 'e2e-test@tcplanpro.com'
 const E2E_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'E2eTestPass2026!'
 
 test.describe('Sign In', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app')
-    await expect(page.getByRole('tab', { name: 'Sign In' })).toBeVisible({ timeout: 15_000 })
+    await openSignInModal(page)
   })
 
   test('signs in with valid credentials and lands on app', async ({ page }) => {
     await page.getByLabel('Email').fill(E2E_EMAIL)
     await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
+    await expectSignedIn(page)
   })
 
   test('shows error with wrong password', async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('Sign In', () => {
 
 test.describe('Create Account', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app')
+    await openSignInModal(page)
     await page.getByRole('tab', { name: 'Create Account' }).click()
     await expect(page.getByRole('button', { name: 'Create Account' })).toBeVisible({ timeout: 15_000 })
   })
@@ -79,16 +79,17 @@ test.describe('Create Account', () => {
 })
 
 test.describe('Sign Out', () => {
-  test('sign out redirects to landing page', async ({ page }) => {
-    // Sign in first
-    await page.goto('/app')
+  test('sign out returns to anonymous canvas — no redirect', async ({ page }) => {
+    // Sign in via modal
+    await openSignInModal(page)
     await page.getByLabel('Email').fill(E2E_EMAIL)
     await page.getByRole('textbox', { name: 'Password' }).fill(E2E_PASSWORD)
     await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
+    await expectSignedIn(page)
 
-    // Sign out
+    // Sign out — stays on /app, sign-out button disappears
     await page.getByTestId('sign-out-button').click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL((url: URL) => url.pathname === '/app')
+    await expect(page.getByTestId('sign-out-button')).not.toBeVisible()
   })
 })

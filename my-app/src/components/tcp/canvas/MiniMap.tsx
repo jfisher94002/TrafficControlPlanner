@@ -100,6 +100,7 @@ export function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMa
       ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 1.5;
       ctx.strokeRect(mmW / 2 - vw / 2, mmH / 2 - vh / 2, vw, vh);
     } else {
+      if (zoom <= 0) return;
       const worldW = 4000, worldH = 3000;
       const s = Math.min(mmW / worldW, mmH / worldH);
       objects.forEach((obj) => {

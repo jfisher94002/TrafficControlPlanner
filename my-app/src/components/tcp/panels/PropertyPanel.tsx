@@ -344,13 +344,9 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
 
       {isLineObject(obj) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
-          {(["x1", "y1", "x2", "y2"] as const).reduce<[string, string][]>((pairs, k, i) => {
-            if (i % 2 === 0) pairs.push([k, "x1"]);
-            else pairs[pairs.length - 1][1] = k;
-            return pairs;
-          }, []).map((_, rowIdx) => (
+          {([ ["x1", "y1"], ["x2", "y2"] ] as const).map((row, rowIdx) => (
             <div key={rowIdx} style={{ display: "flex", gap: 6 }}>
-              {(["x1", "y1", "x2", "y2"] as const).slice(rowIdx * 2, rowIdx * 2 + 2).map((k) => (
+              {row.map((k) => (
                 <label key={k} style={{ flex: 1, fontSize: 11, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 2 }}>
                   {k.toUpperCase()}
                   <input type="number" step="any" value={obj[k]}

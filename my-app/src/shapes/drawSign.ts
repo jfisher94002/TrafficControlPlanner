@@ -3,7 +3,7 @@ import { COLORS } from '../features/tcp/constants';
 
 export function drawSign(
   ctx: CanvasRenderingContext2D,
-  sign: { x: number; y: number; signData: SignData; rotation: number; scale: number },
+  sign: { x: number; y: number; signData: SignData; rotation?: number; scale?: number },
   isSelected: boolean,
 ): void {
   const { x, y, signData, rotation = 0, scale = 1 } = sign;

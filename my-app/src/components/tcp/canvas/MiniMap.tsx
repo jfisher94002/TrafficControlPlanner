@@ -2,7 +2,8 @@ import { useRef, useState, useEffect } from 'react';
 import type { CanvasObject, MapCenter, Point } from '../../../types';
 import { isPointObject } from '../../../utils';
 import { buildTileUrl } from '../../../utils';
-import { COLORS, TILE_URL_TEMPLATE } from '../../../features/tcp/constants';
+import { COLORS } from '../../../features/tcp/constants';
+import { TILE_URL_TEMPLATE } from '../../../features/tcp/tileUrl';
 
 export function latLonToPixel(lat: number, lon: number, zoom: number): { x: number; y: number } {
   const scale = Math.pow(2, zoom) * 256;

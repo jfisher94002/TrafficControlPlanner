@@ -27,7 +27,8 @@ import {
   TOOLS,
   TOOLS_REQUIRING_MAP,
 } from './features/tcp/tcpCatalog';
-import { COLORS, GRID_SIZE, MIN_ZOOM, MAX_ZOOM, SNAP_RADIUS, TILE_URL_TEMPLATE } from './features/tcp/constants';
+import { COLORS, GRID_SIZE, MIN_ZOOM, MAX_ZOOM, SNAP_RADIUS } from './features/tcp/constants';
+import { TILE_URL_TEMPLATE } from './features/tcp/tileUrl';
 import { normalizeForSearch, createIntersectionRoads, AUTOSAVE_KEY, readAutosave } from './features/tcp/planUtils';
 import { sectionTitle, panelBtnStyle } from './features/tcp/panelHelpers';
 import { drawSign } from './shapes/drawSign';

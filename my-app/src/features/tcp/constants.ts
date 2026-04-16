@@ -1,5 +1,3 @@
-import { resolveTileUrl } from '../../utils';
-
 // ─── Canvas constants ─────────────────────────────────────────────────────────
 export const GRID_SIZE = 20;
 export const MIN_ZOOM = 0.1;
@@ -30,5 +28,3 @@ export const COLORS = {
   selected: "#818cf8",
 };
 
-// ─── Map tile URL ─────────────────────────────────────────────────────────────
-export const TILE_URL_TEMPLATE = resolveTileUrl(import.meta.env.VITE_TILE_URL as string | undefined);

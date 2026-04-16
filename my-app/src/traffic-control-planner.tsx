@@ -2,16 +2,15 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Stage, Layer, Line, Rect, Circle, Text as KonvaText, Group, Shape, Image as KonvaImage } from "react-konva";
 import type Konva from 'konva';
 import type { Context as KonvaContext } from 'konva/lib/Context';
-import type { KonvaEventObject } from 'konva/lib/Node';
 import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
-  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject, CrosswalkObject, TurnLaneObject,
+  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject, CrosswalkObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
-  MapCenter, MapTile, MapTileEntry, PlanMeta, Point, SnapResult, ToolDef,
+  MapCenter, PlanMeta, Point, ToolDef,
   GeocodeResult, SignShape,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier, distToPolyline, formatSearchPrimary, geocodeAddress, isPointObject, isLineObject, isMultiPointRoad, calcTaperLength, cloneObject, buildTileUrl } from './utils';
+import { uid, dist, angleBetween, geoRoadWidthPx, sampleBezier, sampleCubicBezier, formatSearchPrimary, geocodeAddress, cloneObject } from './utils';
 import { savePlanToCloud } from './planStorage';
 import PlanDashboard from './PlanDashboard';
 import TemplatePicker from './TemplatePicker';
@@ -27,17 +26,20 @@ import {
   TOOLS,
   TOOLS_REQUIRING_MAP,
 } from './features/tcp/tcpCatalog';
-import { COLORS, GRID_SIZE, MIN_ZOOM, MAX_ZOOM, SNAP_RADIUS } from './features/tcp/constants';
-import { TILE_URL_TEMPLATE } from './features/tcp/tileUrl';
-import { normalizeForSearch, createIntersectionRoads, AUTOSAVE_KEY, readAutosave } from './features/tcp/planUtils';
+import { COLORS, GRID_SIZE, MIN_ZOOM, MAX_ZOOM } from './features/tcp/constants';
+import { normalizeForSearch, AUTOSAVE_KEY, readAutosave } from './features/tcp/planUtils';
 import { sectionTitle, panelBtnStyle } from './features/tcp/panelHelpers';
 import { drawSign } from './shapes/drawSign';
 import { HelpModal } from './components/tcp/panels/HelpModal';
 import { ManifestPanel } from './components/tcp/panels/ManifestPanel';
 import { QCPanel, getQCBadgeColor } from './components/tcp/panels/QCPanel';
 import { PropertyPanel } from './components/tcp/panels/PropertyPanel';
-import { MiniMap, latLonToPixel, pixelToLatLon } from './components/tcp/canvas/MiniMap';
+import { MiniMap } from './components/tcp/canvas/MiniMap';
 import { LegendBox, NorthArrow } from './components/tcp/canvas/LegendBox';
+import { useHistory } from './hooks/useHistory';
+import { useAutosave } from './hooks/useAutosave';
+import { useMapTiles } from './hooks/useMapTiles';
+import { useCanvasEvents } from './hooks/useCanvasEvents';
 
 // ─── KONVA OBJECT COMPONENTS ──────────────────────────────────────────────────
 
@@ -934,7 +936,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
   // Core state
   const [tool, setTool] = useState("select");
-  const [objects, setObjects] = useState<CanvasObject[]>(() => initialAutosave?.canvasState?.objects ?? []);
+  const { objects, setObjects, pushHistory, undo, redo, resetHistory } = useHistory(initialAutosave?.canvasState?.objects ?? []);
   const [selected, setSelected] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(() => initialAutosave?.canvasZoom ?? 1);
   const [offset, setOffset] = useState<Point>(() => initialAutosave?.canvasOffset ?? { x: 0, y: 0 });
@@ -956,13 +958,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [history, setHistory] = useState<CanvasObject[][]>(() => [initialAutosave?.canvasState?.objects ?? []]);
-  const [historyIndex, setHistoryIndex] = useState(0);
   const [planTitle, setPlanTitle] = useState<string>(() => initialAutosave?.name ?? "Untitled Traffic Control Plan");
   const [planId, setPlanId] = useState<string>(() => initialAutosave?.id ?? uid());
   const [planCreatedAt, setPlanCreatedAt] = useState<string>(() => initialAutosave?.createdAt ?? new Date().toISOString());
   const [planMeta, setPlanMeta] = useState<PlanMeta>(() => initialAutosave?.metadata ?? { projectNumber: "", client: "", location: "", notes: "" });
-  const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<CanvasObject | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
@@ -984,9 +983,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     const lon = raw?.lng ?? raw?.lon;
     return raw != null && lon != null ? { lat: raw.lat, lon, zoom: raw.zoom } : null;
   });
-  const [mapRenderTick, setMapRenderTick] = useState(0);
-  const mapTileCacheRef = useRef<Record<string, MapTileEntry>>({});
-
   const [roadDrawMode, setRoadDrawMode] = useState("straight");
   const [intersectionType, setIntersectionType] = useState<'t' | '4way'>('4way');
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
@@ -1004,42 +1000,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const lastClickTimeRef = useRef<number>(0);
   const lastClickPosRef = useRef<Point | null>(null);
 
-  // Map tiles
-  const mapTiles = useMemo<MapTile[]>(() => {
-    if (!mapCenter) return [];
-    const tileSize = 256;
-    const zoomLevel = mapCenter.zoom;
-    const scale = Math.pow(2, zoomLevel) * tileSize;
-    const centerX = ((mapCenter.lon + 180) / 360) * scale;
-    const sinLat = Math.sin((mapCenter.lat * Math.PI) / 180);
-    const centerY = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
-    const left = centerX - canvasSize.w / 2, top = centerY - canvasSize.h / 2;
-    const startTileX = Math.floor(left / tileSize), endTileX = Math.floor((left + canvasSize.w) / tileSize);
-    const startTileY = Math.floor(top / tileSize), endTileY = Math.floor((top + canvasSize.h) / tileSize);
-    const maxTile = Math.pow(2, zoomLevel);
-    const tiles: MapTile[] = [];
-    for (let ty = startTileY; ty <= endTileY; ty++) {
-      if (ty < 0 || ty >= maxTile) continue;
-      for (let tx = startTileX; tx <= endTileX; tx++) {
-        const wrappedX = ((tx % maxTile) + maxTile) % maxTile;
-        tiles.push({ url: buildTileUrl(TILE_URL_TEMPLATE, zoomLevel, wrappedX, ty), x: tx * tileSize - left, y: ty * tileSize - top, size: tileSize });
-      }
-    }
-    return tiles;
-  }, [mapCenter, canvasSize.w, canvasSize.h]);
-
-  useEffect(() => {
-    mapTiles.forEach((tile) => {
-      if (mapTileCacheRef.current[tile.url]) return;
-      const image = new Image();
-      image.crossOrigin = "anonymous";
-      const entry: MapTileEntry = { image, loaded: false };
-      mapTileCacheRef.current[tile.url] = entry;
-      image.onload = () => { entry.loaded = true; setMapRenderTick((t) => t + 1); };
-      image.onerror = () => { delete mapTileCacheRef.current[tile.url]; };
-      image.src = tile.url;
-    });
-  }, [mapTiles]);
+  // Map tiles — computed and loaded by useMapTiles hook
+  const { mapTiles, mapTileCacheRef } = useMapTiles(mapCenter, canvasSize);
 
   // Resize observer
   useEffect(() => {
@@ -1084,24 +1046,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     localStorage.setItem("tcp_custom_signs", JSON.stringify(customSigns));
   }, [customSigns]);
 
-  // Auto-save plan state on every change
-  useEffect(() => {
-    try {
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
-        id: planId, name: planTitle, createdAt: planCreatedAt,
-        updatedAt: new Date().toISOString(),
-        userId: userId,
-        canvasOffset: offset, canvasZoom: zoom,
-        canvasState: { objects }, metadata: planMeta,
-        mapCenter,
-      }));
-      setAutosaveError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn("[TCP] Auto-save failed:", msg);
-      setAutosaveError(msg);
-    }
-  }, [objects, planTitle, planMeta, planId, planCreatedAt, zoom, offset, mapCenter, userId]);
+  // Autosave — delegates to useAutosave hook
+  const { autosaveError } = useAutosave({ objects, planId, planTitle, planCreatedAt, planMeta, zoom, offset, mapCenter, userId: userId ?? null });
 
   // Passive wheel listener to prevent page scroll
   useEffect(() => {
@@ -1111,22 +1057,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     el.addEventListener("wheel", h, { passive: false });
     return () => el.removeEventListener("wheel", h);
   }, []);
-
-  // History
-  const pushHistory = useCallback((newObjects: CanvasObject[]) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newObjects);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex]);
-
-  const undo = useCallback(() => {
-    if (historyIndex > 0) { setHistoryIndex(historyIndex - 1); setObjects(history[historyIndex - 1]); setSelected(null); }
-  }, [history, historyIndex]);
-
-  const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) { setHistoryIndex(historyIndex + 1); setObjects(history[historyIndex + 1]); setSelected(null); }
-  }, [history, historyIndex]);
 
   const switchTool = useCallback((newTool: string) => {
     setTool(newTool);
@@ -1254,364 +1184,21 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     return () => window.removeEventListener("keydown", handleKey);
   }, [selected, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, requestTool]);
 
-  // toWorld: uses Konva Stage pointer position
-  const toWorld = useCallback((): Point => {
-    const pos = stageRef.current?.getPointerPosition();
-    if (!pos) return { x: 0, y: 0 };
-    return {
-      x: (pos.x - offset.x) / zoom,
-      y: (pos.y - offset.y) / zoom,
-    };
-  }, [offset, zoom]);
+  // Mouse handlers + toWorld/trySnap/hitTest — managed by useCanvasEvents hook
+  const { handleMouseDown, handleMouseMove, handleMouseUp, handleWheel } = useCanvasEvents({
+    tool, roadDrawMode, intersectionType, snapEnabled,
+    objects, selected, zoom, offset, mapCenter,
+    selectedSign, selectedDevice, selectedRoadType,
+    polyPoints, curvePoints, cubicPoints,
+    drawStart, isPanning, panStart,
+    stageRef, lastClickTimeRef, lastClickPosRef,
+    setObjects, setSelected, setZoom, setOffset, setMapCenter,
+    setIsPanning, setPanStart, setDrawStart,
+    setPolyPoints, setCurvePoints, setCubicPoints,
+    setSnapIndicator, setCursorPos, pushHistory,
+  });
 
-  const trySnap = useCallback((x: number, y: number): SnapResult => {
-    if (!snapEnabled) return { x, y, snapped: false };
-    return snapToEndpoint(x, y, objects, SNAP_RADIUS, zoom);
-  }, [snapEnabled, objects, zoom]);
 
-  const hitTest = useCallback((wx: number, wy: number): CanvasObject | null => {
-    const effectiveHalfWidth = (o: CanvasObject): number => {
-      if ('width' in o) return geoRoadWidthPx(o as { width: number; realWidth?: number }, mapCenter) / 2 + 6;
-      return 6;
-    };
-    for (let i = objects.length - 1; i >= 0; i--) {
-      const o = objects[i];
-      if (o.type === "taper") {
-        const storedTaperLength = (o as TaperObject).taperLength;
-        const effectiveTaperLength =
-          typeof storedTaperLength === "number" && Number.isFinite(storedTaperLength) && storedTaperLength > 0
-            ? storedTaperLength
-            : calcTaperLength(o.speed, o.laneWidth, o.numLanes);
-        const taperHitRadius = Math.max(30, Math.min(effectiveTaperLength * TAPER_SCALE / 2, 150));
-        if (dist(wx, wy, o.x, o.y) < taperHitRadius) return o;
-      } else if (o.type === "turn_lane") {
-        // Hit within bounding radius (taper+run length / 2) capped to reasonable range
-        const totalLen = o.taperLength + o.runLength;
-        const hitRadius = Math.max(30, Math.min(totalLen / 2, 150));
-        if (dist(wx, wy, o.x, o.y) < hitRadius) return o;
-      } else if (o.type === "sign" || o.type === "device" || o.type === "text") {
-        if (dist(wx, wy, o.x, o.y) < 30) return o;
-      }
-      if (o.type === "zone") {
-        if (wx >= o.x && wx <= o.x + o.w && wy >= o.y && wy <= o.y + o.h) return o;
-      }
-      if (o.type === "road" || o.type === "arrow" || o.type === "measure") {
-        const d1 = dist(wx, wy, o.x1, o.y1), d2 = dist(wx, wy, o.x2, o.y2);
-        const segLen = dist(o.x1, o.y1, o.x2, o.y2);
-        if (d1 + d2 < segLen + effectiveHalfWidth(o)) return o;
-      }
-      if (o.type === "lane_mask") {
-        const d1 = dist(wx, wy, o.x1, o.y1), d2 = dist(wx, wy, o.x2, o.y2);
-        const segLen = dist(o.x1, o.y1, o.x2, o.y2);
-        if (d1 + d2 < segLen + o.laneWidth / 2 + 6) return o;
-      }
-      if (o.type === "crosswalk") {
-        // Distance from click to the crosswalk center axis (x1y1→x2y2)
-        const cwDx = o.x2 - o.x1, cwDy = o.y2 - o.y1;
-        const cwLenSq = cwDx * cwDx + cwDy * cwDy;
-        const cwT = cwLenSq === 0 ? 0 : Math.max(0, Math.min(1, ((wx - o.x1) * cwDx + (wy - o.y1) * cwDy) / cwLenSq));
-        const cwCx = o.x1 + cwT * cwDx, cwCy = o.y1 + cwT * cwDy;
-        if (dist(wx, wy, cwCx, cwCy) < o.depth / 2 + 5) return o;
-      }
-      if (o.type === "polyline_road" && o.points?.length >= 2) {
-        if (distToPolyline(wx, wy, o.points) < effectiveHalfWidth(o)) return o;
-      }
-      if (o.type === "curve_road" && o.points?.length === 3) {
-        const sampledPts = sampleBezier(o.points[0], o.points[1], o.points[2], 20);
-        if (distToPolyline(wx, wy, sampledPts) < effectiveHalfWidth(o)) return o;
-      }
-      if (o.type === "cubic_bezier_road" && o.points?.length === 4) {
-        const sampledPts = sampleCubicBezier(o.points[0], o.points[1], o.points[2], o.points[3], 20);
-        if (distToPolyline(wx, wy, sampledPts) < effectiveHalfWidth(o)) return o;
-      }
-    }
-    return null;
-  }, [objects, mapCenter]);
-
-  // Mouse handlers — e.button/clientX/deltaY accessed via e.evt (Konva wraps native events)
-  const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
-    const raw = toWorld();
-    const { x, y, snapped } = trySnap(raw.x, raw.y);
-    setCursorPos(raw);
-    setSnapIndicator(snapped ? { x, y } : null);
-
-    if (tool === "pan" || e.evt.button === 1) {
-      setIsPanning(true);
-      const pos = stageRef.current?.getPointerPosition();
-      if (pos) setPanStart({ x: pos.x - offset.x, y: pos.y - offset.y });
-      return;
-    }
-
-    if (tool === "select") {
-      // Check if click is near a handle of the currently selected cubic bezier road
-      if (selected) {
-        const selObj = objects.find((o) => o.id === selected);
-        if (selObj?.type === "cubic_bezier_road") {
-          const handleRadius = Math.min(10 / zoom, 20);
-          for (let i = 0; i < selObj.points.length; i++) {
-            const p = selObj.points[i];
-            if (dist(raw.x, raw.y, p.x, p.y) < handleRadius) {
-              setDrawStart({
-                x: raw.x, y: raw.y,
-                id: selObj.id,
-                handleIndex: i,
-                origPoints: selObj.points.map((pt) => ({ ...pt })),
-              });
-              return;
-            }
-          }
-        }
-      }
-      const hit = hitTest(raw.x, raw.y);
-      setSelected(hit ? hit.id : null);
-      if (hit) {
-        setDrawStart({
-          x: raw.x, y: raw.y,
-          ox: isPointObject(hit) ? hit.x : isLineObject(hit) ? hit.x1 : 0,
-          oy: isPointObject(hit) ? hit.y : isLineObject(hit) ? hit.y1 : 0,
-          id: hit.id,
-          origPoints: isMultiPointRoad(hit) ? hit.points.map((p) => ({ ...p })) : null,
-        });
-      }
-      return;
-    }
-
-    if (tool === "erase") {
-      const hit = hitTest(raw.x, raw.y);
-      if (hit) {
-        const newObjs = objects.filter((o) => o.id !== hit.id);
-        setObjects(newObjs); pushHistory(newObjs); setSelected(null);
-      }
-      return;
-    }
-
-    if (tool === "sign") {
-      const newSign: SignObject = { id: uid(), type: "sign", x: raw.x, y: raw.y, signData: selectedSign, rotation: 0, scale: 1 };
-      const newObjs = [...objects, newSign];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newSign.id);
-      if (selectedSign) {
-        const isCustom = selectedSign.id.startsWith('custom_');
-        track('sign_placed', {
-          sign_id: selectedSign.id,
-          sign_source: isCustom ? 'custom' : 'builtin',
-          ...(isCustom ? {} : { sign_label: selectedSign.label }),
-        });
-      }
-      return;
-    }
-
-    if (tool === "device") {
-      const newDev: DeviceObject = { id: uid(), type: "device", x: raw.x, y: raw.y, deviceData: selectedDevice, rotation: 0 };
-      const newObjs = [...objects, newDev];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newDev.id);
-      return;
-    }
-
-    if (tool === "taper") {
-      const speed = 45, laneWidth = 12;
-      const newTaper: TaperObject = { id: uid(), type: "taper", x: raw.x, y: raw.y, rotation: 0, speed, laneWidth, taperLength: calcTaperLength(speed, laneWidth), manualLength: false, numLanes: 1 };
-      const newObjs = [...objects, newTaper];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newTaper.id);
-      return;
-    }
-
-    if (tool === "turn_lane") {
-      const newTL: TurnLaneObject = { id: uid(), type: "turn_lane", x: raw.x, y: raw.y, rotation: 0, laneWidth: 20, taperLength: 80, runLength: 100, side: 'right', turnDir: 'right' };
-      const newObjs = [...objects, newTL];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newTL.id);
-      return;
-    }
-
-    if (tool === "text") {
-      const textVal = prompt("Enter text label:");
-      if (textVal) {
-        const newText: TextObject = { id: uid(), type: "text", x: raw.x, y: raw.y, text: textVal, fontSize: 14, bold: false, color: "#ffffff" };
-        const newObjs = [...objects, newText];
-        setObjects(newObjs); pushHistory(newObjs); setSelected(newText.id);
-      }
-      return;
-    }
-
-    if (tool === "road") {
-      if (roadDrawMode === "straight") {
-        setDrawStart({ x, y });
-        return;
-      }
-
-      if (roadDrawMode === "poly" || roadDrawMode === "smooth") {
-        const now = Date.now();
-        const last = lastClickPosRef.current;
-        const isDouble = (now - lastClickTimeRef.current < 350) && last && dist(x, y, last.x, last.y) < 15 / zoom;
-        lastClickTimeRef.current = now;
-        lastClickPosRef.current = { x, y };
-
-        if (isDouble && polyPoints.length >= 2) {
-          const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
-          const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
-          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
-        } else {
-          setPolyPoints((prev) => [...prev, { x, y }]);
-        }
-        return;
-      }
-
-      if (roadDrawMode === "curve") {
-        const newCurvePts = [...curvePoints, { x, y }];
-        if (newCurvePts.length === 3) {
-          const newRoad: CurveRoadObject = { id: uid(), type: "curve_road", points: newCurvePts as [Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
-          const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCurvePoints([]);
-          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'curve', point_count: 3 });
-        } else {
-          setCurvePoints(newCurvePts);
-        }
-        return;
-      }
-
-      if (roadDrawMode === "cubic") {
-        const newCubicPts = [...cubicPoints, { x, y }];
-        if (newCubicPts.length === 4) {
-          const newRoad: CubicBezierRoadObject = { id: uid(), type: "cubic_bezier_road", points: newCubicPts as [Point, Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
-          const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
-          track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'cubic', point_count: 4 });
-        } else {
-          setCubicPoints(newCubicPts);
-        }
-        return;
-      }
-    }
-
-    if (tool === "intersection") {
-      const roads = createIntersectionRoads(x, y, intersectionType, selectedRoadType);
-      const newObjs = [...objects, ...roads];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
-      track('road_drawn', { road_type: selectedRoadType.id, draw_mode: intersectionType === '4way' ? 'intersection_4way' : 'intersection_t' });
-      return;
-    }
-
-    if (["zone", "arrow", "measure", "lane_mask", "crosswalk"].includes(tool)) {
-      setDrawStart({ x: raw.x, y: raw.y });
-    }
-  }, [tool, roadDrawMode, intersectionType, toWorld, trySnap, hitTest, offset, objects, selected, selectedSign, selectedDevice, selectedRoadType, polyPoints, curvePoints, cubicPoints, pushHistory, zoom]);
-
-  const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
-    const raw = toWorld();
-    setCursorPos(raw);
-
-    if ((tool === "road" || tool === "intersection") && snapEnabled) {
-      const { x, y, snapped } = snapToEndpoint(raw.x, raw.y, objects, SNAP_RADIUS, zoom);
-      setSnapIndicator(snapped ? { x, y } : null);
-    } else {
-      setSnapIndicator(null);
-    }
-
-    if (isPanning && panStart) {
-      const pos = stageRef.current?.getPointerPosition();
-      if (pos) {
-        const newOffset = { x: pos.x - panStart.x, y: pos.y - panStart.y };
-        const dox = newOffset.x - offset.x;
-        const doy = newOffset.y - offset.y;
-        setOffset(newOffset);
-        // Shift map tiles to follow the pan. Tiles live in screen space (Layer 1,
-        // no Konva transform), so 1 screen pixel == 1 tile pixel: shift mapCenter
-        // by (-dox, -doy) in tile pixel space and convert back to lat/lon.
-        if (mapCenter) {
-          const { x: cx, y: cy } = latLonToPixel(mapCenter.lat, mapCenter.lon, mapCenter.zoom);
-          const { lat: newLat, lon: newLon } = pixelToLatLon(cx - dox, cy - doy, mapCenter.zoom);
-          setMapCenter({ lat: newLat, lon: newLon, zoom: mapCenter.zoom });
-        }
-      }
-      return;
-    }
-
-    if (tool === "select" && drawStart && drawStart.id) {
-      const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
-      setObjects((prev) => prev.map((o) => {
-        if (o.id !== drawStart.id) return o;
-        if (o.type === "cubic_bezier_road" && drawStart.origPoints) {
-          if (drawStart.handleIndex != null) {
-            // Drag a single handle
-            const newPoints = drawStart.origPoints.map((p, i) =>
-              i === drawStart.handleIndex ? { x: p.x + dx, y: p.y + dy } : { ...p }
-            ) as [Point, Point, Point, Point];
-            return { ...o, points: newPoints };
-          }
-          // Drag whole object
-          return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point, Point] };
-        }
-        if ((o.type === "polyline_road" || o.type === "curve_road") && drawStart.origPoints) {
-          return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
-        }
-        if (isPointObject(o)) {
-          return { ...o, x: (drawStart.ox ?? 0) + dx, y: (drawStart.oy ?? 0) + dy } as CanvasObject;
-        }
-        if (isLineObject(o)) {
-          const sdx = o.x2 - o.x1, sdy = o.y2 - o.y1;
-          return { ...o, x1: (drawStart.ox ?? 0) + dx, y1: (drawStart.oy ?? 0) + dy, x2: (drawStart.ox ?? 0) + dx + sdx, y2: (drawStart.oy ?? 0) + dy + sdy } as CanvasObject;
-        }
-        return o;
-      }));
-    }
-  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom, offset, mapCenter, setMapCenter]);
-
-  const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
-    if (isPanning) { setIsPanning(false); setPanStart(null); return; }
-
-    if (tool === "select" && drawStart && drawStart.id) {
-      pushHistory(objects); setDrawStart(null); return;
-    }
-
-    if (drawStart && tool === "road" && roadDrawMode === "straight") {
-      const raw = toWorld();
-      const { x, y } = trySnap(raw.x, raw.y);
-      const d = dist(drawStart.x, drawStart.y, x, y);
-      if (d < 5) { setDrawStart(null); return; }
-      const newRoad: StraightRoadObject = { id: uid(), type: "road", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
-      const newObjs = [...objects, newRoad];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id);
-      track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'straight' });
-      setDrawStart(null);
-      return;
-    }
-
-    if (drawStart && ["zone", "arrow", "measure", "lane_mask", "crosswalk"].includes(tool)) {
-      const { x, y } = toWorld();
-      const d = dist(drawStart.x, drawStart.y, x, y);
-      if (d < 5) { setDrawStart(null); return; }
-
-      let newObj: CanvasObject | undefined;
-      if (tool === "zone") {
-        const zx = Math.min(drawStart.x, x), zy = Math.min(drawStart.y, y);
-        newObj = { id: uid(), type: "zone", x: zx, y: zy, w: Math.abs(x - drawStart.x), h: Math.abs(y - drawStart.y) };
-      } else if (tool === "arrow") {
-        newObj = { id: uid(), type: "arrow", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, color: "#fff" };
-      } else if (tool === "measure") {
-        newObj = { id: uid(), type: "measure", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y };
-      } else if (tool === "lane_mask") {
-        newObj = { id: uid(), type: "lane_mask", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, laneWidth: 20, color: "rgba(239,68,68,0.5)", style: "hatch" };
-      } else if (tool === "crosswalk") {
-        newObj = { id: uid(), type: "crosswalk", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, depth: 24, stripeCount: 6, stripeColor: "#ffffff" };
-      }
-
-      if (newObj) {
-        const newObjs = [...objects, newObj];
-        setObjects(newObjs); pushHistory(newObjs); setSelected(newObj.id);
-      }
-      setDrawStart(null);
-    }
-  }, [isPanning, drawStart, tool, roadDrawMode, toWorld, trySnap, objects, selectedRoadType, pushHistory]);
-
-  const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
-    const pos = stageRef.current?.getPointerPosition();
-    if (!pos) return;
-    const mx = pos.x, my = pos.y;
-    const factor = e.evt.deltaY < 0 ? 1.1 : 0.9;
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * factor));
-    setZoom(newZoom);
-    setOffset({ x: mx - ((mx - offset.x) / zoom) * newZoom, y: my - ((my - offset.y) / zoom) * newZoom });
-  }, [zoom, offset]);
 
   // Object helpers
   const updateObject = (id: string, updates: Record<string, unknown>) => {
@@ -1749,9 +1336,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setPlanTitle(newTitle);
     setPlanCreatedAt(newCreatedAt);
     setPlanMeta(newMeta);
-    setObjects(newObjects);
-    setHistory([newObjects]);
-    setHistoryIndex(0);
+    resetHistory(newObjects);
     setSelected(null);
     setOffset(newOffset);
     setZoom(newZoom);
@@ -1876,9 +1461,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const polyInProgress = tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length > 0;
   const curveInProgress = tool === "road" && roadDrawMode === "curve" && curvePoints.length > 0;
   const cubicInProgress = tool === "road" && roadDrawMode === "cubic" && cubicPoints.length > 0;
-
-  // suppress mapRenderTick lint warning — used to trigger re-render when tiles load
-  void mapRenderTick;
 
   // Pre-compute sign search results so JSX stays readable
   const signSearchResults: { sign: SignData; catLabel: string; catColor: string }[] = (() => {

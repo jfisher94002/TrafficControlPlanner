@@ -70,7 +70,7 @@ describe('useAutosave', () => {
 
   it('surfaces autosaveError when localStorage write fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    vi.spyOn(window.localStorage, 'setItem').mockImplementationOnce(() => {
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
       throw new Error('quota exceeded')
     })
 

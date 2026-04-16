@@ -30,9 +30,16 @@ interface MiniMapProps {
 
 export function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMapProps) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const mmW = 160, mmH = 100;
   const tileCache = useRef<Record<string, HTMLImageElement>>({});
   const [tileTick, setTileTick] = useState(0);
+
+  // Cache the 2D context once on mount so the draw effect doesn't call
+  // getContext() on every re-render.
+  useEffect(() => {
+    ctxRef.current = ref.current?.getContext("2d") ?? null;
+  }, []);
 
   const ovZoom = mapCenter ? Math.max(8, Math.min(11, mapCenter.zoom - 4)) : null;
 
@@ -61,9 +68,7 @@ export function MiniMap({ objects, canvasSize, zoom, offset, mapCenter }: MiniMa
   }, [mapCenter, ovZoom]);
 
   useEffect(() => {
-    const cvs = ref.current;
-    if (!cvs) return;
-    const ctx = cvs.getContext("2d");
+    const ctx = ctxRef.current;
     if (!ctx) return;
     ctx.clearRect(0, 0, mmW, mmH);
     ctx.fillStyle = COLORS.bg;

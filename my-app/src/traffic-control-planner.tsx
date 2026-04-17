@@ -1,35 +1,28 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Stage, Layer, Line, Rect, Circle, Text as KonvaText, Group, Shape, Image as KonvaImage } from "react-konva";
+import { Stage, Layer, Rect, Image as KonvaImage } from "react-konva";
 import type Konva from 'konva';
-import type { Context as KonvaContext } from 'konva/lib/Context';
 import type React from 'react';
 import type {
-  CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
-  SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, LaneMaskObject, CrosswalkObject,
+  CanvasObject, PolylineRoadObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
-  MapCenter, PlanMeta, Point, ToolDef,
-  GeocodeResult, SignShape,
+  MapCenter, PlanMeta, Point,
+  GeocodeResult,
 } from './types';
-import { uid, dist, angleBetween, geoRoadWidthPx, sampleBezier, sampleCubicBezier, formatSearchPrimary, geocodeAddress, cloneObject } from './utils';
+import { uid, geoRoadWidthPx, formatSearchPrimary, geocodeAddress, cloneObject } from './utils';
 import { savePlanToCloud } from './planStorage';
 import PlanDashboard from './PlanDashboard';
 import TemplatePicker from './TemplatePicker';
 import ExportPreviewModal from './ExportPreviewModal';
 import { runQCChecks, type QCIssue } from './qcRules';
 import { track } from './analytics';
-import { LaneMaskShape, CrosswalkShape, TurnLaneShape } from './shapes/TrafficControlShapes';
-import {
-  DEVICES,
-  ROAD_TYPES,
-  SIGN_CATEGORIES,
-  SIGN_SHAPES,
-  TOOLS,
-  TOOLS_REQUIRING_MAP,
-} from './features/tcp/tcpCatalog';
-import { COLORS, GRID_SIZE, MIN_ZOOM, MAX_ZOOM } from './features/tcp/constants';
+import { DEVICES, ROAD_TYPES, SIGN_CATEGORIES, TOOLS, TOOLS_REQUIRING_MAP } from './features/tcp/tcpCatalog';
+import { GridLines, ObjectShape } from './components/tcp/canvas/ObjectShapes';
+import { DrawingOverlays } from './components/tcp/canvas/DrawingOverlays';
+import { ToolButton } from './components/tcp/ui/ToolButton';
+import { SignEditorPanel } from './components/tcp/panels/SignEditorPanel';
+import { COLORS, MIN_ZOOM, MAX_ZOOM } from './features/tcp/constants';
 import { normalizeForSearch, AUTOSAVE_KEY, readAutosave } from './features/tcp/planUtils';
 import { sectionTitle, panelBtnStyle } from './features/tcp/panelHelpers';
-import { drawSign } from './shapes/drawSign';
 import { HelpModal } from './components/tcp/panels/HelpModal';
 import { ManifestPanel } from './components/tcp/panels/ManifestPanel';
 import { QCPanel, getQCBadgeColor } from './components/tcp/panels/QCPanel';
@@ -41,871 +34,13 @@ import { useAutosave } from './hooks/useAutosave';
 import { useMapTiles } from './hooks/useMapTiles';
 import { useCanvasEvents } from './hooks/useCanvasEvents';
 
-// ─── KONVA OBJECT COMPONENTS ──────────────────────────────────────────────────
+// GridLines, RoadSegment, PolylineRoad, CurveRoad, CubicBezierRoad, SignShape, DeviceShape,
+// WorkZone, ArrowShape, TextLabel, MeasurementShape, TaperShape, ObjectShape
+//   → src/components/tcp/canvas/ObjectShapes.tsx
+// DrawingOverlays → src/components/tcp/canvas/DrawingOverlays.tsx
+// ToolButton     → src/components/tcp/ui/ToolButton.tsx
+// SignEditorPanel → src/components/tcp/panels/SignEditorPanel.tsx
 
-interface GridLinesProps { offset: Point; zoom: number; canvasSize: { w: number; h: number }; }
-function GridLines({ offset, zoom, canvasSize }: GridLinesProps) {
-  const startX = Math.floor(-offset.x / zoom / GRID_SIZE) * GRID_SIZE - GRID_SIZE;
-  const startY = Math.floor(-offset.y / zoom / GRID_SIZE) * GRID_SIZE - GRID_SIZE;
-  const endX = startX + canvasSize.w / zoom + GRID_SIZE * 2;
-  const endY = startY + canvasSize.h / zoom + GRID_SIZE * 2;
-  const lines = [];
-  for (let gx = startX; gx < endX; gx += GRID_SIZE) {
-    lines.push(<Line key={`x${gx}`} points={[gx, startY, gx, endY]} stroke={COLORS.grid} strokeWidth={0.5} listening={false} />);
-  }
-  for (let gy = startY; gy < endY; gy += GRID_SIZE) {
-    lines.push(<Line key={`y${gy}`} points={[startX, gy, endX, gy]} stroke={COLORS.grid} strokeWidth={0.5} listening={false} />);
-  }
-  return <>{lines}</>;
-}
-
-interface RoadSegmentProps { obj: StraightRoadObject; isSelected: boolean; }
-function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
-  const { x1, y1, x2, y2, width, lanes, roadType, shoulderWidth = 0, sidewalkWidth = 0, sidewalkSide } = obj;
-  const angle = angleBetween(x1, y1, x2, y2);
-  const perpAngle = angle + Math.PI / 2;
-  const hw = width / 2;
-  const cos = Math.cos(perpAngle), sin = Math.sin(perpAngle);
-
-  // Perpendicular unit vector (nx, ny) for offset lines
-  const dx = x2 - x1, dy = y2 - y1;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const nx = -dy / len, ny = dx / len;
-
-  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
-  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
-
-  const roadPoly = [
-    x1 + cos * hw, y1 + sin * hw,
-    x2 + cos * hw, y2 + sin * hw,
-    x2 - cos * hw, y2 - sin * hw,
-    x1 - cos * hw, y1 - sin * hw,
-  ];
-
-  const laneMarkings = [];
-  const laneWidth = width / lanes;
-  for (let i = 1; i < lanes; i++) {
-    const off = -hw + i * laneWidth;
-    const lx1 = x1 + cos * off, ly1 = y1 + sin * off;
-    const lx2 = x2 + cos * off, ly2 = y2 + sin * off;
-    const isCenter = i === lanes / 2 && roadType !== "2lane";
-    if (isCenter) {
-      for (const d of [-2, 2]) {
-        laneMarkings.push(
-          <Line key={`c${i}_${d}`}
-            points={[lx1 + cos * d, ly1 + sin * d, lx2 + cos * d, ly2 + sin * d]}
-            stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
-        );
-      }
-    } else {
-      laneMarkings.push(
-        <Line key={`l${i}`}
-          points={[lx1, ly1, lx2, ly2]}
-          stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
-      );
-    }
-  }
-
-  // Shoulder lines (rendered behind road body)
-  const shoulderLines = shoulderWidth > 0 ? [
-    <Line key="sl" points={[
-      x1 + nx * (hw + shoulderWidth / 2), y1 + ny * (hw + shoulderWidth / 2),
-      x2 + nx * (hw + shoulderWidth / 2), y2 + ny * (hw + shoulderWidth / 2),
-    ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
-    <Line key="sr" points={[
-      x1 - nx * (hw + shoulderWidth / 2), y1 - ny * (hw + shoulderWidth / 2),
-      x2 - nx * (hw + shoulderWidth / 2), y2 - ny * (hw + shoulderWidth / 2),
-    ]} stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} listening={false} />,
-  ] : [];
-
-  // Sidewalk lines (rendered behind road body, outside shoulder if present)
-  const swOff = hw + (shoulderWidth > 0 ? shoulderWidth : 0) + (sidewalkWidth > 0 ? sidewalkWidth / 2 : 0);
-  const sidewalkLines: React.ReactElement[] = [];
-  if (sidewalkWidth > 0 && sidewalkSide) {
-    if (showLeft) {
-      sidewalkLines.push(
-        <Line key="swl-fill" points={[
-          x1 + nx * swOff, y1 + ny * swOff,
-          x2 + nx * swOff, y2 + ny * swOff,
-        ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
-        <Line key="swl-edge" points={[
-          x1 + nx * (swOff + sidewalkWidth / 2), y1 + ny * (swOff + sidewalkWidth / 2),
-          x2 + nx * (swOff + sidewalkWidth / 2), y2 + ny * (swOff + sidewalkWidth / 2),
-        ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
-      );
-    }
-    if (showRight) {
-      sidewalkLines.push(
-        <Line key="swr-fill" points={[
-          x1 - nx * swOff, y1 - ny * swOff,
-          x2 - nx * swOff, y2 - ny * swOff,
-        ]} stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} listening={false} />,
-        <Line key="swr-edge" points={[
-          x1 - nx * (swOff + sidewalkWidth / 2), y1 - ny * (swOff + sidewalkWidth / 2),
-          x2 - nx * (swOff + sidewalkWidth / 2), y2 - ny * (swOff + sidewalkWidth / 2),
-        ]} stroke="rgba(160,155,145,0.8)" strokeWidth={1} listening={false} />,
-      );
-    }
-  }
-
-  return (
-    <Group listening={false}>
-      {/* Shoulders and sidewalks rendered first (behind road body) */}
-      {sidewalkLines}
-      {shoulderLines}
-      {/* End-cap discs fill visual gaps at intersections where roads of different widths meet */}
-      <Circle x={x1} y={y1} radius={hw + 1} fill="#555" listening={false} />
-      <Circle x={x2} y={y2} radius={hw + 1} fill="#555" listening={false} />
-      <Circle x={x1} y={y1} radius={hw - 1} fill={COLORS.road} listening={false} />
-      <Circle x={x2} y={y2} radius={hw - 1} fill={COLORS.road} listening={false} />
-      <Line points={roadPoly} closed fill={COLORS.road} stroke="#555" strokeWidth={2} />
-      <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
-      <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
-      {laneMarkings}
-      {isSelected && <Line points={[x1, y1, x2, y2]} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />}
-    </Group>
-  );
-}
-
-interface PolylineRoadProps { obj: PolylineRoadObject; isSelected: boolean; }
-function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
-  const { points, width, lanes, roadType, smooth } = obj;
-  const tension = smooth ? 0.5 : 0;
-  if (!points || points.length < 2) return null;
-
-  const pts: Point[] = [];
-  for (let i = 0; i < points.length; i++) {
-    if (i === 0 || dist(points[i].x, points[i].y, points[i - 1].x, points[i - 1].y) > 0.5)
-      pts.push(points[i]);
-  }
-  if (pts.length < 2) return null;
-
-  const flat = pts.flatMap((p) => [p.x, p.y]);
-  const hw = width / 2;
-  const laneMarkings = [];
-  const laneW = width / lanes;
-  for (let li = 1; li < lanes; li++) {
-    const off = -hw + li * laneW;
-    const isCenter = li === lanes / 2 && roadType !== "2lane";
-    for (let si = 0; si < pts.length - 1; si++) {
-      const { x: x1, y: y1 } = pts[si];
-      const { x: x2, y: y2 } = pts[si + 1];
-      const perp = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
-      const cx = Math.cos(perp), cy = Math.sin(perp);
-      if (isCenter) {
-        for (const d of [-2, 2]) {
-          laneMarkings.push(
-            <Line key={`c${li}_${si}_${d}`}
-              points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
-              stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
-          );
-        }
-      } else {
-        laneMarkings.push(
-          <Line key={`l${li}_${si}`}
-            points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
-            stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
-        );
-      }
-    }
-  }
-
-  return (
-    <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
-      {laneMarkings}
-      {isSelected && (
-        <>
-          <Line points={flat} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />
-          {pts.map((p, i) => <Circle key={i} x={p.x} y={p.y} radius={4} fill={COLORS.selected} />)}
-        </>
-      )}
-    </Group>
-  );
-}
-
-interface CurveRoadProps { obj: CurveRoadObject; isSelected: boolean; }
-function CurveRoad({ obj, isSelected }: CurveRoadProps) {
-  const { points, width, lanes, roadType } = obj;
-  if (!points || points.length < 3) return null;
-  const [p0, p1, p2] = points;
-
-  const spine = sampleBezier(p0, p1, p2, 32);
-  const flat = spine.flatMap((p) => [p.x, p.y]);
-  const hw = width / 2;
-  const laneMarkings = [];
-  const laneW = width / lanes;
-  for (let li = 1; li < lanes; li++) {
-    const off = -hw + li * laneW;
-    const isCenter = li === lanes / 2 && roadType !== "2lane";
-    for (let si = 0; si < spine.length - 1; si++) {
-      const { x: x1, y: y1 } = spine[si];
-      const { x: x2, y: y2 } = spine[si + 1];
-      const perp = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
-      const cx = Math.cos(perp), cy = Math.sin(perp);
-      if (isCenter) {
-        for (const d of [-2, 2]) {
-          laneMarkings.push(
-            <Line key={`c${li}_${si}_${d}`}
-              points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
-              stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
-          );
-        }
-      } else {
-        laneMarkings.push(
-          <Line key={`l${li}_${si}`}
-            points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
-            stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
-        );
-      }
-    }
-  }
-
-  return (
-    <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
-      {laneMarkings}
-      {isSelected && (
-        <>
-          <Line points={flat} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />
-          <Circle x={p1.x} y={p1.y} radius={6} fill={COLORS.info} />
-          <Line points={[p0.x, p0.y, p1.x, p1.y, p2.x, p2.y]} stroke="rgba(59,130,246,0.5)" strokeWidth={1} dash={[3, 3]} />
-        </>
-      )}
-    </Group>
-  );
-}
-
-interface CubicBezierRoadProps { obj: CubicBezierRoadObject; isSelected: boolean; }
-function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
-  const { points, width, lanes, roadType } = obj;
-  if (!points || points.length < 4) return null;
-  const [p0, p1, p2, p3] = points;
-
-  const spine = sampleCubicBezier(p0, p1, p2, p3, 32);
-  const flat = spine.flatMap((p) => [p.x, p.y]);
-  const hw = width / 2;
-  const laneMarkings = [];
-  const laneW = width / lanes;
-  for (let li = 1; li < lanes; li++) {
-    const off = -hw + li * laneW;
-    const isCenter = li === lanes / 2 && roadType !== "2lane";
-    for (let si = 0; si < spine.length - 1; si++) {
-      const { x: x1, y: y1 } = spine[si];
-      const { x: x2, y: y2 } = spine[si + 1];
-      const perp = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
-      const cx = Math.cos(perp), cy = Math.sin(perp);
-      if (isCenter) {
-        for (const d of [-2, 2]) {
-          laneMarkings.push(
-            <Line key={`c${li}_${si}_${d}`}
-              points={[x1 + cx * (off + d), y1 + cy * (off + d), x2 + cx * (off + d), y2 + cy * (off + d)]}
-              stroke={COLORS.roadLine} strokeWidth={2} listening={false} />
-          );
-        }
-      } else {
-        laneMarkings.push(
-          <Line key={`l${li}_${si}`}
-            points={[x1 + cx * off, y1 + cy * off, x2 + cx * off, y2 + cy * off]}
-            stroke={COLORS.laneMarking} strokeWidth={1.5} dash={[12, 18]} listening={false} />
-        );
-      }
-    }
-  }
-
-  return (
-    <Group listening={false}>
-      <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
-      {laneMarkings}
-      {isSelected && (
-        <>
-          <Line points={flat} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />
-          {/* Tangent arms: p0→cp1 and cp2→p3 */}
-          <Line points={[p0.x, p0.y, p1.x, p1.y]} stroke="rgba(59,130,246,0.5)" strokeWidth={1} dash={[3, 3]} />
-          <Line points={[p2.x, p2.y, p3.x, p3.y]} stroke="rgba(59,130,246,0.5)" strokeWidth={1} dash={[3, 3]} />
-          {/* Endpoint handles (green circles) */}
-          <Circle x={p0.x} y={p0.y} radius={6} fill={COLORS.success} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
-          <Circle x={p3.x} y={p3.y} radius={6} fill={COLORS.success} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
-          {/* Control point handles (blue circles) */}
-          <Circle x={p1.x} y={p1.y} radius={5} fill={COLORS.info} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
-          <Circle x={p2.x} y={p2.y} radius={5} fill={COLORS.info} stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
-        </>
-      )}
-    </Group>
-  );
-}
-
-interface SignShapeProps { obj: SignObject; isSelected: boolean; }
-function SignShape({ obj, isSelected }: SignShapeProps) {
-  const { x, y, signData, rotation = 0, scale: sc = 1 } = obj;
-  const s = 18 * sc;
-  return (
-    <Shape
-      x={x} y={y}
-      rotation={rotation}
-      shadowColor={isSelected ? COLORS.selected : undefined}
-      shadowBlur={isSelected ? 12 : 0}
-      listening={false}
-      sceneFunc={(ctx: KonvaContext) => {
-        const shp = signData.shape;
-        if (shp === "octagon") {
-          ctx.beginPath();
-          for (let i = 0; i < 8; i++) {
-            const a = Math.PI / 8 + (i * Math.PI) / 4;
-            ctx.lineTo(Math.cos(a) * s, Math.sin(a) * s);
-          }
-          ctx.closePath();
-          ctx.fillStyle = signData.color; ctx.fill();
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
-        } else if (shp === "diamond") {
-          ctx.beginPath();
-          ctx.moveTo(0, -s); ctx.lineTo(s, 0); ctx.lineTo(0, s); ctx.lineTo(-s, 0);
-          ctx.closePath();
-          ctx.fillStyle = signData.color; ctx.fill();
-          ctx.strokeStyle = "#111"; ctx.lineWidth = 2; ctx.stroke();
-        } else if (shp === "triangle") {
-          ctx.beginPath();
-          ctx.moveTo(0, -s); ctx.lineTo(s, s * 0.7); ctx.lineTo(-s, s * 0.7);
-          ctx.closePath();
-          ctx.fillStyle = signData.color; ctx.fill();
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
-        } else if (shp === "circle") {
-          ctx.beginPath();
-          ctx.arc(0, 0, s, 0, Math.PI * 2);
-          ctx.fillStyle = signData.color; ctx.fill();
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
-        } else if (shp === "shield") {
-          ctx.beginPath();
-          ctx.moveTo(-s * 0.7, -s); ctx.lineTo(s * 0.7, -s);
-          ctx.lineTo(s * 0.8, -s * 0.3); ctx.lineTo(0, s); ctx.lineTo(-s * 0.8, -s * 0.3);
-          ctx.closePath();
-          ctx.fillStyle = signData.color; ctx.fill();
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
-        } else {
-          ctx.fillStyle = signData.color || "#fff";
-          ctx.strokeStyle = signData.border || "#333";
-          ctx.lineWidth = 2;
-          ctx.fillRect(-s, -s * 0.65, s * 2, s * 1.3);
-          ctx.strokeRect(-s, -s * 0.65, s * 2, s * 1.3);
-        }
-        ctx.fillStyle = signData.textColor || "#fff";
-        const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
-        const baseFontSize = label.length <= 4 ? 13 : label.length <= 8 ? 11 : 8;
-        ctx.font = `bold ${Math.max(6, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(label, 0, shp === "triangle" ? 4 : 0);
-      }}
-    />
-  );
-}
-
-interface DeviceShapeProps { obj: DeviceObject; isSelected: boolean; }
-function DeviceShape({ obj, isSelected }: DeviceShapeProps) {
-  const { x, y, deviceData, rotation = 0 } = obj;
-  return (
-    <Shape
-      x={x} y={y}
-      rotation={rotation}
-      shadowColor={isSelected ? COLORS.selected : undefined}
-      shadowBlur={isSelected ? 12 : 0}
-      listening={false}
-      sceneFunc={(ctx: KonvaContext) => {
-        ctx.fillStyle = deviceData.color;
-        ctx.font = "22px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(deviceData.icon, 0, 0);
-        ctx.fillStyle = COLORS.textMuted;
-        ctx.font = "9px 'JetBrains Mono', monospace";
-        ctx.fillText(deviceData.label, 0, 18);
-      }}
-    />
-  );
-}
-
-interface WorkZoneProps { obj: ZoneObject; isSelected: boolean; }
-function WorkZone({ obj, isSelected }: WorkZoneProps) {
-  const { x, y, w, h } = obj;
-  const hatches = [];
-  const maxD = Math.max(w, h);
-  for (let i = -maxD; i < maxD * 2; i += 20) {
-    hatches.push(
-      <Line key={i} points={[x + i, y, x + i + h, y + h]} stroke="rgba(245,158,11,0.12)" strokeWidth={1} listening={false} />
-    );
-  }
-  return (
-    <Group listening={false}>
-      <Rect x={x} y={y} width={w} height={h} fill="rgba(245,158,11,0.08)"
-        stroke={isSelected ? COLORS.selected : "rgba(245,158,11,0.5)"} strokeWidth={2} dash={[8, 6]} />
-      {hatches}
-      <KonvaText x={x} y={y} width={w} height={h} text="WORK ZONE"
-        fontSize={11} fontStyle="bold" fontFamily="'JetBrains Mono', monospace"
-        fill={COLORS.accent} align="center" verticalAlign="middle" />
-    </Group>
-  );
-}
-
-interface ArrowShapeProps { obj: ArrowObject; isSelected: boolean; }
-function ArrowShape({ obj, isSelected }: ArrowShapeProps) {
-  const { x1, y1, x2, y2, color = "#fff" } = obj;
-  const angle = angleBetween(x1, y1, x2, y2);
-  const headLen = 14;
-  const col = isSelected ? COLORS.selected : color;
-  const hx1 = x2 - headLen * Math.cos(angle - 0.4);
-  const hy1 = y2 - headLen * Math.sin(angle - 0.4);
-  const hx2 = x2 - headLen * Math.cos(angle + 0.4);
-  const hy2 = y2 - headLen * Math.sin(angle + 0.4);
-  return (
-    <Group listening={false}>
-      <Line points={[x1, y1, x2, y2]} stroke={col} strokeWidth={3} />
-      <Line points={[x2, y2, hx1, hy1, hx2, hy2]} closed fill={col} stroke={col} strokeWidth={1} />
-    </Group>
-  );
-}
-
-interface TextLabelProps { obj: TextObject; isSelected: boolean; }
-function TextLabel({ obj, isSelected }: TextLabelProps) {
-  const { x, y, text, fontSize = 14, bold, color = "#fff" } = obj;
-  return (
-    <KonvaText x={x} y={y} text={text} fontSize={fontSize}
-      fontStyle={bold ? "bold" : "normal"}
-      fontFamily="'JetBrains Mono', monospace"
-      fill={isSelected ? COLORS.selected : color}
-      listening={false} />
-  );
-}
-
-interface MeasurementShapeProps { obj: MeasureObject; }
-function MeasurementShape({ obj }: MeasurementShapeProps) {
-  const { x1, y1, x2, y2 } = obj;
-  const d = dist(x1, y1, x2, y2);
-  const ft = (d * 0.5).toFixed(1);
-  const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
-  return (
-    <Group listening={false}>
-      <Line points={[x1, y1, x2, y2]} stroke="#818cf8" strokeWidth={1.5} dash={[5, 5]} />
-      <Circle x={x1} y={y1} radius={4} fill="#818cf8" />
-      <Circle x={x2} y={y2} radius={4} fill="#818cf8" />
-      <Rect x={midX - 28} y={midY - 10} width={56} height={20} fill="#0f1117" stroke="#818cf8" strokeWidth={1} />
-      <KonvaText x={midX - 28} y={midY - 10} width={56} height={20} text={`${ft} ft`}
-        fontSize={10} fontStyle="bold" fontFamily="'JetBrains Mono', monospace"
-        fill="#818cf8" align="center" verticalAlign="middle" />
-    </Group>
-  );
-}
-
-// px per foot — chosen to match road scale (2-lane road = 22 ft realWidth ≈ 80 px → ~3.6 px/ft)
-const TAPER_SCALE = 3;
-
-interface TaperShapeProps { obj: TaperObject; isSelected: boolean; }
-function TaperShape({ obj, isSelected }: TaperShapeProps) {
-  const { x, y, rotation, laneWidth, taperLength, numLanes } = obj;
-  const totalWidthPx = laneWidth * numLanes * TAPER_SCALE;
-  const narrowHalfPx = (laneWidth * TAPER_SCALE) / 2;
-  const lengthPx = taperLength * TAPER_SCALE;
-  const hw = totalWidthPx / 2;
-
-  return (
-    <Shape
-      x={x} y={y} rotation={rotation}
-      listening={false}
-      shadowColor={isSelected ? COLORS.selected : undefined}
-      shadowBlur={isSelected ? 12 : 0}
-      sceneFunc={(ctx: KonvaContext) => {
-        // Trapezoid: wide end centered at origin, narrow end at +lengthPx
-        // Wide end spans ±hw, narrow end spans ±narrowHalfPx (open lane persists)
-        ctx.beginPath();
-        ctx.moveTo(0, -hw);
-        ctx.lineTo(0,  hw);
-        ctx.lineTo(lengthPx,  narrowHalfPx);
-        ctx.lineTo(lengthPx, -narrowHalfPx);
-        ctx.closePath();
-        ctx.fillStyle = "rgba(249,115,22,0.35)";
-        ctx.fill();
-        ctx.strokeStyle = isSelected ? COLORS.selected : "#f97316";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        // Dashed centerline with arrowhead
-        ctx.strokeStyle = "rgba(255,255,255,0.7)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([8, 6]);
-        ctx.beginPath();
-        ctx.moveTo(8, 0);
-        ctx.lineTo(lengthPx - 18, 0);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.beginPath();
-        ctx.moveTo(lengthPx - 8, 0);
-        ctx.lineTo(lengthPx - 18, -5);
-        ctx.lineTo(lengthPx - 18, 5);
-        ctx.closePath();
-        ctx.fill();
-        // L label
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 11px 'JetBrains Mono', monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(`L=${Math.round(obj.taperLength)}ft`, lengthPx / 2, hw + 14);
-      }}
-    />
-  );
-}
-
-interface ObjectShapeProps { obj: CanvasObject; isSelected: boolean; }
-function ObjectShape({ obj, isSelected }: ObjectShapeProps) {
-  switch (obj.type) {
-    case "road":         return <RoadSegment obj={obj} isSelected={isSelected} />;
-    case "polyline_road":return <PolylineRoad obj={obj} isSelected={isSelected} />;
-    case "curve_road":         return <CurveRoad obj={obj} isSelected={isSelected} />;
-    case "cubic_bezier_road":  return <CubicBezierRoad obj={obj} isSelected={isSelected} />;
-    case "sign":         return <SignShape obj={obj} isSelected={isSelected} />;
-    case "device":       return <DeviceShape obj={obj} isSelected={isSelected} />;
-    case "zone":         return <WorkZone obj={obj} isSelected={isSelected} />;
-    case "arrow":        return <ArrowShape obj={obj} isSelected={isSelected} />;
-    case "text":         return <TextLabel obj={obj} isSelected={isSelected} />;
-    case "measure":      return <MeasurementShape obj={obj} />;
-    case "taper":        return <TaperShape obj={obj} isSelected={isSelected} />;
-    case "lane_mask":    return <LaneMaskShape obj={obj} isSelected={isSelected} />;
-    case "crosswalk":    return <CrosswalkShape obj={obj} isSelected={isSelected} />;
-    case "turn_lane":    return <TurnLaneShape obj={obj} isSelected={isSelected} />;
-    default:             return null;
-  }
-}
-
-interface DrawingOverlaysProps { tool: string; roadDrawMode: string; drawStart: DrawStart | null; cursorPos: Point; snapIndicator: Point | null; polyPoints: Point[]; curvePoints: Point[]; cubicPoints: Point[]; }
-function DrawingOverlays({ tool, roadDrawMode, drawStart, cursorPos, snapIndicator, polyPoints, curvePoints, cubicPoints }: DrawingOverlaysProps) {
-  const previewTarget = snapIndicator || cursorPos;
-  const elements = [];
-
-  // Straight road preview
-  if (drawStart && tool === "road" && roadDrawMode === "straight") {
-    elements.push(
-      <Line key="road-preview"
-        points={[drawStart.x, drawStart.y, previewTarget.x, previewTarget.y]}
-        stroke="rgba(245,158,11,0.5)" strokeWidth={1} dash={[6, 4]} listening={false} />
-    );
-  }
-
-  // Zone preview
-  if (drawStart && tool === "zone") {
-    const zx = Math.min(drawStart.x, cursorPos.x), zy = Math.min(drawStart.y, cursorPos.y);
-    elements.push(
-      <Rect key="zone-preview" x={zx} y={zy}
-        width={Math.abs(cursorPos.x - drawStart.x)} height={Math.abs(cursorPos.y - drawStart.y)}
-        stroke="rgba(245,158,11,0.5)" strokeWidth={1} dash={[6, 4]} listening={false} />
-    );
-  }
-
-  // Arrow / measure preview
-  if (drawStart && (tool === "arrow" || tool === "measure")) {
-    elements.push(
-      <Line key="line-preview"
-        points={[drawStart.x, drawStart.y, cursorPos.x, cursorPos.y]}
-        stroke="rgba(245,158,11,0.5)" strokeWidth={1} dash={[6, 4]} listening={false} />
-    );
-  }
-
-  // Lane mask preview
-  if (drawStart && tool === "lane_mask") {
-    const previewMask: LaneMaskObject = {
-      id: "__preview__",
-      type: "lane_mask",
-      x1: drawStart.x, y1: drawStart.y,
-      x2: cursorPos.x, y2: cursorPos.y,
-      laneWidth: 20,
-      color: "rgba(239,68,68,0.5)",
-      style: "hatch",
-    };
-    elements.push(<LaneMaskShape key="lane-mask-preview" obj={previewMask} isSelected={false} />);
-  }
-
-  // Crosswalk preview
-  if (drawStart && tool === "crosswalk") {
-    const previewCW: CrosswalkObject = {
-      id: "__preview__",
-      type: "crosswalk",
-      x1: drawStart.x, y1: drawStart.y,
-      x2: cursorPos.x, y2: cursorPos.y,
-      depth: 24,
-      stripeCount: 6,
-      stripeColor: "#ffffff",
-    };
-    elements.push(<CrosswalkShape key="crosswalk-preview" obj={previewCW} isSelected={false} />);
-  }
-
-  // Polyline / smooth in-progress
-  if (tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length > 0) {
-    const flat = [...polyPoints.flatMap((p) => [p.x, p.y]), previewTarget.x, previewTarget.y];
-    const previewTension = roadDrawMode === "smooth" ? 0.5 : 0;
-    elements.push(
-      <Line key="poly-preview" points={flat}
-        stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={previewTension} listening={false} />
-    );
-    polyPoints.forEach((p, idx) => {
-      elements.push(
-        <Circle key={`poly-pt-${idx}`} x={p.x} y={p.y} radius={5}
-          fill={idx === 0 ? COLORS.success : COLORS.accent}
-          stroke="rgba(255,255,255,0.6)" strokeWidth={1} listening={false} />
-      );
-    });
-  }
-
-  // Curve in-progress
-  if (tool === "road" && roadDrawMode === "curve" && curvePoints.length > 0) {
-    if (curvePoints.length === 1) {
-      elements.push(
-        <Line key="curve-preview-1"
-          points={[curvePoints[0].x, curvePoints[0].y, previewTarget.x, previewTarget.y]}
-          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} listening={false} />
-      );
-    } else {
-      const previewSpine = sampleBezier(curvePoints[0], curvePoints[1], previewTarget, 20);
-      elements.push(
-        <Line key="curve-preview-2" points={previewSpine.flatMap((p) => [p.x, p.y])}
-          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
-      );
-      elements.push(
-        <Line key="curve-tangent"
-          points={[curvePoints[0].x, curvePoints[0].y, curvePoints[1].x, curvePoints[1].y, previewTarget.x, previewTarget.y]}
-          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
-      );
-    }
-    curvePoints.forEach((p, idx) => {
-      elements.push(
-        <Circle key={`curve-pt-${idx}`} x={p.x} y={p.y} radius={5}
-          fill={idx === 0 ? COLORS.success : COLORS.info}
-          stroke="rgba(255,255,255,0.6)" strokeWidth={1} listening={false} />
-      );
-    });
-  }
-
-  // Cubic bezier in-progress
-  if (tool === "road" && roadDrawMode === "cubic" && cubicPoints.length > 0) {
-    const [q0, q1, q2] = cubicPoints;
-    if (cubicPoints.length === 1) {
-      // Step 1: line from p0 to cursor
-      elements.push(
-        <Line key="cubic-preview-1"
-          points={[q0.x, q0.y, previewTarget.x, previewTarget.y]}
-          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} listening={false} />
-      );
-    } else if (cubicPoints.length === 2) {
-      // Step 2: cp1 placed, collapse cp2+p3 to cursor for preview
-      const spine = sampleCubicBezier(q0, q1, previewTarget, previewTarget, 20);
-      elements.push(
-        <Line key="cubic-preview-2" points={spine.flatMap((p) => [p.x, p.y])}
-          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
-      );
-      elements.push(
-        <Line key="cubic-tangent-1"
-          points={[q0.x, q0.y, q1.x, q1.y]}
-          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
-      );
-    } else {
-      // Step 3: cp1 + cp2 placed, preview p3 at cursor
-      const spine = sampleCubicBezier(q0, q1, q2, previewTarget, 20);
-      elements.push(
-        <Line key="cubic-preview-3" points={spine.flatMap((p) => [p.x, p.y])}
-          stroke="rgba(245,158,11,0.65)" strokeWidth={2} dash={[6, 4]} tension={0} listening={false} />
-      );
-      elements.push(
-        <Line key="cubic-tangent-1"
-          points={[q0.x, q0.y, q1.x, q1.y]}
-          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
-      );
-      elements.push(
-        <Line key="cubic-tangent-2"
-          points={[q2.x, q2.y, previewTarget.x, previewTarget.y]}
-          stroke="rgba(255,255,255,0.2)" strokeWidth={1} dash={[3, 3]} listening={false} />
-      );
-    }
-    cubicPoints.forEach((p, idx) => {
-      elements.push(
-        <Circle key={`cubic-pt-${idx}`} x={p.x} y={p.y} radius={5}
-          fill={idx === 0 ? COLORS.success : COLORS.info}
-          stroke="rgba(255,255,255,0.6)" strokeWidth={1} listening={false} />
-      );
-    });
-  }
-
-  // Snap indicator
-  if (snapIndicator) {
-    elements.push(
-      <Circle key="snap-outer" x={snapIndicator.x} y={snapIndicator.y} radius={9}
-        stroke={COLORS.success} strokeWidth={2} listening={false} />
-    );
-    elements.push(
-      <Circle key="snap-inner" x={snapIndicator.x} y={snapIndicator.y} radius={3}
-        fill={COLORS.success} listening={false} />
-    );
-  }
-
-  return <>{elements}</>;
-}
-
-// ─── UI COMPONENTS ─────────────────────────────────────────────────────────────
-
-interface ToolButtonProps { tool: ToolDef; active: boolean; onClick: () => void; }
-function ToolButton({ tool, active, onClick }: ToolButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      title={`${tool.label} (${tool.shortcut})`}
-      data-testid={`tool-${tool.id}`}
-      aria-pressed={active}
-      style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        width: 40, height: 40, borderRadius: 8,
-        border: active ? `2px solid ${COLORS.accent}` : "1px solid transparent",
-        background: active ? COLORS.accentDim : "transparent",
-        color: active ? COLORS.accent : COLORS.textMuted,
-        cursor: "pointer", fontSize: 18, transition: "all 0.15s", position: "relative",
-      }}
-    >
-      <span>{tool.icon}</span>
-      <span style={{ position: "absolute", bottom: 2, right: 3, fontSize: 7, color: COLORS.textDim, fontFamily: "'JetBrains Mono', monospace" }}>
-        {tool.shortcut}
-      </span>
-    </button>
-  );
-}
-
-// HelpModal → src/components/tcp/panels/HelpModal.tsx
-
-// ─── SIGN EDITOR PANEL ───────────────────────────────────────────────────────
-
-interface SignEditorPanelProps { onUseSign: () => void; onSaveToLibrary: (signData: SignData) => void; onSignChange: (signData: SignData) => void; }
-function SignEditorPanel({ onUseSign, onSaveToLibrary, onSignChange }: SignEditorPanelProps) {
-  const [shape, setShape] = useState<SignShape>("diamond");
-  const [text, setText] = useState("CUSTOM");
-  const [bgColor, setBgColor] = useState("#f97316");
-  const [textColor, setTextColor] = useState("#111111");
-  const previewRef = useRef<HTMLCanvasElement>(null);
-
-  const signData = useMemo(() => ({
-    // Derive id from configuration so legend/analytics can distinguish different editor signs.
-    id: `custom_${shape}_${(text || " ").trim().toLowerCase().replace(/\s+/g, "_")}`,
-    label: text || " ",
-    shape,
-    color: bgColor,
-    textColor,
-    border: "#333",
-  }), [shape, text, bgColor, textColor]);
-
-  // Keep parent's selectedSign in sync so clicking the canvas always places
-  // the current editor sign (not whatever was last selected from the library).
-  useEffect(() => { onSignChange(signData) }, [signData, onSignChange]);
-
-  useEffect(() => {
-    const cvs = previewRef.current;
-    if (!cvs) return;
-    const ctx = cvs.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, 100, 100);
-    ctx.fillStyle = COLORS.canvas;
-    ctx.fillRect(0, 0, 100, 100);
-    drawSign(ctx, { x: 50, y: 50, signData, rotation: 0, scale: 2.2 }, false);
-  }, [signData]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {sectionTitle("Shape")}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
-        {SIGN_SHAPES.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setShape(s.id as SignShape)}
-            style={{
-              padding: "6px 4px",
-              background: shape === s.id ? COLORS.accentDim : "rgba(255,255,255,0.03)",
-              border: `1px solid ${shape === s.id ? COLORS.accent : COLORS.panelBorder}`,
-              borderRadius: 4,
-              color: shape === s.id ? COLORS.accent : COLORS.textMuted,
-              cursor: "pointer", fontSize: 10, fontFamily: "inherit",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-            }}
-          >
-            <span style={{ fontSize: 14 }}>{s.preview}</span>
-            <span style={{ fontSize: 8 }}>{s.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {sectionTitle("Sign Text")}
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value.slice(0, 14))}
-        style={{
-          background: COLORS.bg, border: `1px solid ${COLORS.panelBorder}`,
-          color: COLORS.text, padding: "6px 8px", borderRadius: 4,
-          fontSize: 12, fontFamily: "inherit", outline: "none",
-        }}
-        placeholder="SIGN TEXT"
-      />
-
-      {sectionTitle("Colors")}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <label style={{ fontSize: 10, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 4 }}>
-          Background
-          <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)}
-            style={{ width: "100%", height: 28, cursor: "pointer", border: "none", borderRadius: 4 }} />
-        </label>
-        <label style={{ fontSize: 10, color: COLORS.textMuted, display: "flex", flexDirection: "column", gap: 4 }}>
-          Text Color
-          <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)}
-            style={{ width: "100%", height: 28, cursor: "pointer", border: "none", borderRadius: 4 }} />
-        </label>
-      </div>
-
-      {sectionTitle("Preview")}
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <canvas ref={previewRef} width={100} height={100}
-          style={{ borderRadius: 6, border: `1px solid ${COLORS.panelBorder}` }} />
-      </div>
-
-      <div style={{ display: "flex", gap: 6 }}>
-        <button
-          onClick={onUseSign}
-          style={{
-            flex: 1, padding: "8px 0", background: COLORS.accentDim,
-            border: `1px solid ${COLORS.accent}`, borderRadius: 6,
-            color: COLORS.accent, cursor: "pointer", fontSize: 11,
-            fontFamily: "inherit", fontWeight: 600, letterSpacing: 0.5,
-          }}
-        >
-          ✓ Place
-        </button>
-        <button
-          onClick={() => onSaveToLibrary({ ...signData, id: "custom_" + uid() })}
-          style={{
-            flex: 1, padding: "8px 0", background: "transparent",
-            border: `1px solid ${COLORS.panelBorder}`, borderRadius: 6,
-            color: COLORS.textMuted, cursor: "pointer", fontSize: 11,
-            fontFamily: "inherit", fontWeight: 600, letterSpacing: 0.5,
-          }}
-        >
-          + Save
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// SignIconSvg, LegendBox, NorthArrow → src/components/tcp/canvas/LegendBox.tsx
-// ManifestPanel → src/components/tcp/panels/ManifestPanel.tsx
-
-// QCPanel, getQCBadgeColor → src/components/tcp/panels/QCPanel.tsx
-// PropertyPanel → src/components/tcp/panels/PropertyPanel.tsx
-
-// MiniMap → src/components/tcp/canvas/MiniMap.tsx
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 interface PlannerProps {
@@ -1121,9 +256,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const key = e.key.toUpperCase();
 
       if (e.metaKey || e.ctrlKey) {
-        if (key === "Z" && e.shiftKey) { e.preventDefault(); redo(); return; }
-        if (key === "Z") { e.preventDefault(); undo(); return; }
-        if (key === "Y") { e.preventDefault(); redo(); return; }
+        if (key === "Z" && e.shiftKey) { e.preventDefault(); redo(); setSelected(null); return; }
+        if (key === "Z") { e.preventDefault(); undo(); setSelected(null); return; }
+        if (key === "Y") { e.preventDefault(); redo(); setSelected(null); return; }
         if (key === "C" && selected) {
           e.preventDefault();
           const obj = objects.find((o) => o.id === selected);
@@ -1134,7 +269,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           e.preventDefault();
           const clone = cloneObject(clipboard);
           const newObjs = [...objects, clone];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(clone.id);
+          pushHistory(newObjs); setSelected(clone.id);
           setClipboard(clone); // shift clipboard so repeated Ctrl+V continues to offset
           return;
         }
@@ -1144,7 +279,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           if (obj) {
             const clone = cloneObject(obj);
             const newObjs = [...objects, clone];
-            setObjects(newObjs); pushHistory(newObjs); setSelected(clone.id);
+            pushHistory(newObjs); setSelected(clone.id);
           }
           return;
         }
@@ -1158,7 +293,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length >= 2) {
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         }
         return;
@@ -1167,7 +302,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       if (key === "DELETE" || key === "BACKSPACE") {
         if (selected) {
           const newObjs = objects.filter((o) => o.id !== selected);
-          setObjects(newObjs); pushHistory(newObjs); setSelected(null);
+          pushHistory(newObjs); setSelected(null);
         }
         return;
       }
@@ -1203,12 +338,12 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   // Object helpers
   const updateObject = (id: string, updates: Record<string, unknown>) => {
     const newObjs = objects.map((o) => (o.id === id ? { ...o, ...updates } as CanvasObject : o));
-    setObjects(newObjs); pushHistory(newObjs);
+    pushHistory(newObjs);
   };
 
   const deleteObject = (id: string) => {
     const newObjs = objects.filter((o) => o.id !== id);
-    setObjects(newObjs); pushHistory(newObjs); setSelected(null);
+    pushHistory(newObjs); setSelected(null);
   };
 
   const reorderObject = (id: string, dir: "front" | "forward" | "backward" | "back") => {
@@ -1223,18 +358,17 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     else if (dir === "back")     next.unshift(obj);
     else if (dir === "forward")  next.splice(idx + 1, 0, obj);
     else                         next.splice(idx - 1, 0, obj);
-    setObjects(next);
     pushHistory(next);
   };
 
   const clearAll = () => {
-    if (confirm("Clear all objects?")) { setObjects([]); pushHistory([]); setSelected(null); }
+    if (confirm("Clear all objects?")) { pushHistory([]); setSelected(null); }
   };
 
   const newPlan = () => {
     if (objects.length > 0 && !confirm("Start a new plan? Unsaved changes will be lost.")) return;
     localStorage.removeItem(AUTOSAVE_KEY);
-    setObjects([]); pushHistory([]); setSelected(null);
+    pushHistory([]); setSelected(null);
     setPlanTitle("Untitled Traffic Control Plan");
     setPlanId(uid());
     setPlanCreatedAt(new Date().toISOString());
@@ -1252,14 +386,12 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setCubicPoints([]);
     setSnapIndicator(null);
     if (mode === 'replace') {
-      setObjects(templateObjects);
       pushHistory(templateObjects);
       setSelected(null);
       setOffset({ x: 0, y: 0 });
       setZoom(1);
     } else {
       const merged = [...objects, ...templateObjects];
-      setObjects(merged);
       pushHistory(merged);
       setSelected(null);
     }
@@ -1420,7 +552,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (plan.canvasOffset) setOffset(plan.canvasOffset);
         if (plan.canvasZoom) setZoom(plan.canvasZoom);
         const loaded: CanvasObject[] = plan.canvasState?.objects || [];
-        setObjects(loaded); pushHistory(loaded); setSelected(null);
+        pushHistory(loaded); setSelected(null);
       } catch {
         alert("Failed to load plan. Make sure it's a valid .tcp.json file.");
       }
@@ -1590,8 +722,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={undo} style={panelBtnStyle(false)} title="Undo (Ctrl+Z)" data-testid="undo-button">↶ Undo</button>
-          <button onClick={redo} style={panelBtnStyle(false)} title="Redo (Ctrl+Shift+Z)" data-testid="redo-button">↷ Redo</button>
+          <button onClick={() => { undo(); setSelected(null); }} style={panelBtnStyle(false)} title="Undo (Ctrl+Z)" data-testid="undo-button">↶ Undo</button>
+          <button onClick={() => { redo(); setSelected(null); }} style={panelBtnStyle(false)} title="Redo (Ctrl+Shift+Z)" data-testid="redo-button">↷ Redo</button>
           <div style={{ width: 1, height: 20, background: COLORS.panelBorder }} />
           <button onClick={clearAll} style={{ ...panelBtnStyle(false), color: COLORS.danger, borderColor: "rgba(239,68,68,0.3)" }}>Clear All</button>
         </div>

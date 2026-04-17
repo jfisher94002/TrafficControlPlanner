@@ -102,6 +102,7 @@ def test_missing_time_on_form_uses_default_and_is_rejected(valid_issue):
     assert res.json()["detail"] == "Invalid submission."
 
 
+
 def test_rate_limit_blocks_fourth_submission_from_same_ip(monkeypatch, valid_issue):
     """After 3 hits in the window, the 4th submission from same IP is rejected."""
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
@@ -163,6 +164,7 @@ def test_rate_limit_uses_request_client_host_when_forwarded_ip_absent(monkeypatc
     blocked = client.post("/create-issue", json=valid_issue)
     assert blocked.status_code == 429
     assert blocked.json()["detail"] == "Too many submissions. Please try again later."
+
 
 
 def test_anonymous_submission_accepted_without_uid(monkeypatch):

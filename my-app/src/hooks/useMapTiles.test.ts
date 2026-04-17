@@ -15,8 +15,8 @@ class MockImage {
   }
 }
 
-function makeCenter(lon = 0): MapCenter {
-  return { lat: 0, lon, zoom: 1 }
+function makeCenter(lon = 0, zoom = 1): MapCenter {
+  return { lat: 0, lon, zoom }
 }
 
 describe('useMapTiles', () => {
@@ -91,5 +91,25 @@ describe('useMapTiles', () => {
       expect(result.current.mapTileCacheRef.current[retryUrl]).toBeDefined()
     })
     expect(MockImage.created.length).toBe(initialCreated + 1)
+  })
+
+  it('evicts stale cache entries when viewport tiles change', () => {
+    const { result, rerender } = renderHook(
+      ({ center }) => useMapTiles(center, { w: 256, h: 256 }),
+      { initialProps: { center: makeCenter(-120, 5) } },
+    )
+
+    const initialUrls = Object.keys(result.current.mapTileCacheRef.current)
+    expect(initialUrls.length).toBeGreaterThan(0)
+
+    rerender({ center: makeCenter(120, 5) })
+
+    const currentTileUrls = new Set(result.current.mapTiles.map((t) => t.url))
+    const cachedUrls = Object.keys(result.current.mapTileCacheRef.current)
+
+    // Ensure the scenario is meaningful: at least one previously cached URL is now out of view.
+    expect(initialUrls.some((url) => !currentTileUrls.has(url))).toBe(true)
+    // Cache should only contain currently visible tile URLs after eviction.
+    expect(cachedUrls.every((url) => currentTileUrls.has(url))).toBe(true)
   })
 })

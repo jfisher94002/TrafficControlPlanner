@@ -111,6 +111,7 @@ function makeProps(overrides: Partial<CanvasEventsProps> = {}) {
     mocks: {
       setObjects,
       setSelected,
+      setDrawStart,
       setSnapIndicator,
       setCursorPos,
       pushHistory,
@@ -162,5 +163,70 @@ describe('useCanvasEvents null tool selections', () => {
     expect(mocks.setObjects).not.toHaveBeenCalled()
     expect(mocks.pushHistory).not.toHaveBeenCalled()
     expect(mocks.setSelected).not.toHaveBeenCalled()
+  })
+
+  it('creates a straight road on mouse up when drag distance is sufficient', () => {
+    const { props, mocks } = makeProps({
+      tool: 'road',
+      roadDrawMode: 'straight',
+      drawStart: { x: 10, y: 12 },
+      objects: [],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).toHaveBeenCalledTimes(1)
+    const nextObjects = mocks.setObjects.mock.calls[0][0] as CanvasObject[]
+    expect(nextObjects).toHaveLength(1)
+    expect(nextObjects[0]).toMatchObject({
+      type: 'road',
+      x1: 10,
+      y1: 12,
+      x2: 24,
+      y2: 36,
+      width: ROAD_TYPE.width,
+      realWidth: ROAD_TYPE.realWidth,
+      lanes: ROAD_TYPE.lanes,
+      roadType: ROAD_TYPE.id,
+    })
+    expect(nextObjects[0].id).toEqual(expect.any(String))
+    expect(mocks.pushHistory).toHaveBeenCalledWith(nextObjects)
+    expect(mocks.setSelected).toHaveBeenCalledWith(nextObjects[0].id)
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+    expect(track).toHaveBeenCalledWith('road_drawn', {
+      road_type: ROAD_TYPE.id,
+      draw_mode: 'straight',
+    })
+  })
+
+  it('skips straight road creation for tiny drags and clears drawStart', () => {
+    const { props, mocks } = makeProps({
+      tool: 'road',
+      roadDrawMode: 'straight',
+      drawStart: { x: 10, y: 10 },
+      objects: [],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 12, y: 13 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).not.toHaveBeenCalled()
+    expect(mocks.pushHistory).not.toHaveBeenCalled()
+    expect(mocks.setSelected).not.toHaveBeenCalled()
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+    expect(track).not.toHaveBeenCalled()
   })
 })

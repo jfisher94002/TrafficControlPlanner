@@ -46,14 +46,10 @@ export async function fetchRemoteUpdatedAt(path: string): Promise<string | null>
 
 function isNotFoundError(error: unknown): boolean {
   if (!(error instanceof Error)) return false
-  const msg = error.message.toLowerCase()
-  return (
-    error.name === 'NoSuchKey' ||
-    msg.includes('nosuchkey') ||
-    msg.includes('not found') ||
-    msg.includes('does not exist') ||
-    msg.includes('404')
-  )
+  // Amplify v6 Storage surfaces S3 NoSuchKey as error.name === 'NoSuchKey'.
+  // The message fallback handles any future SDK restructuring but is kept
+  // narrow (exact code string only) to avoid swallowing unrelated errors.
+  return error.name === 'NoSuchKey' || error.message.includes('NoSuchKey')
 }
 
 /** List all plans for the given user. */

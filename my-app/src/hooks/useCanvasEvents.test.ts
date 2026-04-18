@@ -229,4 +229,89 @@ describe('useCanvasEvents null tool selections', () => {
     expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
     expect(track).not.toHaveBeenCalled()
   })
+
+  it('snaps straight road endpoint to existing road endpoint on mouse up', () => {
+    const { props, mocks } = makeProps({
+      tool: 'road',
+      roadDrawMode: 'straight',
+      snapEnabled: true,
+      drawStart: { x: 0, y: 0 },
+      objects: [
+        {
+          id: 'existing-road',
+          type: 'road',
+          x1: 40,
+          y1: 40,
+          x2: 100,
+          y2: 100,
+          width: ROAD_TYPE.width,
+          realWidth: ROAD_TYPE.realWidth,
+          lanes: ROAD_TYPE.lanes,
+          roadType: ROAD_TYPE.id,
+        },
+      ],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 45, y: 44 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).toHaveBeenCalledTimes(1)
+    const nextObjects = mocks.setObjects.mock.calls[0][0] as CanvasObject[]
+    expect(nextObjects).toHaveLength(2)
+    const createdRoad = nextObjects[1]
+    expect(createdRoad).toMatchObject({
+      type: 'road',
+      x1: 0,
+      y1: 0,
+      x2: 40,
+      y2: 40,
+    })
+    expect(mocks.pushHistory).toHaveBeenCalledWith(nextObjects)
+    expect(mocks.setSelected).toHaveBeenCalledWith(createdRoad.id)
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+  })
+
+  it('clears drawStart without creating a road when snap collapses drag distance', () => {
+    const { props, mocks } = makeProps({
+      tool: 'road',
+      roadDrawMode: 'straight',
+      snapEnabled: true,
+      drawStart: { x: 40, y: 40 },
+      objects: [
+        {
+          id: 'existing-road',
+          type: 'road',
+          x1: 40,
+          y1: 40,
+          x2: 100,
+          y2: 100,
+          width: ROAD_TYPE.width,
+          realWidth: ROAD_TYPE.realWidth,
+          lanes: ROAD_TYPE.lanes,
+          roadType: ROAD_TYPE.id,
+        },
+      ],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 45, y: 44 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).not.toHaveBeenCalled()
+    expect(mocks.pushHistory).not.toHaveBeenCalled()
+    expect(mocks.setSelected).not.toHaveBeenCalled()
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+    expect(track).not.toHaveBeenCalled()
+  })
 })

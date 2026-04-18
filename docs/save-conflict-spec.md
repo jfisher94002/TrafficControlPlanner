@@ -1,7 +1,7 @@
 # Save Conflict Detection & Resolution — Spec
 
 **Issue:** #193  
-**Status:** Implemented in PR #254  
+**Status:** As implemented in `feat/save-conflict-193` (see PR #254; update this line if behavior changes)  
 **Branch:** `feat/save-conflict-193`
 
 ---
@@ -30,7 +30,11 @@ Each plan stored in S3 carries an `updatedAt` ISO 8601 timestamp in two places:
 | JSON body (`data.updatedAt`) | Canonical record; read when the plan is loaded |
 | S3 object user metadata (`x-amz-meta-updatedAt`) | Cheap HEAD-only check; avoids downloading the full JSON |
 
-On every successful `savePlanToCloud` call, both are written atomically (same `uploadData` call).
+`updatedAt` is always generated client-side (`new Date().toISOString()`) immediately before each save — it is never copied from a previously loaded plan. This means the token reflects when *this client* saved, not when any other session saved, avoiding clock-skew confusion between clients.
+
+On every successful `savePlanToCloud` call, both locations are written atomically (same `uploadData` call).
+
+If `getProperties` throws (network error, object not found), `fetchRemoteUpdatedAt` returns `null` and the conflict check is skipped — preferring availability over false conflict warnings.
 
 ### Version token lifecycle
 
@@ -43,7 +47,7 @@ User edits plan locally...
 
 User clicks ☁ Save
   └─► fetchRemoteUpdatedAt(path) → HEAD request → reads x-amz-meta-updatedAt
-      ├─ Returns null (plan never saved, or no metadata) → skip check, save normally
+      ├─ Returns null (new plan, legacy object, or network error) → skip check, save normally
       ├─ Returns "T1" (matches lastKnownUpdatedAt) → no conflict, save normally
       └─ Returns "T2" (differs) → conflict! load full remote JSON → show modal
 ```
@@ -71,9 +75,10 @@ User clicks ☁ Save
 ### Flow C — User chooses "Overwrite remote"
 
 1. Conflict modal is dismissed (`conflictData = null`)
-2. Plan is saved immediately, bypassing the conflict check
+2. Plan is saved immediately; the conflict check is bypassed for this one save only
 3. `lastKnownUpdatedAt` is updated to the new `updatedAt`
-4. Button shows "Saved ✓"
+4. Subsequent normal saves resume conflict detection against the new token (no permanent "force" mode)
+5. Button shows "Saved ✓"
 
 ### Flow D — User chooses "Load remote version"
 
@@ -86,20 +91,29 @@ User clicks ☁ Save
 ### Flow E — User chooses "Keep unsaved"
 
 1. Conflict modal is dismissed (`conflictData = null`)
-2. No save occurs; local edits are preserved
-3. `lastKnownUpdatedAt` is unchanged — the next save attempt will detect the conflict again
+2. No save occurs; local edits are preserved in the browser
+3. `lastKnownUpdatedAt` is unchanged — the next save attempt will detect the same conflict again
+4. The user must eventually choose Overwrite or Load Remote to unblock saving
 
 ### Flow F — First save of a new plan
 
-1. `lastKnownUpdatedAt` is `null` (never loaded from cloud)
-2. Conflict check is skipped entirely
-3. Plan is saved normally
+1. `lastKnownUpdatedAt` is `null` (plan was never loaded from cloud)
+2. Conflict check is skipped entirely — there is no prior token to compare against
+3. Plan is saved normally; `lastKnownUpdatedAt` is set to the new `updatedAt`
+
+---
+
+## Migration Path
+
+Plans saved before this feature was deployed have no `updatedAt` in S3 metadata. `fetchRemoteUpdatedAt` returns `null` for these, following the same null path as Flow F. The first save after upgrade is intentionally a "trust first save" — no cross-tab protection yet, because there is no baseline token to compare against. After that first save, metadata is written and all subsequent saves have full conflict detection.
+
+**Implication:** Two tabs with a legacy plan open at the same time could still race on the very first post-upgrade save. This is an acceptable trade-off; it matches the behavior before this feature and resolves automatically after one save.
 
 ---
 
 ## UI
 
-A modal overlay (`data-testid="save-conflict-modal"`) is shown when a conflict is detected:
+A modal overlay (`data-testid="save-conflict-modal"`) is shown when a conflict is detected. Button labels in the modal and in this document use the same copy as the rendered UI:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -108,15 +122,25 @@ A modal overlay (`data-testid="save-conflict-modal"`) is shown when a conflict i
 │ This plan was modified elsewhere since you  │
 │ last loaded it. Choose how to proceed:      │
 │                                             │
-│ [Overwrite remote] [Load remote] [Keep local]│
+│ [Overwrite remote] [Load remote version] [Keep unsaved] │
 └─────────────────────────────────────────────┘
 ```
 
 | Button | `data-testid` | Action |
 |---|---|---|
-| Overwrite remote | `conflict-overwrite-btn` | Force-saves local version |
-| Load remote version | `conflict-load-remote-btn` | Replaces canvas with remote plan |
-| Keep unsaved | `conflict-dismiss-btn` | Closes modal, no action |
+| Overwrite remote | `conflict-overwrite-btn` | Force-saves local version (conflict check bypassed for this save only) |
+| Load remote version | `conflict-load-remote-btn` | Replaces canvas with remote plan; local changes are lost |
+| Keep unsaved | `conflict-dismiss-btn` | Dismisses modal without saving; local edits are preserved but conflict will reappear on next save attempt |
+
+---
+
+## Concurrency Edge Cases
+
+**Two tabs both choose "Overwrite remote" after seeing the same conflict.** This is a last-writer-wins race — the second overwrite clobbers the first. No additional protection is provided. Users who need true multi-user editing should wait for the Aurora + team collaboration phase (planned post-public launch).
+
+**Network error during conflict check.** If `getProperties` throws, `fetchRemoteUpdatedAt` returns `null`, the conflict check is skipped, and the save proceeds as if no conflict exists. This matches the behavior for new and legacy plans and avoids blocking saves due to transient network issues.
+
+**Offline / queued save.** Conflict detection runs only at save time and requires a live network call to `getProperties`. There is currently no offline queue; if the network is unavailable the save call itself will fail before the conflict check is reached.
 
 ---
 
@@ -130,9 +154,11 @@ A modal overlay (`data-testid="save-conflict-modal"`) is shown when a conflict i
 // Before
 savePlanToCloud(userId: string, planId: string, data: object): Promise<void>
 
-// After — data must include updatedAt; it is written to S3 metadata
+// After — caller must supply updatedAt; it is written to both the JSON body and S3 metadata
 savePlanToCloud(userId: string, planId: string, data: object & { updatedAt: string }): Promise<void>
 ```
+
+`updatedAt` must be generated by the caller immediately before the save call (`new Date().toISOString()`). It is not inferred inside `savePlanToCloud`.
 
 #### New: `fetchRemoteUpdatedAt`
 
@@ -140,7 +166,7 @@ savePlanToCloud(userId: string, planId: string, data: object & { updatedAt: stri
 fetchRemoteUpdatedAt(path: string): Promise<string | null>
 ```
 
-Performs a HEAD-only `getProperties` call (no body download). Returns the `updatedAt` string from S3 user metadata, or `null` if absent or if the object doesn't exist.
+Performs a HEAD-only `getProperties` call (no body download). Returns the `updatedAt` string from S3 user metadata, or `null` if the field is absent, the object does not exist, or the call throws.
 
 ### `traffic-control-planner.tsx`
 
@@ -159,15 +185,9 @@ const [conflictData, setConflictData] = useState<Record<string, unknown> | null>
 
 ---
 
-## Migration Path
-
-Plans saved before this feature was deployed have no `updatedAt` in S3 metadata. `fetchRemoteUpdatedAt` returns `null` for these, which causes the conflict check to be skipped (Flow F). On first save after the upgrade, metadata is written and future saves will have conflict detection.
-
----
-
 ## Testing
 
 | Test file | Coverage |
 |---|---|
-| `src/test/planStorage.test.ts` | `savePlanToCloud` writes metadata; `fetchRemoteUpdatedAt` returns value / null / null-on-error |
-| `src/test/planner.test.tsx` | Modal not shown initially; conflict detected; Overwrite; Load Remote; Keep Local; no conflict when tokens match |
+| `src/test/planStorage.test.ts` | `savePlanToCloud` writes correct path and metadata; `fetchRemoteUpdatedAt` returns token / null (no metadata) / null (throws) |
+| `src/test/planner.test.tsx` | Modal absent on initial render; conflict detected when tokens differ; Overwrite saves and closes modal; Load Remote switches plan title; Keep Unsaved closes modal without saving; no modal when tokens match |

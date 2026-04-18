@@ -72,6 +72,32 @@ describe('Undo/Redo', () => {
     await user.click(screen.getByTestId('redo-button'))
     expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
   })
+
+  it('Ctrl+Z clears selection so properties panel returns to Plan Info', () => {
+    setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    const rightPanel = screen.getByTestId('right-panel')
+    expect(within(rightPanel).getByText(/sign Properties/i)).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true })
+    expect(within(rightPanel).getByText(/Plan Info/i)).toBeInTheDocument()
+    expect(screen.queryByText(/sign Properties/i)).not.toBeInTheDocument()
+  })
+
+  it('redo button keeps selection cleared after restoring objects', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(screen.getByTestId('undo-button'))
+    await user.click(screen.getByTestId('redo-button'))
+
+    const rightPanel = screen.getByTestId('right-panel')
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    expect(within(rightPanel).getByText(/Plan Info/i)).toBeInTheDocument()
+    expect(screen.queryByText(/sign Properties/i)).not.toBeInTheDocument()
+  })
 })
 
 // ─── Plan metadata ────────────────────────────────────────────────────────────

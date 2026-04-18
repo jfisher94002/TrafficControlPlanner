@@ -30,15 +30,30 @@ export async function savePlanToCloud(userId: string, planId: string, data: obje
 
 /**
  * Returns the `updatedAt` ISO string stored in S3 object metadata for the given path,
- * or null if the object doesn't exist or has no metadata. Used for conflict detection.
+ * or null if the object doesn't exist or has no updatedAt metadata field.
+ * Throws for any other error (auth failure, throttling, etc.) so callers know
+ * the conflict check could not be performed.
  */
 export async function fetchRemoteUpdatedAt(path: string): Promise<string | null> {
   try {
     const props = await getProperties({ path })
     return (props.metadata?.updatedAt as string | undefined) ?? null
-  } catch {
-    return null
+  } catch (error) {
+    if (isNotFoundError(error)) return null
+    throw error
   }
+}
+
+function isNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return (
+    error.name === 'NoSuchKey' ||
+    msg.includes('nosuchkey') ||
+    msg.includes('not found') ||
+    msg.includes('does not exist') ||
+    msg.includes('404')
+  )
 }
 
 /** List all plans for the given user. */

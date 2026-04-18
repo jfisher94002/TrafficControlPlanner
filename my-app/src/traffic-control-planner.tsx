@@ -435,6 +435,22 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     track('plan_saved_local', { object_count: objects.length });
   };
 
+  // Shared upload logic — builds payload, uploads, updates state.
+  // Returns the new updatedAt on success; throws on failure.
+  const performCloudSave = async (): Promise<string> => {
+    const updatedAt = new Date().toISOString();
+    const data = {
+      id: planId, name: planTitle, createdAt: planCreatedAt,
+      updatedAt, userId: userId!,
+      canvasState: { objects }, metadata: planMeta,
+      canvasOffset: offset, canvasZoom: zoom, mapCenter,
+    };
+    await savePlanToCloud(userId!, planId, data);
+    setLastKnownUpdatedAt(updatedAt);
+    track('plan_saved_cloud', { object_count: objects.length });
+    return updatedAt;
+  };
+
   const handleCloudSave = async () => {
     if (!userId || cloudSaveStatus === 'Saving…') return;
     setCloudSaveStatus('Saving…');
@@ -450,18 +466,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           return;
         }
       }
-      const objectCount = objects.length;
-      const updatedAt = new Date().toISOString();
-      const data = {
-        id: planId, name: planTitle, createdAt: planCreatedAt,
-        updatedAt, userId,
-        canvasState: { objects }, metadata: planMeta,
-        canvasOffset: offset, canvasZoom: zoom, mapCenter,
-      };
-      await savePlanToCloud(userId, planId, data);
-      setLastKnownUpdatedAt(updatedAt);
+      await performCloudSave();
       setCloudSaveStatus('Saved ✓');
-      track('plan_saved_cloud', { object_count: objectCount });
     } catch (e) {
       setCloudSaveStatus(e instanceof Error ? e.message : 'Save failed');
     }
@@ -469,22 +475,12 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const handleConflictOverwrite = async () => {
-    setConflictData(null);
     if (!userId) return;
     setCloudSaveStatus('Saving…');
     try {
-      const objectCount = objects.length;
-      const updatedAt = new Date().toISOString();
-      const data = {
-        id: planId, name: planTitle, createdAt: planCreatedAt,
-        updatedAt, userId,
-        canvasState: { objects }, metadata: planMeta,
-        canvasOffset: offset, canvasZoom: zoom, mapCenter,
-      };
-      await savePlanToCloud(userId, planId, data);
-      setLastKnownUpdatedAt(updatedAt);
+      await performCloudSave();
+      setConflictData(null); // close modal only after save succeeds
       setCloudSaveStatus('Saved ✓');
-      track('plan_saved_cloud', { object_count: objectCount });
     } catch (e) {
       setCloudSaveStatus(e instanceof Error ? e.message : 'Save failed');
     }
@@ -603,6 +599,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (plan.canvasZoom) setZoom(plan.canvasZoom);
         const loaded: CanvasObject[] = plan.canvasState?.objects || [];
         pushHistory(loaded); setSelected(null);
+        setLastKnownUpdatedAt(null); // local file load has no cloud version token
       } catch {
         alert("Failed to load plan. Make sure it's a valid .tcp.json file.");
       }
@@ -1338,10 +1335,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       {conflictData !== null && (
         <div
           data-testid="save-conflict-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="conflict-modal-title"
+          onKeyDown={(e) => { if (e.key === 'Escape') handleConflictDismiss(); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
         >
           <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 8, padding: 32, maxWidth: 480, width: '90%' }}>
-            <h3 style={{ color: COLORS.text, margin: '0 0 12px' }}>Save Conflict</h3>
+            <h3 id="conflict-modal-title" style={{ color: COLORS.text, margin: '0 0 12px' }}>Save Conflict</h3>
             <p style={{ color: COLORS.textMuted, marginBottom: 24, lineHeight: 1.5 }}>
               This plan was modified elsewhere since you last loaded it. Choose how to proceed:
             </p>
@@ -1350,6 +1351,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 data-testid="conflict-overwrite-btn"
                 onClick={() => { void handleConflictOverwrite(); }}
                 style={{ ...panelBtnStyle(false), flex: 1 }}
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
               >
                 Overwrite remote
               </button>

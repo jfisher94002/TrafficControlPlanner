@@ -1116,6 +1116,51 @@ describe('Save Conflict Detection', () => {
     expect(screen.getByDisplayValue('Remote Plan')).toBeInTheDocument()
   })
 
+  it('subsequent save after "Overwrite remote" does not show conflict modal again', async () => {
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([MOCK_PLAN_META])
+    vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue(REMOTE_PLAN)
+    vi.spyOn(planStorage, 'fetchRemoteUpdatedAt')
+      .mockResolvedValueOnce('2026-04-15T10:00:00.000Z') // first save → conflict
+      .mockResolvedValue(null)                            // second save → no metadata, skip check
+    vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+
+    await loadPlanFromDashboard(user)
+
+    // First save triggers conflict; overwrite resolves it
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() => expect(screen.getByTestId('save-conflict-modal')).toBeInTheDocument())
+    await user.click(screen.getByTestId('conflict-overwrite-btn'))
+    await waitFor(() => expect(screen.queryByTestId('save-conflict-modal')).not.toBeInTheDocument())
+
+    // Second save should go through without a conflict modal
+    await user.click(screen.getByTestId('cloud-save-button'))
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+    expect(screen.queryByTestId('save-conflict-modal')).not.toBeInTheDocument()
+  })
+
+  it('save succeeds without conflict modal when fetchRemoteUpdatedAt returns null', async () => {
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([MOCK_PLAN_META])
+    vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue(REMOTE_PLAN)
+    vi.spyOn(planStorage, 'fetchRemoteUpdatedAt').mockResolvedValue(null) // no metadata (legacy plan)
+    vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+
+    await loadPlanFromDashboard(user)
+    await user.click(screen.getByTestId('cloud-save-button'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+    expect(screen.queryByTestId('save-conflict-modal')).not.toBeInTheDocument()
+  })
+
   it('no conflict modal when remote updatedAt matches lastKnownUpdatedAt', async () => {
     const KNOWN_AT = '2026-04-15T09:00:00.000Z' // same as REMOTE_PLAN.updatedAt
     vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([MOCK_PLAN_META])

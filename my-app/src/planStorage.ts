@@ -9,7 +9,7 @@
 
 /** Increment when the stored plan shape changes in a breaking way. */
 export const PLAN_SCHEMA_VERSION = 1
-import { uploadData, list, getUrl, remove } from 'aws-amplify/storage'
+import { uploadData, list, getUrl, remove, getProperties } from 'aws-amplify/storage'
 
 export interface CloudPlanMeta {
   path: string
@@ -19,13 +19,26 @@ export interface CloudPlanMeta {
   size: number
 }
 
-/** Upload (create or overwrite) a plan to S3. */
-export async function savePlanToCloud(userId: string, planId: string, data: object): Promise<void> {
+/** Upload (create or overwrite) a plan to S3. The `updatedAt` field is also written to S3 user metadata for conflict detection. */
+export async function savePlanToCloud(userId: string, planId: string, data: object & { updatedAt: string }): Promise<void> {
   await uploadData({
     path: `plans/${userId}/${planId}.tcp.json`,
     data: JSON.stringify({ ...data, _schemaVersion: PLAN_SCHEMA_VERSION }),
-    options: { contentType: 'application/json' },
+    options: { contentType: 'application/json', metadata: { updatedAt: data.updatedAt } },
   }).result
+}
+
+/**
+ * Returns the `updatedAt` ISO string stored in S3 object metadata for the given path,
+ * or null if the object doesn't exist or has no metadata. Used for conflict detection.
+ */
+export async function fetchRemoteUpdatedAt(path: string): Promise<string | null> {
+  try {
+    const props = await getProperties({ path })
+    return (props.metadata?.updatedAt as string | undefined) ?? null
+  } catch {
+    return null
+  }
 }
 
 /** List all plans for the given user. */

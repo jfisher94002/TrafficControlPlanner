@@ -11,9 +11,9 @@ import type {
 } from '../../../types'
 
 function normalizeReactKey(key: string): string {
-  if (key.startsWith('.$')) return key.slice(2)
-  if (key.startsWith('.')) return key.slice(1)
-  return key
+  const withoutDot = key.startsWith('.') ? key.slice(1) : key
+  const leafSegment = withoutDot.includes(':') ? withoutDot.slice(withoutDot.lastIndexOf(':') + 1) : withoutDot
+  return leafSegment.startsWith('$') ? leafSegment.slice(1) : leafSegment
 }
 
 function getChildKeys(node: React.ReactNode): string[] {

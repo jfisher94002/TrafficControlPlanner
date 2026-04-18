@@ -30,7 +30,7 @@ Each plan stored in S3 carries an `updatedAt` ISO 8601 timestamp in two places:
 | JSON body (`data.updatedAt`) | Canonical record; read when the plan is loaded |
 | S3 object user metadata (`x-amz-meta-updatedAt`) | Cheap HEAD-only check; avoids downloading the full JSON |
 
-`updatedAt` is always generated client-side (`new Date().toISOString()`) immediately before each save — it is never copied from a previously loaded plan. This means the token reflects when *this client* saved, not when any other session saved, avoiding clock-skew confusion between clients.
+`updatedAt` is always generated client-side (`new Date().toISOString()`) immediately before each save — it is never copied from a previously loaded plan. Locally generated `updatedAt` is always fresh; remote metadata still reflects whichever client last wrote the object. The conflict check compares the two, not two local clocks.
 
 On every successful `savePlanToCloud` call, both locations are written atomically (same `uploadData` call).
 
@@ -168,6 +168,8 @@ fetchRemoteUpdatedAt(path: string): Promise<string | null>
 
 Performs a HEAD-only `getProperties` call (no body download). Returns the `updatedAt` string from S3 user metadata, or `null` if the field is absent, the object does not exist, or the call throws.
 
+The `path` argument must be the full S3 object key in the same form used by `savePlanToCloud` and the dashboard: `plans/{userId}/{planId}.tcp.json`. Only one call site exists today (`handleCloudSave`), but callers must not pass a partial or relative key.
+
 ### `traffic-control-planner.tsx`
 
 New state:
@@ -178,7 +180,7 @@ const [conflictData, setConflictData] = useState<Record<string, unknown> | null>
 ```
 
 `lastKnownUpdatedAt` is set by:
-- `handleDashboardOpen` — when a plan is opened from the cloud dashboard
+- `handleDashboardOpen` — when a plan is opened from the cloud dashboard; set to `data.updatedAt` if present, or `null` if the loaded plan pre-dates this feature (legacy JSON with no `updatedAt` field). A `null` here means the first save will follow Flow F (trust first save) rather than Flow A.
 - `handleCloudSave` — updated to the new `updatedAt` after every successful save
 - `handleConflictOverwrite` — updated after a force-save
 - `newPlan` — reset to `null`

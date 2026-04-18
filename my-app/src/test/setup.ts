@@ -111,4 +111,5 @@ vi.mock('aws-amplify/storage', () => ({
   list: vi.fn(() => Promise.resolve({ items: [] })),
   getUrl: vi.fn(() => Promise.resolve({ url: new URL('https://example.com/plan.json') })),
   remove: vi.fn(() => Promise.resolve()),
+  getProperties: vi.fn(() => Promise.resolve({ metadata: {} })),
 }))

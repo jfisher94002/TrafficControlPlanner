@@ -1057,6 +1057,23 @@ describe('Save Conflict Detection', () => {
     )
   })
 
+  it('saves without remote conflict check before any cloud plan has been loaded', async () => {
+    const fetchSpy = vi.spyOn(planStorage, 'fetchRemoteUpdatedAt').mockResolvedValue(null)
+    const saveSpy = vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+
+    await user.click(screen.getByTestId('cloud-save-button'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(saveSpy).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('save-conflict-modal')).not.toBeInTheDocument()
+  })
+
   it('"Keep unsaved" button closes the conflict modal without saving', async () => {
     vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([MOCK_PLAN_META])
     vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue(REMOTE_PLAN)
@@ -1132,6 +1149,29 @@ describe('Save Conflict Detection', () => {
     await waitFor(() =>
       expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
     )
+    expect(screen.queryByTestId('save-conflict-modal')).not.toBeInTheDocument()
+  })
+
+  it('saves without showing conflict when remote metadata cannot be read', async () => {
+    vi.spyOn(planStorage, 'listCloudPlans').mockResolvedValue([MOCK_PLAN_META])
+    const loadSpy = vi.spyOn(planStorage, 'loadPlanFromCloud').mockResolvedValue(REMOTE_PLAN)
+    const fetchSpy = vi.spyOn(planStorage, 'fetchRemoteUpdatedAt').mockResolvedValue(null)
+    const saveSpy = vi.spyOn(planStorage, 'savePlanToCloud').mockResolvedValue(undefined)
+
+    const user = userEvent.setup()
+    render(<TrafficControlPlanner userId="user-abc" />)
+
+    await loadPlanFromDashboard(user)
+    loadSpy.mockClear()
+
+    await user.click(screen.getByTestId('cloud-save-button'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('cloud-save-button')).toHaveTextContent('Saved ✓')
+    )
+    expect(fetchSpy).toHaveBeenCalledWith('plans/user-abc/plan-abc.tcp.json')
+    expect(saveSpy).toHaveBeenCalledTimes(1)
+    expect(loadSpy).not.toHaveBeenCalled()
     expect(screen.queryByTestId('save-conflict-modal')).not.toBeInTheDocument()
   })
 })

@@ -57,8 +57,8 @@ GeoSpace (lat/lng)   — WGS84 for map display, DXF, PostGIS
 Given live React state `{ offset, zoom, canvasSize, mapCenter, mapZoom }`:
 
 ```
-screenX = worldX * zoom + offset.x
-screenY = worldY * zoom + offset.y
+screenX = worldX * canvasZoom + canvasOffset.x
+screenY = worldY * canvasZoom + canvasOffset.y
 
 // mapCenter sits at screen center (useMapTiles invariant):
 originScreenX = canvasSize.w / 2
@@ -168,7 +168,7 @@ export function geoToPlan(ll: LatLng, geo: GeoContext): PlanPt
 
 ### New: `my-app/src/coordinate-bridge.test.ts`
 
-- `groundResolution(17, 37.7749)` ≈ 0.596 m/px (Web Mercator reference value)
+- `groundResolution(17, 37.7749)` ≈ 0.944 m/px (Web Mercator reference value at SF latitude)
 - Round-trip: `screenToPlan(planToScreen(pt, vp, geo), vp, geo) ≈ pt` within 0.001 m
 - Round-trip: `geoToPlan(planToGeo(pt, geo), geo) ≈ pt` within 0.001 m
 - `planToScreen` with `offset={0,0}, zoom=1`: origin maps to `originScreenPx`
@@ -279,7 +279,7 @@ aws s3api get-bucket-versioning --bucket YOUR_BUCKET_NAME
 ## Acceptance checklist
 
 - [ ] S3 versioning enabled on production bucket before merging
-- [ ] `groundResolution(17, 37.7749)` ≈ 0.596 m/px (Web Mercator reference)
+- [ ] `groundResolution(17, 37.7749)` ≈ 0.944 m/px (Web Mercator reference)
 - [ ] `coordinate-bridge` round-trip tests pass within 0.001 m epsilon
 - [ ] `planMigration` fixture: world → save v2 → load v2 → world within 1 px
 - [ ] v1 plan loads unchanged; objects render in correct positions

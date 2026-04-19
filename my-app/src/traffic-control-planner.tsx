@@ -10,6 +10,8 @@ import type {
 } from './types';
 import { uid, geoRoadWidthPx, formatSearchPrimary, geocodeAddress, cloneObject } from './utils';
 import { savePlanToCloud, fetchRemoteUpdatedAt, loadPlanFromCloud } from './planStorage';
+import { buildGeoContext, worldToPlan } from './coordinate-bridge';
+import { detectSchemaVersion, v2ToWorldCoords } from './planMigration';
 import PlanDashboard from './PlanDashboard';
 import TemplatePicker from './TemplatePicker';
 import ExportPreviewModal from './ExportPreviewModal';
@@ -66,6 +68,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
   const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem(BANNER_KEY) === '1');
   const [pdfSeen, setPdfSeen] = useState(() => sessionStorage.getItem(PDF_SEEN_KEY) === '1');
+  const [v1NoMapBanner, setV1NoMapBanner] = useState(false);
 
   const dismissBanner = () => { sessionStorage.setItem(BANNER_KEY, '1'); setBannerDismissed(true); };
 
@@ -436,14 +439,65 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   // Shared upload logic — builds payload, uploads, updates state.
+  // Writes v2 (plan-space coordinates) when mapCenter is set; v1 otherwise.
   // Returns the new updatedAt on success; throws on failure.
   const performCloudSave = async (): Promise<string> => {
     const updatedAt = new Date().toISOString();
+    const viewport = { offsetX: offset.x, offsetY: offset.y, zoom };
+
+    let saveObjects: CanvasObject[] = objects;
+    let geoContext: ReturnType<typeof buildGeoContext> | null = null;
+    let schemaVersion = 1;
+
+    if (mapCenter) {
+      const geo = buildGeoContext(
+        { lat: mapCenter.lat, lng: mapCenter.lon },
+        mapCenter.zoom,
+        canvasSize,
+      );
+      geoContext = geo;
+      schemaVersion = 2;
+      saveObjects = objects.map((obj): CanvasObject => {
+        switch (obj.type) {
+          case 'sign':
+          case 'device':
+          case 'zone':
+          case 'text':
+          case 'taper':
+          case 'turn_lane': {
+            const p = worldToPlan({ x: obj.x, y: obj.y }, viewport, geo);
+            return { ...obj, x: p.x, y: p.y };
+          }
+          case 'road':
+          case 'arrow':
+          case 'measure':
+          case 'lane_mask':
+          case 'crosswalk': {
+            const p1 = worldToPlan({ x: obj.x1, y: obj.y1 }, viewport, geo);
+            const p2 = worldToPlan({ x: obj.x2, y: obj.y2 }, viewport, geo);
+            return { ...obj, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+          }
+          case 'polyline_road':
+          case 'curve_road':
+          case 'cubic_bezier_road': {
+            const pts = (obj.points as { x: number; y: number }[]).map(
+              (p) => worldToPlan(p, viewport, geo)
+            );
+            return { ...obj, points: pts } as CanvasObject;
+          }
+          default:
+            return obj;
+        }
+      });
+    }
+
     const data = {
+      _schemaVersion: schemaVersion,
       id: planId, name: planTitle, createdAt: planCreatedAt,
       updatedAt, userId: userId!,
-      canvasState: { objects }, metadata: planMeta,
+      canvasState: { objects: saveObjects }, metadata: planMeta,
       canvasOffset: offset, canvasZoom: zoom, mapCenter,
+      ...(geoContext ? { geoContext } : {}),
     };
     await savePlanToCloud(userId!, planId, data);
     setLastKnownUpdatedAt(updatedAt);
@@ -460,7 +514,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         const path = `plans/${userId}/${planId}.tcp.json`;
         const remoteUpdatedAt = await fetchRemoteUpdatedAt(path);
         if (remoteUpdatedAt !== null && remoteUpdatedAt !== lastKnownUpdatedAt) {
-          const remotePlan = await loadPlanFromCloud(path);
+          const remotePlan = await loadPlanFromCloud(path, canvasSize);
           setConflictData(remotePlan);
           setCloudSaveStatus(null);
           return;
@@ -519,6 +573,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setZoom(newZoom);
     setMapCenter(newMapCenter);
     setLastKnownUpdatedAt(typeof data.updatedAt === 'string' ? data.updatedAt : null);
+    // Show warning banner for v1 plans that have no geo anchor
+    const isV1NoMap = (typeof data._schemaVersion !== 'number' || data._schemaVersion < 2) && newMapCenter === null;
+    setV1NoMapBanner(isV1NoMap);
     setShowDashboard(false);
     track('plan_loaded_cloud', { object_count: newObjects.length });
   };
@@ -589,17 +646,25 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     const reader = new FileReader();
     reader.onload = (evt: ProgressEvent<FileReader>) => {
       try {
-        const plan = JSON.parse(evt.target!.result as string);
-        setPlanTitle(plan.name || "Untitled Traffic Control Plan");
-        setPlanId(plan.id || uid());
-        setPlanCreatedAt(plan.createdAt || new Date().toISOString());
-        setPlanMeta(plan.metadata || { projectNumber: "", client: "", location: "", notes: "" });
-        if (plan.mapCenter) setMapCenter({ lat: plan.mapCenter.lat, lon: plan.mapCenter.lng, zoom: plan.mapCenter.zoom });
-        if (plan.canvasOffset) setOffset(plan.canvasOffset);
-        if (plan.canvasZoom) setZoom(plan.canvasZoom);
-        const loaded: CanvasObject[] = plan.canvasState?.objects || [];
+        let plan = JSON.parse(evt.target!.result as string) as Record<string, unknown>;
+        if (detectSchemaVersion(plan) === 2) {
+          const { plan: migrated } = v2ToWorldCoords(plan, canvasSize);
+          plan = migrated;
+        }
+        setPlanTitle((plan.name as string | undefined) || "Untitled Traffic Control Plan");
+        setPlanId((plan.id as string | undefined) || uid());
+        setPlanCreatedAt((plan.createdAt as string | undefined) || new Date().toISOString());
+        setPlanMeta((plan.metadata as PlanMeta | undefined) || { projectNumber: "", client: "", location: "", notes: "" });
+        const rawMC = plan.mapCenter as { lat: number; lng?: number; lon?: number; zoom: number } | null | undefined;
+        const rawLon = rawMC?.lng ?? rawMC?.lon;
+        if (rawMC != null && rawLon != null) setMapCenter({ lat: rawMC.lat, lon: rawLon, zoom: rawMC.zoom });
+        if (plan.canvasOffset) setOffset(plan.canvasOffset as Point);
+        if (plan.canvasZoom) setZoom(plan.canvasZoom as number);
+        const loaded: CanvasObject[] = (plan.canvasState as { objects?: CanvasObject[] } | undefined)?.objects || [];
         pushHistory(loaded); setSelected(null);
         setLastKnownUpdatedAt(null); // local file load has no cloud version token
+        const wasV1NoMap = (detectSchemaVersion(plan) === 1) && (rawMC == null || rawLon == null);
+        setV1NoMapBanner(wasV1NoMap);
       } catch {
         alert("Failed to load plan. Make sure it's a valid .tcp.json file.");
       }
@@ -629,7 +694,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setSearchQuery(formatSearchPrimary(result));
     const lat = Number(result?.lat), lon = Number(result?.lon);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      setMapCenter({ lat, lon, zoom: 16 }); setOffset({ x: 0, y: 0 }); setZoom(1);
+      setMapCenter({ lat, lon, zoom: 16 }); setOffset({ x: 0, y: 0 }); setZoom(1); setV1NoMapBanner(false);
       setSearchStatus(`Centered on ${formatSearchPrimary(result)}`);
     } else { setSearchStatus("Selected result has no coordinates."); }
     setSearchOpen(false);
@@ -668,6 +733,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: COLORS.accent, textDecoration: "underline" }}>Report an issue</a>
           </span>
           <button onClick={dismissBanner} data-testid="dismiss-banner" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 4px" }} title="Dismiss">✕</button>
+        </div>
+      )}
+      {v1NoMapBanner && (
+        <div data-testid="v1-no-map-banner" style={{ background: "rgba(245,158,11,0.12)", borderBottom: `1px solid rgba(245,158,11,0.3)`, padding: "6px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: COLORS.accent }}>
+            This plan has no map location — geo-referenced export is unavailable. Use the address search bar to set a location.
+          </span>
+          <button onClick={() => setV1NoMapBanner(false)} data-testid="dismiss-v1-no-map-banner" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 4px" }} title="Dismiss">✕</button>
         </div>
       )}
 
@@ -1311,6 +1384,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       {showDashboard && userId && CLOUD_ENABLED && (
         <PlanDashboard
           userId={userId}
+          canvasSize={canvasSize}
           onOpen={handleDashboardOpen}
           onClose={() => setShowDashboard(false)}
         />

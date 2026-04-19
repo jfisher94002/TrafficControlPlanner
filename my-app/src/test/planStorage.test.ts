@@ -7,6 +7,7 @@ import * as planMigration from '../planMigration'
 import { savePlanToCloud, fetchRemoteUpdatedAt, loadPlanFromCloud } from '../planStorage'
 
 beforeEach(() => {
+  vi.clearAllMocks()
   vi.restoreAllMocks()
 })
 

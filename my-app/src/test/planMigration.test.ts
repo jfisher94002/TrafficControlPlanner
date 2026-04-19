@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { detectSchemaVersion, v2ToWorldCoords } from '../planMigration'
 import { buildGeoContext, worldToPlan, type ViewportState } from '../coordinate-bridge'
 
@@ -42,8 +42,28 @@ describe('detectSchemaVersion', () => {
     expect(detectSchemaVersion({ canvasState: { objects: [] } })).toBe(1)
   })
 
-  it('returns 1 for a plan with _schemaVersion=2 but no geoContext', () => {
+  it('returns 1 for a plan with _schemaVersion=2 but no geoContext, and warns', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(detectSchemaVersion({ _schemaVersion: 2, canvasState: { objects: [] } })).toBe(1)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('invalid or missing geoContext'), undefined)
+    warnSpy.mockRestore()
+  })
+
+  it('returns 1 for a plan with _schemaVersion=2 but geoContext missing mapCenter, and warns', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(detectSchemaVersion({ _schemaVersion: 2, geoContext: { mapZoom: 17 } })).toBe(1)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('returns 1 for a plan with _schemaVersion=2 but NaN in geoContext, and warns', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(detectSchemaVersion({
+      _schemaVersion: 2,
+      geoContext: { mapCenter: { lat: NaN, lng: -122 }, mapZoom: 17 },
+    })).toBe(1)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })
 
@@ -170,13 +190,47 @@ describe('v2ToWorldCoords — Fixture 4: full round-trip', () => {
 // ─── Skipped objects ──────────────────────────────────────────────────────────
 
 describe('v2ToWorldCoords — skipped objects', () => {
-  it('counts objects with unrecognised coord shape in skippedCount', () => {
+  it('counts objects with unrecognised coord shape in skippedCount and emits one aggregated warn', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const plan = makeV2Plan([
-      { type: 'sign', id: 'a', x: 0, y: 0 },           // converted
-      { type: 'unknown', id: 'b', someField: 'value' },  // skipped
+      { type: 'sign', id: 'a', x: 0, y: 0 },            // converted
+      { type: 'unknown', id: 'b', someField: 'value' },   // skipped
+      { type: 'unknown', id: 'c', otherField: 123 },      // skipped
     ])
     const { stats } = v2ToWorldCoords(plan, CANVAS_SIZE)
     expect(stats.convertedCount).toBe(1)
-    expect(stats.skippedCount).toBe(1)
+    expect(stats.skippedCount).toBe(2)
+    // Only one aggregated warning, not one per object
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('2 object(s)'),
+      expect.arrayContaining(['b', 'c']),
+    )
+    warnSpy.mockRestore()
+  })
+})
+
+// ─── resolveViewport defaults ─────────────────────────────────────────────────
+
+describe('v2ToWorldCoords — resolveViewport defaults', () => {
+  it('uses offset={0,0} and zoom=1 when canvasOffset and canvasZoom are absent', () => {
+    const worldPt = { x: 200, y: 150 }
+    const planPt = worldToPlan(worldPt, VIEWPORT, GEO)  // VIEWPORT is identity
+
+    // Build a v2 plan with no canvasOffset / canvasZoom fields
+    const plan: Record<string, unknown> = {
+      _schemaVersion: 2,
+      geoContext: GEO,
+      // canvasOffset omitted
+      // canvasZoom omitted
+      canvasState: { objects: [{ type: 'sign', id: 'x', x: planPt.x, y: planPt.y }] },
+    }
+
+    const { plan: out, stats } = v2ToWorldCoords(plan, CANVAS_SIZE)
+    const objs = (out.canvasState as { objects: Record<string, unknown>[] }).objects
+    // With default offset=(0,0) zoom=1, should round-trip to original world coords
+    expect(objs[0].x as number).toBeCloseTo(worldPt.x, 0)
+    expect(objs[0].y as number).toBeCloseTo(worldPt.y, 0)
+    expect(stats.convertedCount).toBe(1)
   })
 })

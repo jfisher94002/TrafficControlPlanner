@@ -1,8 +1,8 @@
 # Plan JSON v1 → v2 Migration Runbook
 
 **Issue:** #194  
-**Status:** Spec — pending implementation  
-**Branch:** TBD (`feat/coord-bridge-194`)
+**Status:** Implemented — merged via PR #257  
+**Branch:** `feat/coord-bridge-194`
 
 ---
 

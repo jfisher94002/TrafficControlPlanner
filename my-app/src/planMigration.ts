@@ -18,17 +18,38 @@ export type SchemaVersion = 1 | 2
 
 /**
  * Detect the schema version of a raw plan object.
- * A plan is v2 if it has `_schemaVersion === 2` and a valid `geoContext` block.
+ * A plan is v2 if it has `_schemaVersion === 2` AND a structurally valid `geoContext`
+ * (mapCenter with finite lat/lng numbers, finite mapZoom).
+ *
+ * A plan with `_schemaVersion === 2` but a missing or malformed `geoContext` is treated
+ * as v1 with a console warning — this prevents NaN from propagating silently if a plan
+ * was partially written.
  */
 export function detectSchemaVersion(plan: Record<string, unknown>): SchemaVersion {
-  if (
-    plan._schemaVersion === 2 &&
-    plan.geoContext !== null &&
-    typeof plan.geoContext === 'object'
-  ) {
-    return 2
+  if (plan._schemaVersion !== 2) return 1
+
+  if (!isValidGeoContext(plan.geoContext)) {
+    console.warn(
+      '[planMigration] Plan has _schemaVersion=2 but invalid or missing geoContext — treating as v1.',
+      plan.geoContext,
+    )
+    return 1
   }
-  return 1
+
+  return 2
+}
+
+function isValidGeoContext(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false
+  const gc = value as Record<string, unknown>
+  const mc = gc.mapCenter
+  if (mc === null || typeof mc !== 'object') return false
+  const { lat, lng } = mc as Record<string, unknown>
+  return (
+    typeof lat === 'number' && Number.isFinite(lat) &&
+    typeof lng === 'number' && Number.isFinite(lng) &&
+    typeof gc.mapZoom === 'number' && Number.isFinite(gc.mapZoom as number)
+  )
 }
 
 export interface MigrationStats {
@@ -62,16 +83,26 @@ export function v2ToWorldCoords(
   let convertedCount = 0
   let skippedCount = 0
 
+  const skippedObjects: Record<string, unknown>[] = []
+
   const convertedObjects = objects.map((obj) => {
     const result = convertObjectToWorld(obj, viewport, geo)
     if (result.converted) {
       convertedCount++
     } else {
       skippedCount++
-      console.warn('[planMigration] Skipped object with unrecognised coord shape:', obj)
+      skippedObjects.push(obj)
     }
     return result.obj
   })
+
+  if (skippedObjects.length > 0) {
+    console.warn(
+      `[planMigration] ${skippedObjects.length} object(s) had unrecognised coordinate shapes and were left in plan-space. ` +
+      'They may render incorrectly. IDs:',
+      skippedObjects.map((o) => o.id ?? '(no id)'),
+    )
+  }
 
   return {
     plan: {
@@ -93,13 +124,24 @@ function getObjects(plan: Record<string, unknown>): Record<string, unknown>[] {
 }
 
 /** Reconstruct a GeoContext from the stored geoContext block, overriding originScreenPx
- *  with the live canvasSize so the viewport center anchor is correct for the current window. */
+ *  with the live canvasSize so the viewport center anchor is correct for the current window.
+ *  Throws with a descriptive message if geoContext fields are missing or non-finite. */
 function resolveGeoContext(plan: Record<string, unknown>, canvasSize: { w: number; h: number }): GeoContext {
   const stored = plan.geoContext as Record<string, unknown>
-  const mapCenter = stored.mapCenter as { lat: number; lng: number }
+  const mc = stored.mapCenter as Record<string, unknown>
+  const lat = mc?.lat as number
+  const lng = mc?.lng as number
   const mapZoom = stored.mapZoom as number
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(mapZoom)) {
+    throw new Error(
+      `[planMigration] Invalid geoContext in v2 plan: mapCenter=${JSON.stringify(mc)}, mapZoom=${mapZoom}. ` +
+      'Cannot convert plan-space coordinates without a valid geo anchor.'
+    )
+  }
+
   // Rebuild from live canvasSize — the map anchor is always at the viewport center.
-  return buildGeoContext(mapCenter, mapZoom, canvasSize)
+  return buildGeoContext({ lat, lng }, mapZoom, canvasSize)
 }
 
 function resolveViewport(plan: Record<string, unknown>): ViewportState {
@@ -113,6 +155,11 @@ function resolveViewport(plan: Record<string, unknown>): ViewportState {
     zoom: typeof plan.canvasZoom === 'number' ? plan.canvasZoom : 1,
   }
 }
+
+// TODO(#194): The object-type → coord-shape mapping here mirrors the one in
+// performCloudSave (traffic-control-planner.tsx). If a new CanvasObject type is
+// added, both places must be updated. Consider centralizing into a shared
+// objectCoordFields() helper to prevent mixed-unit objects.
 
 /** Convert a single canvas object's plan-space coords to world pixels. */
 function convertObjectToWorld(

@@ -40,7 +40,7 @@ describe('savePlanToCloud', () => {
     )
   })
 
-  it('preserves an existing schema version in payload data', async () => {
+  it('always writes the current schema version to uploaded payloads', async () => {
     const uploadDataSpy = vi.spyOn(amplifyStorage, 'uploadData').mockReturnValue({
       result: Promise.resolve({} as never),
       cancel: vi.fn(),
@@ -55,7 +55,7 @@ describe('savePlanToCloud', () => {
     })
 
     const body = JSON.parse(String(uploadDataSpy.mock.calls[0]?.[0]?.data))
-    expect(body._schemaVersion).toBe(1)
+    expect(body._schemaVersion).toBe(PLAN_SCHEMA_VERSION)
   })
 })
 

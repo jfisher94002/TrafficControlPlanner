@@ -98,12 +98,35 @@ describe('buildOffsetSpine', () => {
 // the Konva Line elements in the output, verifying shoulder/sidewalk elements
 // are present or absent based on the object configuration.
 
-import { render } from '@testing-library/react'
 import React from 'react'
 import { PolylineRoad, CurveRoad, CubicBezierRoad } from '../components/tcp/canvas/ObjectShapes'
 import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject } from '../types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function getChildKeys(element: React.ReactElement | null): string[] {
+  if (!element) return []
+  const children = React.Children.toArray(
+    (element.props as { children?: React.ReactNode }).children,
+  )
+  return children
+    .filter((child): child is React.ReactElement => React.isValidElement(child))
+    .map((child) => String(child.key ?? ''))
+}
+
+function hasKeySuffix(keys: string[], suffix: string): boolean {
+  return keys.some((key) => key.endsWith(suffix))
+}
+
+function expectSidewalkKeys(
+  keys: string[],
+  id: string,
+  { left, right }: { left: boolean; right: boolean },
+) {
+  expect(hasKeySuffix(keys, `${id}-swl-fill`)).toBe(left)
+  expect(hasKeySuffix(keys, `${id}-swl-edge`)).toBe(left)
+  expect(hasKeySuffix(keys, `${id}-swr-fill`)).toBe(right)
+  expect(hasKeySuffix(keys, `${id}-swr-edge`)).toBe(right)
+}
 
 
 // ─── PolylineRoad ─────────────────────────────────────────────────────────────
@@ -120,28 +143,31 @@ describe('PolylineRoad — shoulder/sidewalk rendering', () => {
     smooth: false,
   }
 
-  it('renders without error when shoulderWidth=0 and sidewalkWidth=0', () => {
-    expect(() => render(React.createElement(PolylineRoad, { obj: base, isSelected: false }))).not.toThrow()
-  })
-
-  it('renders without error when shoulderWidth > 0', () => {
+  it('renders both shoulder lines when shoulderWidth > 0', () => {
     const obj = { ...base, shoulderWidth: 8 }
-    expect(() => render(React.createElement(PolylineRoad, { obj, isSelected: false }))).not.toThrow()
+    const keys = getChildKeys(PolylineRoad({ obj, isSelected: false }))
+    expect(hasKeySuffix(keys, 'pr1-sl')).toBe(true)
+    expect(hasKeySuffix(keys, 'pr1-sr')).toBe(true)
   })
 
-  it('renders without error when sidewalkWidth > 0 and sidewalkSide=both', () => {
+  it('renders sidewalks on both sides when sidewalkSide=both', () => {
     const obj = { ...base, sidewalkWidth: 12, sidewalkSide: 'both' as const }
-    expect(() => render(React.createElement(PolylineRoad, { obj, isSelected: false }))).not.toThrow()
+    const keys = getChildKeys(PolylineRoad({ obj, isSelected: false }))
+    expectSidewalkKeys(keys, 'pr1', { left: true, right: true })
   })
 
-  it('renders without error with shoulder + sidewalk on left only', () => {
+  it('renders sidewalks only on left when sidewalkSide=left', () => {
     const obj = { ...base, shoulderWidth: 6, sidewalkWidth: 10, sidewalkSide: 'left' as const }
-    expect(() => render(React.createElement(PolylineRoad, { obj, isSelected: false }))).not.toThrow()
+    const keys = getChildKeys(PolylineRoad({ obj, isSelected: false }))
+    expect(hasKeySuffix(keys, 'pr1-sl')).toBe(true)
+    expect(hasKeySuffix(keys, 'pr1-sr')).toBe(true)
+    expectSidewalkKeys(keys, 'pr1', { left: true, right: false })
   })
 
-  it('renders without error with smooth=true', () => {
-    const obj = { ...base, smooth: true, shoulderWidth: 8, sidewalkWidth: 10, sidewalkSide: 'both' as const }
-    expect(() => render(React.createElement(PolylineRoad, { obj, isSelected: false }))).not.toThrow()
+  it('does not render sidewalks when sidewalkSide is omitted', () => {
+    const obj = { ...base, sidewalkWidth: 10 }
+    const keys = getChildKeys(PolylineRoad({ obj, isSelected: false }))
+    expectSidewalkKeys(keys, 'pr1', { left: false, right: false })
   })
 })
 
@@ -158,23 +184,19 @@ describe('CurveRoad — shoulder/sidewalk rendering', () => {
     roadType: '2lane',
   }
 
-  it('renders without error when shoulderWidth=0 and sidewalkWidth=0', () => {
-    expect(() => render(React.createElement(CurveRoad, { obj: base, isSelected: false }))).not.toThrow()
-  })
-
-  it('renders without error when shoulderWidth > 0', () => {
+  it('renders both shoulder lines when shoulderWidth > 0', () => {
     const obj = { ...base, shoulderWidth: 8 }
-    expect(() => render(React.createElement(CurveRoad, { obj, isSelected: false }))).not.toThrow()
+    const keys = getChildKeys(CurveRoad({ obj, isSelected: false }))
+    expect(hasKeySuffix(keys, 'cr1-sl')).toBe(true)
+    expect(hasKeySuffix(keys, 'cr1-sr')).toBe(true)
   })
 
-  it('renders without error when sidewalkWidth > 0 and sidewalkSide=both', () => {
-    const obj = { ...base, sidewalkWidth: 12, sidewalkSide: 'both' as const }
-    expect(() => render(React.createElement(CurveRoad, { obj, isSelected: false }))).not.toThrow()
-  })
-
-  it('renders without error with shoulder + sidewalk on right only', () => {
+  it('renders sidewalks only on right when sidewalkSide=right', () => {
     const obj = { ...base, shoulderWidth: 6, sidewalkWidth: 10, sidewalkSide: 'right' as const }
-    expect(() => render(React.createElement(CurveRoad, { obj, isSelected: false }))).not.toThrow()
+    const keys = getChildKeys(CurveRoad({ obj, isSelected: false }))
+    expect(hasKeySuffix(keys, 'cr1-sl')).toBe(true)
+    expect(hasKeySuffix(keys, 'cr1-sr')).toBe(true)
+    expectSidewalkKeys(keys, 'cr1', { left: false, right: true })
   })
 })
 
@@ -191,27 +213,22 @@ describe('CubicBezierRoad — shoulder/sidewalk rendering', () => {
     roadType: '2lane',
   }
 
-  it('renders without error when shoulderWidth=0 and sidewalkWidth=0', () => {
-    expect(() => render(React.createElement(CubicBezierRoad, { obj: base, isSelected: false }))).not.toThrow()
-  })
-
-  it('renders without error when shoulderWidth > 0', () => {
+  it('renders both shoulder lines when shoulderWidth > 0', () => {
     const obj = { ...base, shoulderWidth: 8 }
-    expect(() => render(React.createElement(CubicBezierRoad, { obj, isSelected: false }))).not.toThrow()
+    const keys = getChildKeys(CubicBezierRoad({ obj, isSelected: false }))
+    expect(hasKeySuffix(keys, 'cbr1-sl')).toBe(true)
+    expect(hasKeySuffix(keys, 'cbr1-sr')).toBe(true)
   })
 
-  it('renders without error when sidewalkWidth > 0 and sidewalkSide=both', () => {
+  it('renders sidewalks on both sides when sidewalkSide=both', () => {
     const obj = { ...base, sidewalkWidth: 12, sidewalkSide: 'both' as const }
-    expect(() => render(React.createElement(CubicBezierRoad, { obj, isSelected: false }))).not.toThrow()
+    const keys = getChildKeys(CubicBezierRoad({ obj, isSelected: false }))
+    expectSidewalkKeys(keys, 'cbr1', { left: true, right: true })
   })
 
-  it('renders without error with shoulder + sidewalk (both sides)', () => {
-    const obj = { ...base, shoulderWidth: 8, sidewalkWidth: 12, sidewalkSide: 'both' as const }
-    expect(() => render(React.createElement(CubicBezierRoad, { obj, isSelected: false }))).not.toThrow()
-  })
-
-  it('renders without error when selected', () => {
-    const obj = { ...base, shoulderWidth: 8, sidewalkWidth: 12, sidewalkSide: 'both' as const }
-    expect(() => render(React.createElement(CubicBezierRoad, { obj, isSelected: true }))).not.toThrow()
+  it('renders sidewalks only on left when sidewalkSide=left', () => {
+    const obj = { ...base, shoulderWidth: 8, sidewalkWidth: 12, sidewalkSide: 'left' as const }
+    const keys = getChildKeys(CubicBezierRoad({ obj, isSelected: false }))
+    expectSidewalkKeys(keys, 'cbr1', { left: true, right: false })
   })
 })

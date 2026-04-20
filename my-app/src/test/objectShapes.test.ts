@@ -4,8 +4,9 @@
  * We test the pure utility (buildOffsetSpine) directly, and verify the rendered
  * element counts for each road component via React Testing Library.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { buildOffsetSpine } from '../utils'
+import * as utils from '../utils'
 import type { Point } from '../types'
 
 // ─── buildOffsetSpine ─────────────────────────────────────────────────────────
@@ -108,6 +109,10 @@ import React from 'react'
 import { PolylineRoad, CurveRoad, CubicBezierRoad } from '../components/tcp/canvas/ObjectShapes'
 import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject } from '../types'
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 // ─── PolylineRoad ─────────────────────────────────────────────────────────────
 
 describe('PolylineRoad — shoulder/sidewalk rendering', () => {
@@ -145,6 +150,34 @@ describe('PolylineRoad — shoulder/sidewalk rendering', () => {
     const obj = { ...base, smooth: true, shoulderWidth: 8, sidewalkWidth: 10, sidewalkSide: 'both' as const }
     expect(() => render(React.createElement(PolylineRoad, { obj, isSelected: false }))).not.toThrow()
   })
+
+  it('builds left-side sidewalk and shoulder offsets from deduped points', () => {
+    const offsetSpy = vi.spyOn(utils, 'buildOffsetSpine')
+    const obj = {
+      ...base,
+      points: [{ x: 0, y: 0 }, { x: 0.2, y: 0.2 }, { x: 200, y: 50 }],
+      shoulderWidth: 6,
+      sidewalkWidth: 10,
+      sidewalkSide: 'left' as const,
+    }
+
+    render(React.createElement(PolylineRoad, { obj, isSelected: false }))
+
+    expect(offsetSpy).toHaveBeenCalledTimes(4)
+    expect(offsetSpy.mock.calls.map(([, d]) => d)).toEqual([31, 36, 23, -23])
+    for (const [spine] of offsetSpy.mock.calls) {
+      expect((spine as Point[])).toHaveLength(2)
+    }
+  })
+
+  it('skips sidewalk offsets when sidewalkSide is omitted', () => {
+    const offsetSpy = vi.spyOn(utils, 'buildOffsetSpine')
+    const obj = { ...base, sidewalkWidth: 10 }
+
+    render(React.createElement(PolylineRoad, { obj, isSelected: false }))
+
+    expect(offsetSpy).not.toHaveBeenCalled()
+  })
 })
 
 // ─── CurveRoad ────────────────────────────────────────────────────────────────
@@ -177,6 +210,19 @@ describe('CurveRoad — shoulder/sidewalk rendering', () => {
   it('renders without error with shoulder + sidewalk on right only', () => {
     const obj = { ...base, shoulderWidth: 6, sidewalkWidth: 10, sidewalkSide: 'right' as const }
     expect(() => render(React.createElement(CurveRoad, { obj, isSelected: false }))).not.toThrow()
+  })
+
+  it('builds right-side sidewalk and shoulder offsets from sampled bezier spine', () => {
+    const offsetSpy = vi.spyOn(utils, 'buildOffsetSpine')
+    const obj = { ...base, shoulderWidth: 6, sidewalkWidth: 10, sidewalkSide: 'right' as const }
+
+    render(React.createElement(CurveRoad, { obj, isSelected: false }))
+
+    expect(offsetSpy).toHaveBeenCalledTimes(4)
+    expect(offsetSpy.mock.calls.map(([, d]) => d)).toEqual([-31, -36, 23, -23])
+    for (const [spine] of offsetSpy.mock.calls) {
+      expect((spine as Point[])).toHaveLength(33)
+    }
   })
 })
 
@@ -215,5 +261,18 @@ describe('CubicBezierRoad — shoulder/sidewalk rendering', () => {
   it('renders without error when selected', () => {
     const obj = { ...base, shoulderWidth: 8, sidewalkWidth: 12, sidewalkSide: 'both' as const }
     expect(() => render(React.createElement(CubicBezierRoad, { obj, isSelected: true }))).not.toThrow()
+  })
+
+  it('builds both-side sidewalk and shoulder offsets from sampled cubic spine', () => {
+    const offsetSpy = vi.spyOn(utils, 'buildOffsetSpine')
+    const obj = { ...base, shoulderWidth: 6, sidewalkWidth: 10, sidewalkSide: 'both' as const }
+
+    render(React.createElement(CubicBezierRoad, { obj, isSelected: false }))
+
+    expect(offsetSpy).toHaveBeenCalledTimes(6)
+    expect(offsetSpy.mock.calls.map(([, d]) => d)).toEqual([31, 36, -31, -36, 23, -23])
+    for (const [spine] of offsetSpy.mock.calls) {
+      expect((spine as Point[])).toHaveLength(33)
+    }
   })
 })

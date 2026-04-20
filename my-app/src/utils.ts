@@ -1,5 +1,5 @@
 import type {
-  CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
+  CanvasObject, GeocodeResult, GeocodeAddress, MapCenter, Point, SnapResult,
   SignObject, DeviceObject, ZoneObject, TextObject, TaperObject, TurnLaneObject,
   StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject, LaneMaskObject, CrosswalkObject,
 } from './types'
@@ -278,24 +278,21 @@ export function buildTileUrl(template: string, z: number, x: number, y: number):
 export async function geocodeAddress(query: string): Promise<GeocodeResult[]> {
   try {
     const response = await fetch(
-      `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query)}&maxLocations=5`,
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
+      { headers: { 'User-Agent': 'TrafficControlPlanner/1.0 (https://tcplanpro.com)' } },
     )
     if (!response.ok) return []
     const data = await response.json()
-    const candidates = Array.isArray(data?.candidates) ? data.candidates : []
-    return candidates.map(
-      (
-        c: Record<string, unknown> & {
-          location?: { x?: number; y?: number }
-          address?: string
-        },
-      ) => ({
-        lat: String(c?.location?.y ?? ''),
-        lon: String(c?.location?.x ?? ''),
-        display_name: c?.address || '',
-        address: { road: c?.address || '' },
-      }),
-    )
+    if (!Array.isArray(data)) return []
+    return (data as Array<Record<string, unknown>>).map((item) => {
+      const addr = (item.address ?? {}) as GeocodeAddress
+      return {
+        lat: String(item.lat ?? ''),
+        lon: String(item.lon ?? ''),
+        display_name: String(item.display_name ?? ''),
+        address: addr,
+      }
+    })
   } catch {
     return []
   }

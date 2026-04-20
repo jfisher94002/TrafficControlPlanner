@@ -204,6 +204,21 @@ describe('geocodeAddress', () => {
     vi.restoreAllMocks()
   })
 
+  it('calls Nominatim with encoded query and expected params', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await geocodeAddress('123 Main St, New York, NY')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://nominatim.openstreetmap.org/search?q=123%20Main%20St%2C%20New%20York%2C%20NY&format=json&limit=5&addressdetails=1',
+    )
+  })
+
   it('returns mapped results on success', async () => {
     const mockData = [
       {
@@ -234,6 +249,33 @@ describe('geocodeAddress', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const results = await geocodeAddress('anything')
     expect(results).toEqual([])
+  })
+
+  it('returns empty array when response JSON is not an array', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ error: 'bad payload' }),
+    }))
+    const results = await geocodeAddress('anything')
+    expect(results).toEqual([])
+  })
+
+  it('maps missing fields to safe defaults', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([
+        { lat: undefined, lon: undefined, display_name: undefined, address: undefined },
+      ]),
+    }))
+    const results = await geocodeAddress('anything')
+    expect(results).toEqual([
+      {
+        lat: '',
+        lon: '',
+        display_name: '',
+        address: {},
+      },
+    ])
   })
 })
 

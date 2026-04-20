@@ -1,5 +1,5 @@
 import type {
-  CanvasObject, GeocodeResult, MapCenter, Point, SnapResult,
+  CanvasObject, GeocodeResult, GeocodeAddress, MapCenter, Point, SnapResult,
   SignObject, DeviceObject, ZoneObject, TextObject, TaperObject, TurnLaneObject,
   StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject, LaneMaskObject, CrosswalkObject,
 } from './types'

@@ -132,8 +132,6 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
   );
 }
 
-// ─── Shared shoulder/sidewalk helper ─────────────────────────────────────────
-
 /**
  * Builds the shoulder and sidewalk Line elements for any curved road type.
  * Returns them in back-to-front order: sidewalk fills, sidewalk edges, shoulders.

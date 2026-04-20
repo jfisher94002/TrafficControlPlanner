@@ -14,6 +14,30 @@ import { SIGN_CATEGORIES } from '../features/tcp/tcpCatalog'
 
 const allSigns = Object.values(SIGN_CATEGORIES).flatMap((cat) => cat.signs)
 
+function parseBackendGeneratorSignIds(fileContents: string): string[] {
+  const ids = new Set<string>()
+
+  // Parse explicit ALL_SIGNS tuple rows: ("id", "LABEL", "shape", ...)
+  const tupleIdPattern = /^\s*\("([a-z0-9]+)",\s*"[^"]*",\s*"(?:octagon|diamond|triangle|circle|shield|rect)"/gm
+  let match: RegExpExecArray | null
+  while ((match = tupleIdPattern.exec(fileContents)) !== null) {
+    ids.add(match[1])
+  }
+
+  // Parse speed sign list-comprehension source: for mph in (15, 20, ...)
+  const speedMphPattern = /for mph in\s*\(([^)]+)\)/
+  const speedMphMatch = speedMphPattern.exec(fileContents)
+  if (speedMphMatch) {
+    speedMphMatch[1]
+      .split(',')
+      .map((token) => Number(token.trim()))
+      .filter((mph) => Number.isFinite(mph))
+      .forEach((mph) => ids.add(`speed${mph}`))
+  }
+
+  return [...ids]
+}
+
 // ─── ID uniqueness ────────────────────────────────────────────────────────────
 
 describe('SIGN_CATEGORIES — ID uniqueness', () => {
@@ -59,5 +83,20 @@ describe('SIGN_CATEGORIES — SVG parity', () => {
       .filter((s) => !fs.existsSync(path.join(signsDir, `${s.id}.svg`)))
       .map((s) => s.id)
     expect(missing).toEqual([])
+  })
+
+  it('keeps backend/generate_signs.py ALL_SIGNS ids in sync with frontend catalog ids', () => {
+    const generatorPath = path.resolve(process.cwd(), '../backend/generate_signs.py')
+    const generatorContents = fs.readFileSync(generatorPath, 'utf8')
+    const backendIds = new Set(parseBackendGeneratorSignIds(generatorContents))
+    const frontendIds = new Set(allSigns.map((s) => s.id))
+
+    const missingInBackend = [...frontendIds].filter((id) => !backendIds.has(id))
+    const extraInBackend = [...backendIds].filter((id) => !frontendIds.has(id))
+
+    expect({ missingInBackend, extraInBackend }).toEqual({
+      missingInBackend: [],
+      extraInBackend: [],
+    })
   })
 })

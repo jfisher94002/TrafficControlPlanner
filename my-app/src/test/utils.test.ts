@@ -235,6 +235,15 @@ describe('geocodeAddress', () => {
     const results = await geocodeAddress('anything')
     expect(results).toEqual([])
   })
+
+  it('returns empty array when response is not an array', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ error: 'Unable to geocode' }),
+    }))
+    const results = await geocodeAddress('anything')
+    expect(results).toEqual([])
+  })
 })
 
 // ─── calcTaperLength ──────────────────────────────────────────────────────────

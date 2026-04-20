@@ -279,6 +279,7 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult[]> {
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`,
+      { headers: { 'User-Agent': 'TrafficControlPlanner/1.0 (https://tcplanpro.com)' } },
     )
     if (!response.ok) return []
     const data = await response.json()

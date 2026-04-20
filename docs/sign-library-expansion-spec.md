@@ -1,24 +1,24 @@
 # Sign Library Expansion — Spec
 
 **Issue:** #196  
-**Status:** Spec — pending implementation  
-**Branch:** TBD (`feat/sign-library-196`)
+**Status:** Implemented — merged in PR #263  
+**Branch:** `feat/sign-library-196`
 
 ---
 
 ## Baseline
 
-The issue states "180 signs" but the actual count is **82 signs** in both `my-app/src/features/tcp/tcpCatalog.ts` and `backend/generate_signs.py`'s `ALL_SIGNS`, backed by 82 SVG files in `backend/signs/`.
+The issue stated "180 signs" but the actual pre-expansion count was **82 signs** in both `my-app/src/features/tcp/tcpCatalog.ts` and `backend/generate_signs.py`'s `ALL_SIGNS`, backed by 82 SVG files in `backend/signs/`. PR #263 expanded this to **200 signs**.
 
-| Category | Current |
-|---|---|
-| Regulatory | 20 |
-| Warning | 23 |
-| Temp Traffic Control | 16 |
-| Guide & Info | 10 |
-| School Zone | 7 |
-| Bicycle & Pedestrian | 6 |
-| **Total** | **82** |
+| Category | Before | After |
+|---|---|---|
+| Regulatory | 20 | 47 |
+| Warning | 23 | 57 |
+| Temp Traffic Control | 16 | 46 |
+| Guide & Info | 10 | 21 |
+| School Zone | 7 | 12 |
+| Bicycle & Pedestrian | 6 | 17 |
+| **Total** | **82** | **200** |
 
 **Known drift to fix at the same time:** `trafficcontrols` exists in `tcpCatalog.ts` and has an SVG on disk but is **missing from `ALL_SIGNS`** in `generate_signs.py`. Running the generator against a clean directory would lose this SVG. Fix it during this PR. After adding the missing tuple, `len(ALL_SIGNS)` must equal the catalog sign count (82 + 1 = 83) **before** adding the 118 new signs — do not count `trafficcontrols` again as one of the 118.
 

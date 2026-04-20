@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="STOP AHEAD">
+  <polygon points="50.0,10.0 90.0,50.0 50.0,90.0 10.0,50.0" fill="#f97316" stroke="#111" stroke-width="2.5"/>
+  <text x="50.0" y="50.0" dominant-baseline="middle" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="10" fill="#111">STOP AHEAD</text>
+</svg>

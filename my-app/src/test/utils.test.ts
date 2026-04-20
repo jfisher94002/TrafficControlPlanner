@@ -205,19 +205,23 @@ describe('geocodeAddress', () => {
   })
 
   it('returns mapped results on success', async () => {
-    const mockData = {
-      candidates: [
-        { address: '123 Main St', location: { x: -74, y: 40 } },
-      ],
-    }
+    const mockData = [
+      {
+        lat: '40.7128',
+        lon: '-74.0060',
+        display_name: '123 Main St, New York, NY, USA',
+        address: { house_number: '123', road: 'Main St', city: 'New York', state: 'NY' },
+      },
+    ]
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockData),
     }))
     const results = await geocodeAddress('123 Main St')
     expect(results).toHaveLength(1)
-    expect(results[0].lat).toBe('40')
-    expect(results[0].lon).toBe('-74')
+    expect(results[0].lat).toBe('40.7128')
+    expect(results[0].lon).toBe('-74.0060')
+    expect(results[0].address.road).toBe('Main St')
   })
 
   it('returns empty array when fetch throws', async () => {

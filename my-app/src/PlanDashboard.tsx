@@ -3,6 +3,7 @@ import { CloudPlanMeta, listCloudPlans, loadPlanFromCloud, deletePlanFromCloud }
 
 interface PlanDashboardProps {
   userId: string
+  canvasSize: { w: number; h: number }
   onOpen: (plan: Record<string, unknown>) => void
   onClose: () => void
 }
@@ -46,7 +47,7 @@ const S: Record<string, React.CSSProperties> = {
   footer: { padding: '12px 20px', borderTop: '1px solid #2d3048', flexShrink: 0, fontSize: 10, color: '#64748b' },
 }
 
-export default function PlanDashboard({ userId, onOpen, onClose }: PlanDashboardProps) {
+export default function PlanDashboard({ userId, canvasSize, onOpen, onClose }: PlanDashboardProps) {
   const [plans, setPlans] = useState<CloudPlanMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -71,7 +72,7 @@ export default function PlanDashboard({ userId, onOpen, onClose }: PlanDashboard
     setOpening(plan.path)
     setError(null)
     try {
-      const data = await loadPlanFromCloud(plan.path)
+      const data = await loadPlanFromCloud(plan.path, canvasSize)
       setOpening(null)
       onOpen(data)
     } catch (e) {

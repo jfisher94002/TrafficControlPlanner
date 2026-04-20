@@ -5,7 +5,7 @@ import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
   SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, Point,
 } from '../../../types';
-import { angleBetween, dist, sampleBezier, sampleCubicBezier } from '../../../utils';
+import { angleBetween, dist, sampleBezier, sampleCubicBezier, buildOffsetSpine } from '../../../utils';
 import { COLORS, GRID_SIZE } from '../../../features/tcp/constants';
 import { LaneMaskShape, CrosswalkShape, TurnLaneShape } from '../../../shapes/TrafficControlShapes';
 
@@ -132,9 +132,60 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
   );
 }
 
+/**
+ * Builds the shoulder and sidewalk Line elements for any curved road type.
+ * Returns them in back-to-front order: sidewalk fills, sidewalk edges, shoulders.
+ * Uses the same offsets and colors as StraightRoad.
+ */
+function buildShoulderSidewalkLines(
+  id: string,
+  spine: Point[],
+  hw: number,
+  shoulderWidth: number,
+  sidewalkWidth: number,
+  sidewalkSide?: 'left' | 'right' | 'both',
+): React.ReactElement[] {
+  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
+  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
+  const sidewalkLines: React.ReactElement[] = [];
+  const shoulderLines: React.ReactElement[] = [];
+
+  if (sidewalkWidth > 0 && sidewalkSide) {
+    const swOff = hw + shoulderWidth + sidewalkWidth / 2;
+    if (showLeft) {
+      sidewalkLines.push(
+        <Line key={`${id}-swl-fill`} points={buildOffsetSpine(spine, swOff)}
+          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
+        <Line key={`${id}-swl-edge`} points={buildOffsetSpine(spine, swOff + sidewalkWidth / 2)}
+          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
+      );
+    }
+    if (showRight) {
+      sidewalkLines.push(
+        <Line key={`${id}-swr-fill`} points={buildOffsetSpine(spine, -swOff)}
+          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
+        <Line key={`${id}-swr-edge`} points={buildOffsetSpine(spine, -(swOff + sidewalkWidth / 2))}
+          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
+      );
+    }
+  }
+
+  if (shoulderWidth > 0) {
+    const shoulderOff = hw + shoulderWidth / 2;
+    shoulderLines.push(
+      <Line key={`${id}-sl`} points={buildOffsetSpine(spine, shoulderOff)}
+        stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
+      <Line key={`${id}-sr`} points={buildOffsetSpine(spine, -shoulderOff)}
+        stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
+    );
+  }
+
+  return [...sidewalkLines, ...shoulderLines];
+}
+
 interface PolylineRoadProps { obj: PolylineRoadObject; isSelected: boolean; }
 export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
-  const { id, points, width, lanes, roadType, smooth } = obj;
+  const { id, points, width, lanes, roadType, smooth, shoulderWidth = 0, sidewalkWidth = 0, sidewalkSide } = obj;
   const tension = smooth ? 0.5 : 0;
   if (!points || points.length < 2) return null;
 
@@ -147,6 +198,7 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
 
   const flat = pts.flatMap((p) => [p.x, p.y]);
   const hw = width / 2;
+
   const laneMarkings = [];
   const laneW = width / lanes;
   for (let li = 1; li < lanes; li++) {
@@ -175,8 +227,11 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
     }
   }
 
+  const extraLines = buildShoulderSidewalkLines(id, pts, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+
   return (
     <Group listening={false}>
+      {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
       <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
       <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
@@ -193,13 +248,14 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
 
 interface CurveRoadProps { obj: CurveRoadObject; isSelected: boolean; }
 export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
-  const { id, points, width, lanes, roadType } = obj;
+  const { id, points, width, lanes, roadType, shoulderWidth = 0, sidewalkWidth = 0, sidewalkSide } = obj;
   if (!points || points.length < 3) return null;
   const [p0, p1, p2] = points;
 
   const spine = sampleBezier(p0, p1, p2, 32);
   const flat = spine.flatMap((p) => [p.x, p.y]);
   const hw = width / 2;
+
   const laneMarkings = [];
   const laneW = width / lanes;
   for (let li = 1; li < lanes; li++) {
@@ -228,8 +284,11 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
     }
   }
 
+  const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+
   return (
     <Group listening={false}>
+      {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
@@ -247,13 +306,14 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
 
 interface CubicBezierRoadProps { obj: CubicBezierRoadObject; isSelected: boolean; }
 export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
-  const { id, points, width, lanes, roadType } = obj;
+  const { id, points, width, lanes, roadType, shoulderWidth = 0, sidewalkWidth = 0, sidewalkSide } = obj;
   if (!points || points.length < 4) return null;
   const [p0, p1, p2, p3] = points;
 
   const spine = sampleCubicBezier(p0, p1, p2, p3, 32);
   const flat = spine.flatMap((p) => [p.x, p.y]);
   const hw = width / 2;
+
   const laneMarkings = [];
   const laneW = width / lanes;
   for (let li = 1; li < lanes; li++) {
@@ -282,8 +342,11 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
     }
   }
 
+  const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+
   return (
     <Group listening={false}>
+      {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />

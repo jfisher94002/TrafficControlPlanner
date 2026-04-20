@@ -196,6 +196,21 @@ describe('formatSearchPrimary', () => {
     }
     expect(formatSearchPrimary(result)).toBe('Oak Ave')
   })
+
+  it('uses alternate Nominatim address fields when road/city are absent', () => {
+    const result: GeocodeResult = {
+      lat: '37.5',
+      lon: '-122.3',
+      display_name: 'Fallback Display',
+      address: {
+        house_number: '10',
+        pedestrian: 'Broadway Walk',
+        town: 'Belmont',
+        state_district: 'San Mateo County',
+      },
+    }
+    expect(formatSearchPrimary(result)).toBe('10 Broadway Walk, Belmont, San Mateo County')
+  })
 })
 
 // ─── geocodeAddress ──────────────────────────────────────────────────────────
@@ -232,6 +247,52 @@ describe('geocodeAddress', () => {
 
   it('returns empty array when response is not ok', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    const results = await geocodeAddress('anything')
+    expect(results).toEqual([])
+  })
+
+  it('calls Nominatim with encoded query and expected parameters', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    await geocodeAddress('1906 Miller Ave, Belmont, CA 94002')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const requestUrl = String(fetchMock.mock.calls[0][0])
+    expect(requestUrl).toContain('https://nominatim.openstreetmap.org/search?')
+    expect(requestUrl).toContain('q=1906%20Miller%20Ave%2C%20Belmont%2C%20CA%2094002')
+    expect(requestUrl).toContain('format=json')
+    expect(requestUrl).toContain('limit=5')
+    expect(requestUrl).toContain('addressdetails=1')
+  })
+
+  it('returns empty array when API payload is not an array', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ error: 'unexpected shape' }),
+    }))
+    const results = await geocodeAddress('anything')
+    expect(results).toEqual([])
+  })
+
+  it('maps malformed items safely with string defaults', async () => {
+    const mockData = [{ lat: 37.5078, display_name: null, address: null }]
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockData),
+    }))
+    const results = await geocodeAddress('anything')
+    expect(results).toEqual([
+      { lat: '37.5078', lon: '', display_name: '', address: {} },
+    ])
+  })
+
+  it('returns empty array when response json parsing throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.reject(new Error('invalid json')),
+    }))
     const results = await geocodeAddress('anything')
     expect(results).toEqual([])
   })

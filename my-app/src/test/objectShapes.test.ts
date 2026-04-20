@@ -10,33 +10,37 @@ import type { Point } from '../types'
 
 // ─── buildOffsetSpine ─────────────────────────────────────────────────────────
 
+// buildOffsetSpine uses the same normal convention as StraightRoad: (nx,ny) = (-dy/len, dx/len).
+// For a rightward segment (dx>0, dy=0): nx=0, ny=1 → positive d shifts Y downward (south).
+// This matches how StraightRoad's positive-normal side maps to sidewalkSide='left'.
+
 describe('buildOffsetSpine', () => {
-  it('offsets a horizontal segment to the left (positive d)', () => {
-    // Segment going right: (0,0) → (10,0). Left normal is (0,-1).
+  it('offsets a horizontal segment with positive d (ny=+1 direction)', () => {
+    // Segment going right: (0,0) → (10,0). Normal is (0,+1) — downward in Y-down canvas.
     const pts: Point[] = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
     const result = buildOffsetSpine(pts, 5)
-    // Both points shifted by (nx=0, ny=-1)*5 → y decreases by 5
+    // Both points shifted by (nx=0, ny=+1)*5 → y increases by 5
     expect(result).toHaveLength(4)
     expect(result[0]).toBeCloseTo(0)   // x0 unchanged
-    expect(result[1]).toBeCloseTo(-5)  // y0 - 5
+    expect(result[1]).toBeCloseTo(5)   // y0 + 5
     expect(result[2]).toBeCloseTo(10)  // x1 unchanged
-    expect(result[3]).toBeCloseTo(-5)  // y1 - 5
+    expect(result[3]).toBeCloseTo(5)   // y1 + 5
   })
 
-  it('offsets a horizontal segment to the right (negative d)', () => {
+  it('offsets a horizontal segment with negative d (opposite side)', () => {
     const pts: Point[] = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
     const result = buildOffsetSpine(pts, -5)
-    expect(result[1]).toBeCloseTo(5)
-    expect(result[3]).toBeCloseTo(5)
+    expect(result[1]).toBeCloseTo(-5)
+    expect(result[3]).toBeCloseTo(-5)
   })
 
   it('offsets a vertical segment correctly', () => {
-    // Segment going down: (0,0) → (0,10). Left normal is (1,0).
+    // Segment going down: (0,0) → (0,10). Normal is (-1,0) — leftward.
     const pts: Point[] = [{ x: 0, y: 0 }, { x: 0, y: 10 }]
     const result = buildOffsetSpine(pts, 5)
-    expect(result[0]).toBeCloseTo(5)   // x0 + 5
+    expect(result[0]).toBeCloseTo(-5)  // x0 - 5
     expect(result[1]).toBeCloseTo(0)   // y0 unchanged
-    expect(result[2]).toBeCloseTo(5)   // x1 + 5
+    expect(result[2]).toBeCloseTo(-5)  // x1 - 5
     expect(result[3]).toBeCloseTo(10)  // y1 unchanged (original = 10)
   })
 
@@ -52,12 +56,12 @@ describe('buildOffsetSpine', () => {
   })
 
   it('uses the last segment normal for the final point', () => {
-    // Two-point segment going right; final point normal = same as only segment normal
+    // Two-point segment going right; final point uses same segment's normal
     const pts: Point[] = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
     const withD = buildOffsetSpine(pts, 10)
-    // Both y values should be -10
-    expect(withD[1]).toBeCloseTo(-10)
-    expect(withD[3]).toBeCloseTo(-10)
+    // Both y values should be +10 (ny=+1 for rightward segment)
+    expect(withD[1]).toBeCloseTo(10)
+    expect(withD[3]).toBeCloseTo(10)
   })
 
   it('returns a flat array suitable for Konva Line points', () => {
@@ -67,18 +71,19 @@ describe('buildOffsetSpine', () => {
     expect(result).toEqual([1, 2, 3, 4, 5, 6])
   })
 
-  it('handles a single point gracefully (no crash)', () => {
+  it('handles a single point gracefully (no crash, returns point unchanged)', () => {
     const pts: Point[] = [{ x: 5, y: 5 }]
     expect(() => buildOffsetSpine(pts, 10)).not.toThrow()
+    expect(buildOffsetSpine(pts, 10)).toEqual([5, 5])
   })
 
-  it('produces symmetric left/right offsets of equal magnitude', () => {
+  it('produces symmetric offsets of equal magnitude on opposite sides', () => {
     const pts: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }]
-    const left  = buildOffsetSpine(pts, 20)
-    const right = buildOffsetSpine(pts, -20)
+    const pos  = buildOffsetSpine(pts, 20)
+    const neg = buildOffsetSpine(pts, -20)
     // y values should be equal in magnitude, opposite in sign
-    for (let i = 1; i < left.length; i += 2) {
-      expect(left[i]).toBeCloseTo(-right[i])
+    for (let i = 1; i < pos.length; i += 2) {
+      expect(pos[i]).toBeCloseTo(-neg[i])
     }
   })
 
@@ -86,25 +91,22 @@ describe('buildOffsetSpine', () => {
     const pts: Point[] = [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 100, y: 0 }]
     const d = 7
     const result = buildOffsetSpine(pts, d)
-    // All y values should be exactly -d (normal is (0,-1) for rightward travel)
+    // ny=+1 for rightward travel → all y values = +d
     for (let i = 1; i < result.length; i += 2) {
-      expect(result[i]).toBeCloseTo(-d, 6)
+      expect(result[i]).toBeCloseTo(d, 6)
     }
   })
 })
 
-// ─── Rendered element counts (component smoke tests) ─────────────────────────
-// These tests use React Testing Library to render the road components and count
-// the Konva Line elements in the output, verifying shoulder/sidewalk elements
-// are present or absent based on the object configuration.
+// ─── Component smoke tests ────────────────────────────────────────────────────
+// react-konva primitives are mocked to render null in the jsdom test env, so
+// these tests only verify that each road component renders without throwing for
+// various shoulder/sidewalk configurations.
 
 import { render } from '@testing-library/react'
 import React from 'react'
 import { PolylineRoad, CurveRoad, CubicBezierRoad } from '../components/tcp/canvas/ObjectShapes'
 import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject } from '../types'
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 
 // ─── PolylineRoad ─────────────────────────────────────────────────────────────
 

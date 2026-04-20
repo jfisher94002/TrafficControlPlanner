@@ -132,6 +132,59 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
   );
 }
 
+// ─── Shared shoulder/sidewalk helper ─────────────────────────────────────────
+
+/**
+ * Builds the shoulder and sidewalk Line elements for any curved road type.
+ * Returns them in back-to-front order: sidewalk fills, sidewalk edges, shoulders.
+ * Uses the same offsets and colors as StraightRoad.
+ */
+function buildShoulderSidewalkLines(
+  id: string,
+  spine: Point[],
+  hw: number,
+  shoulderWidth: number,
+  sidewalkWidth: number,
+  sidewalkSide?: 'left' | 'right' | 'both',
+): React.ReactElement[] {
+  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
+  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
+  const sidewalkLines: React.ReactElement[] = [];
+  const shoulderLines: React.ReactElement[] = [];
+
+  if (sidewalkWidth > 0 && sidewalkSide) {
+    const swOff = hw + shoulderWidth + sidewalkWidth / 2;
+    if (showLeft) {
+      sidewalkLines.push(
+        <Line key={`${id}-swl-fill`} points={buildOffsetSpine(spine, swOff)}
+          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
+        <Line key={`${id}-swl-edge`} points={buildOffsetSpine(spine, swOff + sidewalkWidth / 2)}
+          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
+      );
+    }
+    if (showRight) {
+      sidewalkLines.push(
+        <Line key={`${id}-swr-fill`} points={buildOffsetSpine(spine, -swOff)}
+          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
+        <Line key={`${id}-swr-edge`} points={buildOffsetSpine(spine, -(swOff + sidewalkWidth / 2))}
+          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
+      );
+    }
+  }
+
+  if (shoulderWidth > 0) {
+    const shoulderOff = hw + shoulderWidth / 2;
+    shoulderLines.push(
+      <Line key={`${id}-sl`} points={buildOffsetSpine(spine, shoulderOff)}
+        stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
+      <Line key={`${id}-sr`} points={buildOffsetSpine(spine, -shoulderOff)}
+        stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
+    );
+  }
+
+  return [...sidewalkLines, ...shoulderLines];
+}
+
 interface PolylineRoadProps { obj: PolylineRoadObject; isSelected: boolean; }
 export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
   const { id, points, width, lanes, roadType, smooth, shoulderWidth = 0, sidewalkWidth = 0, sidewalkSide } = obj;
@@ -147,8 +200,6 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
 
   const flat = pts.flatMap((p) => [p.x, p.y]);
   const hw = width / 2;
-  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
-  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
 
   const laneMarkings = [];
   const laneW = width / lanes;
@@ -178,39 +229,11 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
     }
   }
 
-  const shoulderOff = hw + shoulderWidth / 2;
-  const shoulderLines = shoulderWidth > 0 ? [
-    <Line key={`${id}-sl`} points={buildOffsetSpine(pts, shoulderOff)}
-      stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
-    <Line key={`${id}-sr`} points={buildOffsetSpine(pts, -shoulderOff)}
-      stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
-  ] : [];
-
-  const swOff = hw + (shoulderWidth > 0 ? shoulderWidth : 0) + sidewalkWidth / 2;
-  const sidewalkLines: React.ReactElement[] = [];
-  if (sidewalkWidth > 0 && sidewalkSide) {
-    if (showLeft) {
-      sidewalkLines.push(
-        <Line key={`${id}-swl-fill`} points={buildOffsetSpine(pts, swOff)}
-          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
-        <Line key={`${id}-swl-edge`} points={buildOffsetSpine(pts, swOff + sidewalkWidth / 2)}
-          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
-      );
-    }
-    if (showRight) {
-      sidewalkLines.push(
-        <Line key={`${id}-swr-fill`} points={buildOffsetSpine(pts, -swOff)}
-          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
-        <Line key={`${id}-swr-edge`} points={buildOffsetSpine(pts, -(swOff + sidewalkWidth / 2))}
-          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
-      );
-    }
-  }
+  const extraLines = buildShoulderSidewalkLines(id, pts, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
 
   return (
     <Group listening={false}>
-      {sidewalkLines}
-      {shoulderLines}
+      {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
       <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
       <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
@@ -234,8 +257,6 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
   const spine = sampleBezier(p0, p1, p2, 32);
   const flat = spine.flatMap((p) => [p.x, p.y]);
   const hw = width / 2;
-  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
-  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
 
   const laneMarkings = [];
   const laneW = width / lanes;
@@ -265,39 +286,11 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
     }
   }
 
-  const shoulderOff = hw + shoulderWidth / 2;
-  const shoulderLines = shoulderWidth > 0 ? [
-    <Line key={`${id}-sl`} points={buildOffsetSpine(spine, shoulderOff)}
-      stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
-    <Line key={`${id}-sr`} points={buildOffsetSpine(spine, -shoulderOff)}
-      stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
-  ] : [];
-
-  const swOff = hw + (shoulderWidth > 0 ? shoulderWidth : 0) + sidewalkWidth / 2;
-  const sidewalkLines: React.ReactElement[] = [];
-  if (sidewalkWidth > 0 && sidewalkSide) {
-    if (showLeft) {
-      sidewalkLines.push(
-        <Line key={`${id}-swl-fill`} points={buildOffsetSpine(spine, swOff)}
-          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
-        <Line key={`${id}-swl-edge`} points={buildOffsetSpine(spine, swOff + sidewalkWidth / 2)}
-          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
-      );
-    }
-    if (showRight) {
-      sidewalkLines.push(
-        <Line key={`${id}-swr-fill`} points={buildOffsetSpine(spine, -swOff)}
-          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
-        <Line key={`${id}-swr-edge`} points={buildOffsetSpine(spine, -(swOff + sidewalkWidth / 2))}
-          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
-      );
-    }
-  }
+  const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
 
   return (
     <Group listening={false}>
-      {sidewalkLines}
-      {shoulderLines}
+      {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
@@ -322,8 +315,6 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
   const spine = sampleCubicBezier(p0, p1, p2, p3, 32);
   const flat = spine.flatMap((p) => [p.x, p.y]);
   const hw = width / 2;
-  const showLeft  = sidewalkSide === 'both' || sidewalkSide === 'left';
-  const showRight = sidewalkSide === 'both' || sidewalkSide === 'right';
 
   const laneMarkings = [];
   const laneW = width / lanes;
@@ -353,39 +344,11 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
     }
   }
 
-  const shoulderOff = hw + shoulderWidth / 2;
-  const shoulderLines = shoulderWidth > 0 ? [
-    <Line key={`${id}-sl`} points={buildOffsetSpine(spine, shoulderOff)}
-      stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
-    <Line key={`${id}-sr`} points={buildOffsetSpine(spine, -shoulderOff)}
-      stroke="rgba(80,90,110,0.8)" strokeWidth={shoulderWidth} lineCap="round" lineJoin="round" listening={false} />,
-  ] : [];
-
-  const swOff = hw + (shoulderWidth > 0 ? shoulderWidth : 0) + sidewalkWidth / 2;
-  const sidewalkLines: React.ReactElement[] = [];
-  if (sidewalkWidth > 0 && sidewalkSide) {
-    if (showLeft) {
-      sidewalkLines.push(
-        <Line key={`${id}-swl-fill`} points={buildOffsetSpine(spine, swOff)}
-          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
-        <Line key={`${id}-swl-edge`} points={buildOffsetSpine(spine, swOff + sidewalkWidth / 2)}
-          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
-      );
-    }
-    if (showRight) {
-      sidewalkLines.push(
-        <Line key={`${id}-swr-fill`} points={buildOffsetSpine(spine, -swOff)}
-          stroke="rgba(200,195,185,0.6)" strokeWidth={sidewalkWidth} lineCap="round" lineJoin="round" listening={false} />,
-        <Line key={`${id}-swr-edge`} points={buildOffsetSpine(spine, -(swOff + sidewalkWidth / 2))}
-          stroke="rgba(160,155,145,0.8)" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
-      );
-    }
-  }
+  const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
 
   return (
     <Group listening={false}>
-      {sidewalkLines}
-      {shoulderLines}
+      {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
       <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />

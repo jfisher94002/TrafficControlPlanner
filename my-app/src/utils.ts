@@ -164,19 +164,23 @@ export function sampleCubicBezier(p0: Point, p1: Point, p2: Point, p3: Point, n:
 
 /**
  * Build a flat Konva points array offset perpendicular to the polyline by `d` pixels.
- * Positive `d` is to the left of the direction of travel (canvas +Y-down convention).
+ * Uses the same normal convention as StraightRoad: `(nx, ny) = (-dy/len, dx/len)`,
+ * so positive `d` offsets in the same direction as StraightRoad's positive-normal side
+ * (and `sidewalkSide = 'left'` corresponds to positive `d`).
  * Uses the outgoing-segment normal at each point; the final point uses the last
  * segment's normal. Works for both densely-sampled spines and raw control points.
+ * Returns a flat array of [x0, y0, x1, y1, ...] suitable for Konva Line `points`.
+ * If fewer than 2 points are provided, returns the original points unchanged (no offset).
  */
 export function buildOffsetSpine(pts: Point[], d: number): number[] {
-  if (pts.length < 2) return pts.flatMap((p) => [p.x + d, p.y])
+  if (pts.length < 2) return pts.flatMap((p) => [p.x, p.y])
   const result: number[] = []
   for (let i = 0; i < pts.length; i++) {
     const a = i < pts.length - 1 ? pts[i] : pts[i - 1]
     const b = i < pts.length - 1 ? pts[i + 1] : pts[i]
     const dx = b.x - a.x, dy = b.y - a.y
     const len = Math.sqrt(dx * dx + dy * dy) || 1
-    const nx = dy / len, ny = -dx / len
+    const nx = -dy / len, ny = dx / len
     result.push(pts[i].x + nx * d, pts[i].y + ny * d)
   }
   return result

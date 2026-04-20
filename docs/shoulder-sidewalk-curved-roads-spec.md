@@ -1,8 +1,8 @@
 # Shoulder & Sidewalk Rendering on Curved Roads — Spec
 
 **Issue:** #195  
-**Status:** Spec — pending implementation  
-**Branch:** TBD (`feat/shoulder-sidewalk-195`)
+**Status:** Implemented  
+**Branch:** `feat/shoulder-sidewalk-195`
 
 ---
 

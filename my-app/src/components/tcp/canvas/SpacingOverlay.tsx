@@ -3,7 +3,7 @@ import type { TaperObject } from '../../../types';
 import { TAPER_SCALE, SIGN_LATERAL_CLEARANCE_PX } from '../../../features/tcp/constants';
 
 /** MUTCD Table 6H-3 advance warning sign spacing by speed. */
-function mutcdSpacingFt(speed: number): number {
+export function mutcdSpacingFt(speed: number): number {
   if (speed <= 35) return 100;
   if (speed <= 45) return 200;
   if (speed <= 55) return 350;

@@ -7,6 +7,12 @@ import * as planStorage from '../planStorage'
 import * as analytics from '../analytics'
 import { DEFAULT_TILE_URL, resolveTileUrl, buildTileUrl } from '../utils'
 
+vi.mock('../components/tcp/canvas/SpacingOverlay', () => ({
+  SpacingOverlay: ({ taper }: { taper: { id: string } }) => (
+    <div data-testid="spacing-overlay-probe" data-taper-id={taper.id} />
+  ),
+}))
+
 beforeEach(() => {
   localStorage.clear()
   // Seed a mapCenter so drawing tools are not blocked by the address guard in any test
@@ -453,6 +459,35 @@ describe('Taper tool', () => {
     fireEvent.keyDown(window, { key: 'P' })
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
     expect(within(screen.getByTestId('right-panel')).getByText(/taper Properties/i)).toBeInTheDocument()
+  })
+})
+
+describe('Spacing guide overlay', () => {
+  it('is hidden by default and toggles on/off from taper properties', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    expect(screen.queryByTestId('spacing-overlay-probe')).not.toBeInTheDocument()
+
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: /show spacing guide/i }))
+    expect(screen.getByTestId('spacing-overlay-probe')).toBeInTheDocument()
+
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: /hide spacing guide/i }))
+    expect(screen.queryByTestId('spacing-overlay-probe')).not.toBeInTheDocument()
+  })
+
+  it('does not render when guide is enabled but selected object is not a taper', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: /show spacing guide/i }))
+    expect(screen.getByTestId('spacing-overlay-probe')).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(within(screen.getByTestId('right-panel')).getByText(/sign Properties/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('spacing-overlay-probe')).not.toBeInTheDocument()
   })
 })
 

@@ -8,7 +8,7 @@ import type {
   MapCenter, PlanMeta, Point,
   GeocodeResult,
 } from './types';
-import { uid, geoRoadWidthPx, formatSearchPrimary, geocodeAddress, cloneObject } from './utils';
+import { uid, geoRoadWidthPx, formatSearchPrimary, geocodeAddress, cloneObject, autoChannelize } from './utils';
 import { savePlanToCloud, fetchRemoteUpdatedAt, loadPlanFromCloud } from './planStorage';
 import { buildGeoContext, worldToPlan } from './coordinate-bridge';
 import { detectSchemaVersion, v2ToWorldCoords } from './planMigration';
@@ -364,6 +364,13 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     else if (dir === "forward")  next.splice(idx + 1, 0, obj);
     else                         next.splice(idx - 1, 0, obj);
     pushHistory(next);
+  };
+
+  const handleAutoChannelize = (taperId: string, workZoneLengthFt: number) => {
+    const taper = objects.find((o) => o.id === taperId);
+    if (!taper || taper.type !== 'taper') return;
+    const newObjs = autoChannelize(taper, workZoneLengthFt);
+    pushHistory([...objects, ...newObjs]);
   };
 
   const clearAll = () => {
@@ -1335,7 +1342,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
-              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} />
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} onAutoChannelize={handleAutoChannelize} />
               : rightTab === "manifest"
               ? <ManifestPanel objects={objects} />
               : <QCPanel issues={qcIssues} />

@@ -240,7 +240,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       if (e.key === 'Tab') {
         const modal = addrModalGoRef.current?.closest('[data-testid="address-required-modal"]');
         if (!modal) return;
-        const focusable = Array.from(modal.querySelectorAll<HTMLElement>('button,input,[tabindex]:not([tabindex="-1"])'));
+        const focusable = Array.from(modal.querySelectorAll<HTMLElement>('a[href],area[href],button,input,select,textarea,iframe,[tabindex]:not([tabindex="-1"])'));
         if (!focusable.length) return;
         const first = focusable[0], last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -373,7 +373,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const newPlan = () => {
     if (objects.length > 0 && !confirm("Start a new plan? Unsaved changes will be lost.")) return;
     localStorage.removeItem(AUTOSAVE_KEY);
-    pushHistory([]); setSelected(null);
+    resetHistory([]); setSelected(null);
     setPlanTitle("Untitled Traffic Control Plan");
     setPlanId(uid());
     setPlanCreatedAt(new Date().toISOString());
@@ -661,7 +661,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (plan.canvasOffset) setOffset(plan.canvasOffset as Point);
         if (plan.canvasZoom) setZoom(plan.canvasZoom as number);
         const loaded: CanvasObject[] = (plan.canvasState as { objects?: CanvasObject[] } | undefined)?.objects || [];
-        pushHistory(loaded); setSelected(null);
+        resetHistory(loaded); setSelected(null);
         setLastKnownUpdatedAt(null); // local file load has no cloud version token
         const wasV1NoMap = (detectSchemaVersion(plan) === 1) && (rawMC == null || rawLon == null);
         setV1NoMapBanner(wasV1NoMap);

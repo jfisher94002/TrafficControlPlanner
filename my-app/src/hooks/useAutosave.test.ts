@@ -64,7 +64,7 @@ describe('useAutosave', () => {
       userId: 'user-42',
       canvasZoom: 1.25,
       canvasOffset: { x: 12, y: 34 },
-      metadata: { projectNumber: 'TCP-123', client: 'City DOT' },
+      metadata: { projectNumber: 'TCP-123', client: 'City DOT', location: 'Main St', notes: 'Night work' },
       mapCenter: { lat: 37.77, lon: -122.41, zoom: 14 },
     })
     expect(saved.canvasState.objects).toHaveLength(2)
@@ -73,9 +73,11 @@ describe('useAutosave', () => {
 
   it('reports storage failures and clears the error after a later successful write', async () => {
     const setItemSpy = vi.spyOn(window.localStorage, 'setItem')
-    setItemSpy.mockImplementationOnce(() => {
-      throw new Error('quota exceeded')
-    })
+    // StrictMode double-invokes effects; mock must throw on both invocations
+    // so autosaveError is still set when we assert it.
+    setItemSpy
+      .mockImplementationOnce(() => { throw new Error('quota exceeded') })
+      .mockImplementationOnce(() => { throw new Error('quota exceeded') })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     const { result, rerender } = renderHook(
@@ -85,6 +87,10 @@ describe('useAutosave', () => {
 
     await waitFor(() => {
       expect(warnSpy).toHaveBeenCalledWith('[TCP] Auto-save failed:', 'quota exceeded')
+    })
+
+    await waitFor(() => {
+      expect(result.current.autosaveError).toBe('quota exceeded')
     })
 
     rerender({ objects: makeObjects(['a', 'b']) })

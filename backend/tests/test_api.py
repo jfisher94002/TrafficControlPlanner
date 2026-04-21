@@ -138,7 +138,8 @@ def test_rate_limit_window_allows_after_expiry(monkeypatch, valid_issue):
     # Clear any state from previous tests for this IP.
     main_module._ip_submissions.pop("192.0.2.55", None)
     # Simulate 3 requests at t=1000,1001,1002 then a 4th at t=4605 (>1h later).
-    # The 4th should be allowed (returns 503 upstream error, not 429 rate-limited).
+    # The 4th should be allowed past the rate limiter (returns 503 because GITHUB_TOKEN
+    # is unset, not 429 which would mean still rate-limited).
     # Use itertools.chain so extra calls (middleware, logging) don't exhaust the
     # iterator and raise StopIteration → RuntimeError inside an async context.
     import itertools

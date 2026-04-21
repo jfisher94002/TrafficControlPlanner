@@ -5,6 +5,12 @@ export const MAX_ZOOM = 5;
 export const SNAP_RADIUS = 14;   // screen-pixels for endpoint snap
 export const STATUS_BAR_H = 28;  // height of the bottom status bar in px
 
+// ─── Taper / channelization constants ────────────────────────────────────────
+/** Canvas pixels per real-world foot for taper geometry. */
+export const TAPER_SCALE = 3;
+/** Lateral clearance (px) from road edge to placed advance warning signs. */
+export const SIGN_LATERAL_CLEARANCE_PX = 30;
+
 // ─── Color palette ────────────────────────────────────────────────────────────
 export const COLORS = {
   bg: "#0f1117",

@@ -3,6 +3,7 @@ import type {
   SignObject, DeviceObject, ZoneObject, TextObject, TaperObject, TurnLaneObject,
   StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject, LaneMaskObject, CrosswalkObject,
 } from './types'
+import { TAPER_SCALE, SIGN_LATERAL_CLEARANCE_PX } from './features/tcp/constants'
 
 // ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
 
@@ -76,9 +77,6 @@ export const uid = () => Math.random().toString(36).slice(2, 10)
 
 // ─── AUTO-CHANNELIZATION ──────────────────────────────────────────────────────
 
-/** Canvas pixels per foot (matches ObjectShapes.tsx TAPER_SCALE). */
-const TAPER_PX_PER_FT = 3
-
 /** MUTCD Table 6H-3: advance warning sign spacing by posted speed. */
 function mutcdSignSpacingFt(speedMph: number): number {
   if (speedMph <= 35) return 100
@@ -100,13 +98,13 @@ function mutcdSignSpacingFt(speedMph: number): number {
  * @returns New CanvasObject[] to push onto the canvas
  */
 export function autoChannelize(taper: TaperObject, workZoneLengthFt: number): CanvasObject[] {
-  const spacingPx = mutcdSignSpacingFt(taper.speed) * TAPER_PX_PER_FT
+  const spacingPx = mutcdSignSpacingFt(taper.speed) * TAPER_SCALE
   const rotRad = (taper.rotation * Math.PI) / 180
 
-  const totalWidthPx = taper.laneWidth * taper.numLanes * TAPER_PX_PER_FT
+  const totalWidthPx = taper.laneWidth * taper.numLanes * TAPER_SCALE
   const hw = totalWidthPx / 2
   // Place signs to the right of the road (driver's right when approaching taper)
-  const lateralOffsetPx = hw + 30
+  const lateralOffsetPx = hw + SIGN_LATERAL_CLEARANCE_PX
 
   /** Convert local taper-space (lx, ly) → world canvas coords. */
   function toWorld(lx: number, ly: number): { x: number; y: number } {
@@ -143,9 +141,9 @@ export function autoChannelize(taper: TaperObject, workZoneLengthFt: number): Ca
   // local space with rotation+180 so the wide end faces away from the work zone
   // and the narrow end abuts the work zone boundary.
   const dsTaperLengthFt = calcTaperLength(taper.speed, taper.laneWidth, taper.numLanes)
-  const dsTaperLengthPx = dsTaperLengthFt * TAPER_PX_PER_FT
-  const mergeTaperPx = taper.taperLength * TAPER_PX_PER_FT
-  const workZonePx = workZoneLengthFt * TAPER_PX_PER_FT
+  const dsTaperLengthPx = dsTaperLengthFt * TAPER_SCALE
+  const mergeTaperPx = taper.taperLength * TAPER_SCALE
+  const workZonePx = workZoneLengthFt * TAPER_SCALE
   const dsLocalX = mergeTaperPx + workZonePx + dsTaperLengthPx
   const dsPos = toWorld(dsLocalX, 0)
 

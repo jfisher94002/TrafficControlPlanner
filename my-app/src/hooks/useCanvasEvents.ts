@@ -11,12 +11,9 @@ import {
   uid, dist, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier,
   distToPolyline, isPointObject, isLineObject, isMultiPointRoad, calcTaperLength,
 } from '../utils';
-import { SNAP_RADIUS, MIN_ZOOM, MAX_ZOOM } from '../features/tcp/constants';
+import { SNAP_RADIUS, MIN_ZOOM, MAX_ZOOM, TAPER_SCALE } from '../features/tcp/constants';
 import { createIntersectionRoads } from '../features/tcp/planUtils';
 import { track } from '../analytics';
-
-// px-per-foot scale for taper hit-radius calculation — matches TaperShape in ObjectShapes.tsx
-const TAPER_SCALE = 3;
 import { latLonToPixel, pixelToLatLon } from '../components/tcp/canvas/MiniMap';
 
 interface CanvasEventsProps {

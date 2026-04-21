@@ -6,11 +6,10 @@ import type {
   SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, Point,
 } from '../../../types';
 import { angleBetween, dist, sampleBezier, sampleCubicBezier, buildOffsetSpine } from '../../../utils';
-import { COLORS, GRID_SIZE } from '../../../features/tcp/constants';
+import { COLORS, GRID_SIZE, TAPER_SCALE } from '../../../features/tcp/constants';
 import { LaneMaskShape, CrosswalkShape, TurnLaneShape } from '../../../shapes/TrafficControlShapes';
 
-// px per foot — chosen to match road scale (2-lane road = 22 ft realWidth ≈ 80 px → ~3.6 px/ft)
-export const TAPER_SCALE = 3;
+export { TAPER_SCALE };
 
 interface GridLinesProps { offset: Point; zoom: number; canvasSize: { w: number; h: number }; }
 export function GridLines({ offset, zoom, canvasSize }: GridLinesProps) {

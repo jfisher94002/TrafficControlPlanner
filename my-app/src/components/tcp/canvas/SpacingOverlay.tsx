@@ -41,7 +41,7 @@ export function SpacingOverlay({ taper }: SpacingOverlayProps) {
         const distFt = (i + 1) * spacingFt;
 
         return (
-          <Group key={i} x={lx} y={0} listening={false}>
+          <Group key={mutcd + label} x={lx} y={0} listening={false}>
             {/* Dashed guide line perpendicular to road */}
             <Line
               points={[0, -lineHalfLen, 0, lineHalfLen]}

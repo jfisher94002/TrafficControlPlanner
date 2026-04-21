@@ -204,6 +204,21 @@ describe('geocodeAddress', () => {
     vi.restoreAllMocks()
   })
 
+  it('calls Nominatim with encoded query params and required User-Agent header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([]),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await geocodeAddress('1600 Pennsylvania Ave NW')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://nominatim.openstreetmap.org/search?q=1600%20Pennsylvania%20Ave%20NW&format=json&limit=5&addressdetails=1',
+      { headers: { 'User-Agent': 'TrafficControlPlanner/1.0 (https://tcplanpro.com)' } },
+    )
+  })
+
   it('returns mapped results on success', async () => {
     const mockData = [
       {
@@ -222,6 +237,24 @@ describe('geocodeAddress', () => {
     expect(results[0].lat).toBe('40.7128')
     expect(results[0].lon).toBe('-74.0060')
     expect(results[0].address.road).toBe('Main St')
+  })
+
+  it('normalizes partial response fields to stable defaults', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([
+        { lat: 40.1, lon: -74.2 },
+      ]),
+    }))
+    const results = await geocodeAddress('anything')
+    expect(results).toEqual([
+      {
+        lat: '40.1',
+        lon: '-74.2',
+        display_name: '',
+        address: {},
+      },
+    ])
   })
 
   it('returns empty array when fetch throws', async () => {

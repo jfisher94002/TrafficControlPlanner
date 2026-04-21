@@ -78,7 +78,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10)
 // ─── AUTO-CHANNELIZATION ──────────────────────────────────────────────────────
 
 /** MUTCD Table 6H-3: advance warning sign spacing by posted speed. */
-function mutcdSignSpacingFt(speedMph: number): number {
+export function mutcdSignSpacingFt(speedMph: number): number {
   if (speedMph <= 35) return 100
   if (speedMph <= 45) return 200
   if (speedMph <= 55) return 350

@@ -3,7 +3,7 @@ import { Stage, Layer, Rect, Image as KonvaImage } from "react-konva";
 import type Konva from 'konva';
 import type React from 'react';
 import type {
-  CanvasObject, PolylineRoadObject,
+  CanvasObject, PolylineRoadObject, TaperObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, PlanMeta, Point,
   GeocodeResult,
@@ -20,6 +20,7 @@ import { track } from './analytics';
 import { DEVICES, ROAD_TYPES, SIGN_CATEGORIES, TOOLS, TOOLS_REQUIRING_MAP } from './features/tcp/tcpCatalog';
 import { GridLines, ObjectShape } from './components/tcp/canvas/ObjectShapes';
 import { DrawingOverlays } from './components/tcp/canvas/DrawingOverlays';
+import { SpacingOverlay } from './components/tcp/canvas/SpacingOverlay';
 import { ToolButton } from './components/tcp/ui/ToolButton';
 import { SignEditorPanel } from './components/tcp/panels/SignEditorPanel';
 import { COLORS, MIN_ZOOM, MAX_ZOOM } from './features/tcp/constants';
@@ -93,6 +94,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
   const qcTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
+  const [showSpacingGuide, setShowSpacingGuide] = useState(false);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -729,6 +731,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     return [...builtIn, ...custom]
   })()
 
+  const selectedTaper = showSpacingGuide
+    ? objects.find((o): o is TaperObject => o.id === selected && o.type === 'taper') ?? null
+    : null;
+
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -1187,6 +1193,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 curvePoints={curvePoints}
                 cubicPoints={cubicPoints}
               />
+              {selectedTaper && <SpacingOverlay taper={selectedTaper} />}
             </Layer>
           </Stage>
 
@@ -1342,7 +1349,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
-              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} onAutoChannelize={handleAutoChannelize} />
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} onAutoChannelize={handleAutoChannelize} showSpacingGuide={showSpacingGuide} onToggleSpacingGuide={() => setShowSpacingGuide((v) => !v)} />
               : rightTab === "manifest"
               ? <ManifestPanel objects={objects} />
               : <QCPanel issues={qcIssues} />

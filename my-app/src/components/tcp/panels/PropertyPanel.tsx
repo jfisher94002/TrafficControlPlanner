@@ -15,9 +15,11 @@ interface PropertyPanelProps {
   planMeta: PlanMeta;
   onUpdateMeta: (meta: PlanMeta) => void;
   onAutoChannelize: (taperId: string, workZoneLengthFt: number) => void;
+  showSpacingGuide: boolean;
+  onToggleSpacingGuide: () => void;
 }
 
-export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta, onAutoChannelize }: PropertyPanelProps) {
+export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta, onAutoChannelize, showSpacingGuide, onToggleSpacingGuide }: PropertyPanelProps) {
   const [workZoneLength, setWorkZoneLength] = useState(500);
   if (!selected) {
     return (
@@ -128,6 +130,17 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => onUpdate(t.id, { rotation: +e.target.value })} />
             </label>
+            <div style={{ borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: 8, marginTop: 4 }}>
+              {sectionTitle("Spacing Guide")}
+              <div style={{ fontSize: 10, color: COLORS.textDim, marginBottom: 6 }}>
+                Show MUTCD Table 6H-3 advance warning sign distances on canvas
+              </div>
+              <button type="button"
+                style={{ ...panelBtnStyle, background: showSpacingGuide ? COLORS.info : undefined, color: showSpacingGuide ? '#fff' : undefined, width: '100%', marginBottom: 8 }}
+                onClick={onToggleSpacingGuide}>
+                {showSpacingGuide ? 'Hide Spacing Guide' : 'Show Spacing Guide'}
+              </button>
+            </div>
             <div style={{ borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: 8, marginTop: 4 }}>
               {sectionTitle("Auto-Channelize")}
               <label style={{ fontSize: 11, color: COLORS.textMuted }}>

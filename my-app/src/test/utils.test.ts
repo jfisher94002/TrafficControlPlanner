@@ -464,4 +464,45 @@ describe('autoChannelize', () => {
     const xs = signs.map((s) => s.x).sort((a, b) => b - a)
     expect(xs[0]).toBeCloseTo(1000 - 300)
   })
+
+  it('uses 600 ft spacing for speed > 65 mph', () => {
+    const taper = makeTaper({ x: 1000, y: 0, rotation: 0, speed: 70 })
+    const signs = autoChannelize(taper, 500)
+      .filter((o) => o.type === 'sign') as SignObject[]
+    // 600 ft × 3 px/ft = 1800 px
+    const xs = signs.map((s) => s.x).sort((a, b) => b - a)
+    expect(xs[0]).toBeCloseTo(1000 - 1800)
+  })
+
+  it("accounts for rotation when placing upstream signs on driver's right", () => {
+    const taper = makeTaper({ x: 400, y: 300, rotation: 90, speed: 45, laneWidth: 12, numLanes: 1 })
+    const firstSign = autoChannelize(taper, 500).find((o) => o.type === 'sign') as SignObject
+    // rotation=90°: x offset comes from lateral placement, y offset comes from upstream spacing
+    expect(firstSign.x).toBeCloseTo(400 - (12 * 1 * 3) / 2 - 30)
+    expect(firstSign.y).toBeCloseTo(300 - 600)
+  })
+
+  it('increases lateral sign offset when more lanes are closed', () => {
+    const oneLane = makeTaper({ x: 800, y: 100, rotation: 0, laneWidth: 12, numLanes: 1 })
+    const twoLanes = makeTaper({ x: 800, y: 100, rotation: 0, laneWidth: 12, numLanes: 2 })
+    const oneLaneSign = autoChannelize(oneLane, 500).find((o) => o.type === 'sign') as SignObject
+    const twoLaneSign = autoChannelize(twoLanes, 500).find((o) => o.type === 'sign') as SignObject
+    // extra lane adds half-lane-width in lateral offset (12 ft * 3 px/ft / 2 = 18 px)
+    expect(twoLaneSign.y - oneLaneSign.y).toBeCloseTo(18)
+  })
+
+  it('places downstream taper at exact merge+work+termination distance and copies key fields', () => {
+    const taper = makeTaper({ x: 250, y: 75, rotation: 0, speed: 55, laneWidth: 12, taperLength: 660, numLanes: 2 })
+    const workZoneLengthFt = 500
+    const ds = autoChannelize(taper, workZoneLengthFt).find((o) => o.type === 'taper') as TaperObject
+    const expectedTerminationLength = calcTaperLength(55, 12, 2)
+    const expectedDx = (660 + workZoneLengthFt + expectedTerminationLength) * 3
+    expect(ds.x).toBeCloseTo(250 + expectedDx)
+    expect(ds.y).toBeCloseTo(75)
+    expect(ds.speed).toBe(55)
+    expect(ds.laneWidth).toBe(12)
+    expect(ds.numLanes).toBe(2)
+    expect(ds.manualLength).toBe(false)
+    expect(ds.taperLength).toBe(expectedTerminationLength)
+  })
 })

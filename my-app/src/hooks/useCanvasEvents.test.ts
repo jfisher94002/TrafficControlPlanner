@@ -230,4 +230,75 @@ describe('useCanvasEvents null tool selections', () => {
     expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
     expect(track).not.toHaveBeenCalled()
   })
+
+  it('finalizes a polyline road on double-click when there are at least two points', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    const polyPoints: Point[] = [
+      { x: 5, y: 5 },
+      { x: 10, y: 10 },
+      { x: 15, y: 15 },
+    ]
+    const { props, mocks } = makeProps({
+      tool: 'road',
+      roadDrawMode: 'poly',
+      polyPoints,
+      objects: [],
+      lastClickTimeRef: makeRef(900),
+      lastClickPosRef: makeRef({ x: 24, y: 36 }),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0 } } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).toHaveBeenCalledTimes(1)
+    const nextObjects = mocks.setObjects.mock.calls[0][0] as CanvasObject[]
+    expect(nextObjects).toHaveLength(1)
+    expect(nextObjects[0]).toMatchObject({
+      type: 'polyline_road',
+      points: polyPoints,
+      width: ROAD_TYPE.width,
+      realWidth: ROAD_TYPE.realWidth,
+      lanes: ROAD_TYPE.lanes,
+      roadType: ROAD_TYPE.id,
+      smooth: false,
+    })
+    expect(mocks.pushHistory).toHaveBeenCalledWith(nextObjects)
+    expect(mocks.setSelected).toHaveBeenCalledWith(nextObjects[0].id)
+    expect(track).toHaveBeenCalledWith('road_drawn', {
+      road_type: ROAD_TYPE.id,
+      draw_mode: 'poly',
+      point_count: polyPoints.length,
+    })
+  })
+
+  it('appends a point instead of finalizing smooth road when not a double-click', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    const { props, mocks } = makeProps({
+      tool: 'road',
+      roadDrawMode: 'smooth',
+      polyPoints: [{ x: 5, y: 5 }, { x: 10, y: 10 }],
+      objects: [],
+      lastClickTimeRef: makeRef(500), // outside double-click threshold
+      lastClickPosRef: makeRef({ x: 24, y: 36 }),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0 } } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).not.toHaveBeenCalled()
+    expect(mocks.pushHistory).not.toHaveBeenCalled()
+    expect(mocks.setSelected).not.toHaveBeenCalled()
+    expect(track).not.toHaveBeenCalled()
+
+    const setPolyPoints = props.setPolyPoints as unknown as ReturnType<typeof vi.fn>
+    expect(setPolyPoints).toHaveBeenCalledTimes(1)
+    const updater = setPolyPoints.mock.calls[0][0] as (prev: Point[]) => Point[]
+    expect(updater([{ x: 1, y: 1 }])).toEqual([{ x: 1, y: 1 }, { x: 24, y: 36 }])
+  })
 })

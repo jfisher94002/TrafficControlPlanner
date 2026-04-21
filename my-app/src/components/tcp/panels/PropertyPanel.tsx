@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   CanvasObject, TaperObject, TurnLaneObject, LaneMaskObject, CrosswalkObject, PlanMeta,
 } from '../../../types';
@@ -13,9 +14,11 @@ interface PropertyPanelProps {
   onReorder: (id: string, dir: "front" | "forward" | "backward" | "back") => void;
   planMeta: PlanMeta;
   onUpdateMeta: (meta: PlanMeta) => void;
+  onAutoChannelize: (taperId: string, workZoneLengthFt: number) => void;
 }
 
-export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta }: PropertyPanelProps) {
+export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta, onAutoChannelize }: PropertyPanelProps) {
+  const [workZoneLength, setWorkZoneLength] = useState(500);
   if (!selected) {
     return (
       <div style={{ padding: 12 }}>
@@ -125,6 +128,23 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => onUpdate(t.id, { rotation: +e.target.value })} />
             </label>
+            <div style={{ borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: 8, marginTop: 4 }}>
+              {sectionTitle("Auto-Channelize")}
+              <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+                Work Zone Length: {workZoneLength} ft
+                <input type="range" min={100} max={5000} step={50} value={workZoneLength}
+                  style={{ width: "100%", accentColor: COLORS.accent }}
+                  onChange={(e) => setWorkZoneLength(+e.target.value)} />
+              </label>
+              <div style={{ fontSize: 10, color: COLORS.textDim, marginBottom: 6 }}>
+                Places MUTCD Table 6H-3 advance warning signs + downstream taper
+              </div>
+              <button type="button"
+                style={{ ...panelBtnStyle, background: COLORS.accent, color: '#fff', width: '100%' }}
+                onClick={() => onAutoChannelize(t.id, workZoneLength)}>
+                Auto-Channelize
+              </button>
+            </div>
           </div>
         );
       })()}

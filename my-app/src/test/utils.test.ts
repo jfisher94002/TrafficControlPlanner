@@ -12,8 +12,9 @@ import {
   geocodeAddress,
   calcTaperLength,
   cloneObject,
+  autoChannelize,
 } from '../utils'
-import type { CanvasObject, GeocodeResult } from '../types'
+import type { CanvasObject, GeocodeResult, TaperObject, SignObject } from '../types'
 
 // ─── dist ─────────────────────────────────────────────────────────────────────
 describe('dist', () => {
@@ -388,5 +389,106 @@ describe('sampleCubicBezier', () => {
     const pts = sampleCubicBezier(a, b, c, d, 2)
     expect(pts[1].y).toBeCloseTo(0)
     expect(pts[1].x).toBeCloseTo(50)
+  })
+})
+
+// ─── autoChannelize ───────────────────────────────────────────────────────────
+describe('autoChannelize', () => {
+  function makeTaper(overrides: Partial<TaperObject> = {}): TaperObject {
+    return {
+      id: 'taper-1',
+      type: 'taper',
+      x: 500,
+      y: 300,
+      rotation: 0,
+      laneWidth: 12,
+      speed: 45,
+      taperLength: 405,
+      manualLength: false,
+      numLanes: 1,
+      ...overrides,
+    }
+  }
+
+  it('returns 4 objects: 3 advance warning signs + 1 downstream taper', () => {
+    const result = autoChannelize(makeTaper(), 500)
+    expect(result).toHaveLength(4)
+    expect(result.filter((o) => o.type === 'sign')).toHaveLength(3)
+    expect(result.filter((o) => o.type === 'taper')).toHaveLength(1)
+  })
+
+  it('places signs with unique ids', () => {
+    const result = autoChannelize(makeTaper(), 500)
+    const ids = result.map((o) => o.id)
+    expect(new Set(ids).size).toBe(4)
+  })
+
+  it('places advance signs in MUTCD sequence: ONE LANE RD → ROAD WORK → WORK AHEAD', () => {
+    const taper = makeTaper({ x: 1000, y: 0, rotation: 0 })
+    const signs = autoChannelize(taper, 500).filter((o) => o.type === 'sign') as SignObject[]
+    // Sorted nearest to farthest from taper
+    const sorted = [...signs].sort((a, b) => b.x - a.x)
+    expect(sorted.map((s) => s.signData.label)).toEqual(['ONE LANE RD', 'ROAD WORK', 'WORK AHEAD'])
+    expect(sorted.map((s) => s.signData.shape)).toEqual(['rect', 'diamond', 'diamond'])
+    expect(sorted.map((s) => s.signData.mutcd)).toEqual(['W20-4a', 'W20-1', 'W20-1'])
+  })
+
+  it('places advance signs upstream (lower x) of the taper for rotation=0', () => {
+    const taper = makeTaper({ x: 500, y: 300, rotation: 0 })
+    const signs = autoChannelize(taper, 500).filter((o) => o.type === 'sign') as SignObject[]
+    for (const sign of signs) {
+      expect(sign.x).toBeLessThan(taper.x)
+    }
+  })
+
+  it('places advance signs upstream of the taper for rotation=90°', () => {
+    // rotation=90 (clockwise) → forward is downward (+y), upstream is upward (-y)
+    // lateral offset (local +y) maps to world leftward (-x)
+    const taper = makeTaper({ x: 500, y: 500, rotation: 90 })
+    const signs = autoChannelize(taper, 500).filter((o) => o.type === 'sign') as SignObject[]
+    for (const sign of signs) {
+      expect(sign.y).toBeLessThan(taper.y) // upstream = above
+      expect(sign.x).toBeLessThan(taper.x) // right-of-road = leftward for downward travel
+    }
+  })
+
+  it.each([
+    [30, 100],
+    [35, 100],
+    [36, 200],
+    [45, 200],
+    [46, 350],
+    [55, 350],
+    [56, 500],
+    [65, 500],
+    [66, 600],
+    [75, 600],
+  ])('uses %i mph → %i ft MUTCD sign spacing', (speed, expectedFt) => {
+    const taper = makeTaper({ x: 3000, y: 0, rotation: 0, speed })
+    const signs = autoChannelize(taper, 500).filter((o) => o.type === 'sign') as SignObject[]
+    const xs = signs.map((s) => s.x).sort((a, b) => b - a)
+    // Gap between consecutive signs should equal spacingFt × 3 px/ft
+    expect(xs[0] - xs[1]).toBeCloseTo(expectedFt * 3)
+    expect(xs[1] - xs[2]).toBeCloseTo(expectedFt * 3)
+  })
+
+  it('places downstream taper to the right of the work zone for rotation=0', () => {
+    const taper = makeTaper({ x: 500, y: 300, rotation: 0, taperLength: 405 })
+    const ds = autoChannelize(taper, 500).find((o) => o.type === 'taper') as TaperObject
+    expect(ds.x).toBeGreaterThan(taper.x)
+    expect(ds.taperLength).toBeCloseTo(calcTaperLength(taper.speed, taper.laneWidth, taper.numLanes))
+    expect(ds.laneWidth).toBe(taper.laneWidth)
+    expect(ds.numLanes).toBe(taper.numLanes)
+    expect(ds.manualLength).toBe(false)
+  })
+
+  it('downstream taper rotation is 180° offset from merge taper', () => {
+    const taper = makeTaper({ rotation: 45 })
+    const ds = autoChannelize(taper, 500).find((o) => o.type === 'taper') as TaperObject
+    expect(ds.rotation).toBe(225)
+    expect(ds.taperLength).toBeCloseTo(calcTaperLength(taper.speed, taper.laneWidth, taper.numLanes))
+    expect(ds.laneWidth).toBe(taper.laneWidth)
+    expect(ds.numLanes).toBe(taper.numLanes)
+    expect(ds.manualLength).toBe(false)
   })
 })

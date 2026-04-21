@@ -3,6 +3,7 @@ import type {
   SignObject, DeviceObject, ZoneObject, TextObject, TaperObject, TurnLaneObject,
   StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ArrowObject, MeasureObject, LaneMaskObject, CrosswalkObject,
 } from './types'
+import { TAPER_SCALE, SIGN_LATERAL_CLEARANCE_PX } from './features/tcp/constants'
 
 // ─── CLONE / DUPLICATE ────────────────────────────────────────────────────────
 
@@ -73,6 +74,94 @@ export function calcTaperLength(speed: number, laneWidth: number, numLanes: numb
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
+
+// ─── AUTO-CHANNELIZATION ──────────────────────────────────────────────────────
+
+/** MUTCD Table 6H-3: advance warning sign spacing by posted speed. */
+function mutcdSignSpacingFt(speedMph: number): number {
+  if (speedMph <= 35) return 100
+  if (speedMph <= 45) return 200
+  if (speedMph <= 55) return 350
+  if (speedMph <= 65) return 500
+  return 600
+}
+
+/**
+ * Generate MUTCD-compliant work zone objects for a lane closure.
+ *
+ * Places 3 advance warning signs upstream of the taper at Table 6H-3 spacing,
+ * plus a downstream (termination) taper at the far end of the work zone.
+ * All returned objects are normal canvas objects the user can move/edit.
+ *
+ * @param taper           The merge taper already on canvas
+ * @param workZoneLengthFt Length of the work zone in feet (between tapers)
+ * @returns New CanvasObject[] to push onto the canvas
+ */
+export function autoChannelize(taper: TaperObject, workZoneLengthFt: number): CanvasObject[] {
+  const spacingPx = mutcdSignSpacingFt(taper.speed) * TAPER_SCALE
+  const rotRad = (taper.rotation * Math.PI) / 180
+
+  const totalWidthPx = taper.laneWidth * taper.numLanes * TAPER_SCALE
+  const hw = totalWidthPx / 2
+  // Place signs to the right of the road (driver's right when approaching taper)
+  const lateralOffsetPx = hw + SIGN_LATERAL_CLEARANCE_PX
+
+  /** Convert local taper-space (lx, ly) → world canvas coords. */
+  function toWorld(lx: number, ly: number): { x: number; y: number } {
+    return {
+      x: taper.x + lx * Math.cos(rotRad) - ly * Math.sin(rotRad),
+      y: taper.y + lx * Math.sin(rotRad) + ly * Math.cos(rotRad),
+    }
+  }
+
+  // Advance warning signs — nearest to farthest from the taper
+  const advanceSigns = [
+    { id: 'onelane',   label: 'ONE LANE RD', shape: 'rect'   , color: '#f97316', textColor: '#111', mutcd: 'W20-4a' },
+    { id: 'roadwork',  label: 'ROAD WORK',   shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'  },
+    { id: 'workahead', label: 'WORK AHEAD',  shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'  },
+  ] as const
+
+  const result: CanvasObject[] = []
+
+  advanceSigns.forEach((signData, i) => {
+    const pos = toWorld(-(i + 1) * spacingPx, lateralOffsetPx)
+    result.push({
+      id: uid(),
+      type: 'sign',
+      x: pos.x,
+      y: pos.y,
+      rotation: taper.rotation,
+      scale: 1,
+      signData: { ...signData },
+    } as SignObject)
+  })
+
+  // Downstream (termination) taper at the far end of the work zone.
+  // We place its origin at (taperLengthPx + workZonePx + dsTaperLengthPx) in
+  // local space with rotation+180 so the wide end faces away from the work zone
+  // and the narrow end abuts the work zone boundary.
+  const dsTaperLengthFt = calcTaperLength(taper.speed, taper.laneWidth, taper.numLanes)
+  const dsTaperLengthPx = dsTaperLengthFt * TAPER_SCALE
+  const mergeTaperPx = taper.taperLength * TAPER_SCALE
+  const workZonePx = workZoneLengthFt * TAPER_SCALE
+  const dsLocalX = mergeTaperPx + workZonePx + dsTaperLengthPx
+  const dsPos = toWorld(dsLocalX, 0)
+
+  result.push({
+    id: uid(),
+    type: 'taper',
+    x: dsPos.x,
+    y: dsPos.y,
+    rotation: (taper.rotation + 180) % 360,
+    laneWidth: taper.laneWidth,
+    speed: taper.speed,
+    taperLength: dsTaperLengthFt,
+    manualLength: false,
+    numLanes: taper.numLanes,
+  } as TaperObject)
+
+  return result
+}
 
 export const dist = (x1: number, y1: number, x2: number, y2: number) =>
   Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)

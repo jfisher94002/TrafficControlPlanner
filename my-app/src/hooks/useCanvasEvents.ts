@@ -183,7 +183,7 @@ export function useCanvasEvents({
       const hit = hitTest(raw.x, raw.y);
       if (hit) {
         const newObjs = objects.filter((o) => o.id !== hit.id);
-        setObjects(newObjs); pushHistory(newObjs); setSelected(null);
+        pushHistory(newObjs); setSelected(null);
       }
       return;
     }
@@ -192,7 +192,7 @@ export function useCanvasEvents({
       if (!selectedSign) return;
       const newSign: SignObject = { id: uid(), type: "sign", x: raw.x, y: raw.y, signData: selectedSign, rotation: 0, scale: 1 };
       const newObjs = [...objects, newSign];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newSign.id);
+      pushHistory(newObjs); setSelected(newSign.id);
       const isCustom = selectedSign.id.startsWith('custom_');
       track('sign_placed', { sign_id: selectedSign.id, sign_source: isCustom ? 'custom' : 'builtin', ...(isCustom ? {} : { sign_label: selectedSign.label }) });
       return;
@@ -202,7 +202,7 @@ export function useCanvasEvents({
       if (!selectedDevice) return;
       const newDev: DeviceObject = { id: uid(), type: "device", x: raw.x, y: raw.y, deviceData: selectedDevice, rotation: 0 };
       const newObjs = [...objects, newDev];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newDev.id);
+      pushHistory(newObjs); setSelected(newDev.id);
       return;
     }
 
@@ -210,14 +210,14 @@ export function useCanvasEvents({
       const speed = 45, laneWidth = 12;
       const newTaper: TaperObject = { id: uid(), type: "taper", x: raw.x, y: raw.y, rotation: 0, speed, laneWidth, taperLength: calcTaperLength(speed, laneWidth), manualLength: false, numLanes: 1 };
       const newObjs = [...objects, newTaper];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newTaper.id);
+      pushHistory(newObjs); setSelected(newTaper.id);
       return;
     }
 
     if (tool === "turn_lane") {
       const newTL: TurnLaneObject = { id: uid(), type: "turn_lane", x: raw.x, y: raw.y, rotation: 0, laneWidth: 20, taperLength: 80, runLength: 100, side: 'right', turnDir: 'right' };
       const newObjs = [...objects, newTL];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newTL.id);
+      pushHistory(newObjs); setSelected(newTL.id);
       return;
     }
 
@@ -226,7 +226,7 @@ export function useCanvasEvents({
       if (textVal) {
         const newText = { id: uid(), type: "text" as const, x: raw.x, y: raw.y, text: textVal, fontSize: 14, bold: false, color: "#ffffff" };
         const newObjs = [...objects, newText];
-        setObjects(newObjs); pushHistory(newObjs); setSelected(newText.id);
+        pushHistory(newObjs); setSelected(newText.id);
       }
       return;
     }
@@ -243,7 +243,7 @@ export function useCanvasEvents({
         if (isDouble && polyPoints.length >= 2) {
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         } else {
           setPolyPoints((prev) => [...prev, { x, y }]);
@@ -256,7 +256,7 @@ export function useCanvasEvents({
         if (newCurvePts.length === 3) {
           const newRoad: CurveRoadObject = { id: uid(), type: "curve_road", points: newCurvePts as [Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCurvePoints([]);
+          pushHistory(newObjs); setSelected(newRoad.id); setCurvePoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'curve', point_count: 3 });
         } else { setCurvePoints(newCurvePts); }
         return;
@@ -267,7 +267,7 @@ export function useCanvasEvents({
         if (newCubicPts.length === 4) {
           const newRoad: CubicBezierRoadObject = { id: uid(), type: "cubic_bezier_road", points: newCubicPts as [Point, Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
-          setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
+          pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'cubic', point_count: 4 });
         } else { setCubicPoints(newCubicPts); }
         return;
@@ -277,7 +277,7 @@ export function useCanvasEvents({
     if (tool === "intersection") {
       const roads = createIntersectionRoads(x, y, intersectionType, selectedRoadType);
       const newObjs = [...objects, ...roads];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
+      pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
       track('road_drawn', { road_type: selectedRoadType.id, draw_mode: intersectionType === '4way' ? 'intersection_4way' : 'intersection_t' });
       return;
     }
@@ -366,7 +366,7 @@ export function useCanvasEvents({
       if (d < 5) { setDrawStart(null); return; }
       const newRoad: StraightRoadObject = { id: uid(), type: "road", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
       const newObjs = [...objects, newRoad];
-      setObjects(newObjs); pushHistory(newObjs); setSelected(newRoad.id);
+      pushHistory(newObjs); setSelected(newRoad.id);
       track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'straight' });
       setDrawStart(null);
       return;
@@ -390,7 +390,7 @@ export function useCanvasEvents({
       }
       if (newObj) {
         const newObjs = [...objects, newObj];
-        setObjects(newObjs); pushHistory(newObjs); setSelected(newObj.id);
+        pushHistory(newObjs); setSelected(newObj.id);
       }
       setDrawStart(null);
     }

@@ -182,8 +182,8 @@ describe('useCanvasEvents null tool selections', () => {
       result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
     })
 
-    expect(mocks.setObjects).toHaveBeenCalledTimes(1)
-    const nextObjects = mocks.setObjects.mock.calls[0][0] as CanvasObject[]
+    expect(mocks.pushHistory).toHaveBeenCalledTimes(1)
+    const nextObjects = mocks.pushHistory.mock.calls[0][0] as CanvasObject[]
     expect(nextObjects).toHaveLength(1)
     expect(nextObjects[0]).toMatchObject({
       type: 'road',
@@ -197,7 +197,7 @@ describe('useCanvasEvents null tool selections', () => {
       roadType: ROAD_TYPE.id,
     })
     expect(nextObjects[0].id).toEqual(expect.any(String))
-    expect(mocks.pushHistory).toHaveBeenCalledWith(nextObjects)
+    expect(mocks.setObjects).not.toHaveBeenCalled()
     expect(mocks.setSelected).toHaveBeenCalledWith(nextObjects[0].id)
     expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
     expect(track).toHaveBeenCalledWith('road_drawn', {

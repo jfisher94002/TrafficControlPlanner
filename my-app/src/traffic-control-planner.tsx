@@ -373,7 +373,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const newPlan = () => {
     if (objects.length > 0 && !confirm("Start a new plan? Unsaved changes will be lost.")) return;
     localStorage.removeItem(AUTOSAVE_KEY);
-    pushHistory([]); setSelected(null);
+    resetHistory([]); setSelected(null);
     setPlanTitle("Untitled Traffic Control Plan");
     setPlanId(uid());
     setPlanCreatedAt(new Date().toISOString());
@@ -661,7 +661,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (plan.canvasOffset) setOffset(plan.canvasOffset as Point);
         if (plan.canvasZoom) setZoom(plan.canvasZoom as number);
         const loaded: CanvasObject[] = (plan.canvasState as { objects?: CanvasObject[] } | undefined)?.objects || [];
-        pushHistory(loaded); setSelected(null);
+        resetHistory(loaded); setSelected(null);
         setLastKnownUpdatedAt(null); // local file load has no cloud version token
         const wasV1NoMap = (detectSchemaVersion(plan) === 1) && (rawMC == null || rawLon == null);
         setV1NoMapBanner(wasV1NoMap);

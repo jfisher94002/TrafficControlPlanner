@@ -136,6 +136,7 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
                 Show MUTCD Table 6H-3 advance warning sign distances on canvas
               </div>
               <button type="button"
+                aria-pressed={showSpacingGuide}
                 style={{ ...panelBtnStyle, background: showSpacingGuide ? COLORS.info : undefined, color: showSpacingGuide ? '#fff' : undefined, width: '100%', marginBottom: 8 }}
                 onClick={onToggleSpacingGuide}>
                 {showSpacingGuide ? 'Hide Spacing Guide' : 'Show Spacing Guide'}

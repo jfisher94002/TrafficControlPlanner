@@ -1,15 +1,7 @@
 import { Group, Line, Text, Circle } from 'react-konva';
 import type { TaperObject } from '../../../types';
 import { TAPER_SCALE, SIGN_LATERAL_CLEARANCE_PX } from '../../../features/tcp/constants';
-
-/** MUTCD Table 6H-3 advance warning sign spacing by speed. */
-function mutcdSpacingFt(speed: number): number {
-  if (speed <= 35) return 100;
-  if (speed <= 45) return 200;
-  if (speed <= 55) return 350;
-  if (speed <= 65) return 500;
-  return 600;
-}
+import { mutcdSignSpacingFt } from '../../../utils';
 
 const SIGN_SEQUENCE = [
   { label: 'ONE LANE RD', mutcd: 'W20-4a' },
@@ -17,20 +9,21 @@ const SIGN_SEQUENCE = [
   { label: 'WORK AHEAD',  mutcd: 'W20-1'  },
 ] as const;
 
-const GUIDE_COLOR  = 'rgba(99,179,237,0.75)';
-const LABEL_COLOR  = 'rgba(99,179,237,0.95)';
-const SIGN_COLOR   = 'rgba(249,115,22,0.9)';
+const GUIDE_COLOR = 'rgba(99,179,237,0.75)';
+const LABEL_COLOR = 'rgba(99,179,237,0.95)';
+const SIGN_COLOR  = 'rgba(249,115,22,0.9)';
 
 interface SpacingOverlayProps {
   taper: TaperObject;
 }
 
 export function SpacingOverlay({ taper }: SpacingOverlayProps) {
-  const spacingFt = mutcdSpacingFt(taper.speed);
+  const spacingFt = mutcdSignSpacingFt(taper.speed);
   const spacingPx = spacingFt * TAPER_SCALE;
   const hw = (taper.laneWidth * taper.numLanes * TAPER_SCALE) / 2;
   const lineHalfLen = hw + 90;
-  const signDotX = hw + SIGN_LATERAL_CLEARANCE_PX;
+  // Lateral (y-axis in taper-local space) offset to the expected sign position
+  const signDotY = hw + SIGN_LATERAL_CLEARANCE_PX;
 
   return (
     <Group x={taper.x} y={taper.y} rotation={taper.rotation} listening={false}>
@@ -79,10 +72,10 @@ export function SpacingOverlay({ taper }: SpacingOverlayProps) {
               listening={false}
             />
 
-            {/* Dot at the expected sign position (right of road) */}
+            {/* Dot at the expected sign position — lateral offset (y) in taper-local space */}
             <Circle
-              x={signDotX}
-              y={0}
+              x={0}
+              y={signDotY}
               radius={5}
               fill={GUIDE_COLOR}
               stroke="rgba(255,255,255,0.5)"
@@ -90,7 +83,7 @@ export function SpacingOverlay({ taper }: SpacingOverlayProps) {
               listening={false}
             />
 
-            {/* Tick at road edge */}
+            {/* Tick marks at road edges */}
             <Line
               points={[0, -hw - 6, 0, -hw + 6]}
               stroke={GUIDE_COLOR}

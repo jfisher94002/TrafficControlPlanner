@@ -731,6 +731,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     return [...builtIn, ...custom]
   })()
 
+  const selectedTaper = showSpacingGuide
+    ? objects.find((o): o is TaperObject => o.id === selected && o.type === 'taper') ?? null
+    : null;
+
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -1189,10 +1193,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 curvePoints={curvePoints}
                 cubicPoints={cubicPoints}
               />
-              {showSpacingGuide && (() => {
-                const taper = objects.find((o) => o.id === selected && o.type === 'taper');
-                return taper ? <SpacingOverlay taper={taper as TaperObject} /> : null;
-              })()}
+              {selectedTaper && <SpacingOverlay taper={selectedTaper} />}
             </Layer>
           </Stage>
 

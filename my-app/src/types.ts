@@ -243,6 +243,15 @@ export interface MapCenter {
 
 // ─── INTERNAL UI TYPES ────────────────────────────────────────────────────────
 
+export interface GroupOrig {
+  id: string;
+  ox?: number;
+  oy?: number;
+  ox2?: number;
+  oy2?: number;
+  origPoints?: Point[] | null;
+}
+
 export interface DrawStart {
   x: number;
   y: number;
@@ -251,6 +260,8 @@ export interface DrawStart {
   id?: string;
   origPoints?: Point[] | null;
   handleIndex?: number | null; // index of the handle being dragged (cubic bezier only)
+  groupOrigPositions?: GroupOrig[];
+  isMarquee?: boolean;
 }
 
 export interface PanStart {

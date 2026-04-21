@@ -98,6 +98,77 @@ describe('Undo/Redo', () => {
     expect(within(rightPanel).getByText(/Plan Info/i)).toBeInTheDocument()
     expect(screen.queryByText(/sign Properties/i)).not.toBeInTheDocument()
   })
+
+  it('new plan resets history so undo/redo cannot restore the previous canvas', async () => {
+    const { user } = setup()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+
+    await user.click(screen.getByRole('button', { name: /^new$/i }))
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+
+    await user.click(screen.getByTestId('redo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+  })
+
+  it('loading a local plan resets history so undo/redo cannot restore pre-load objects', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+
+    const loadedPlan = {
+      id: 'loaded-plan-id',
+      name: 'Loaded Local Plan',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      canvasState: { objects: [] },
+      metadata: { projectNumber: '', client: '', location: '', notes: '' },
+      canvasOffset: { x: 0, y: 0 },
+      canvasZoom: 1,
+    }
+
+    const OriginalFileReader = globalThis.FileReader
+    class MockFileReader {
+      onload: ((evt: ProgressEvent<FileReader>) => void) | null = null
+      result: string | ArrayBuffer | null = null
+
+      readAsText() {
+        this.result = JSON.stringify(loadedPlan)
+        this.onload?.({ target: this } as unknown as ProgressEvent<FileReader>)
+      }
+    }
+
+    ;(globalThis as unknown as { FileReader: typeof FileReader }).FileReader =
+      MockFileReader as unknown as typeof FileReader
+
+    try {
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null
+      expect(fileInput).not.toBeNull()
+      fireEvent.change(fileInput!, {
+        target: {
+          files: [new File(['{}'], 'loaded.tcp.json', { type: 'application/json' })],
+        },
+      })
+
+      await waitFor(() => expect(screen.getByTestId('plan-title')).toHaveValue('Loaded Local Plan'))
+      expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+
+      await user.click(screen.getByTestId('undo-button'))
+      expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+
+      await user.click(screen.getByTestId('redo-button'))
+      expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+    } finally {
+      ;(globalThis as unknown as { FileReader: typeof FileReader }).FileReader = OriginalFileReader
+    }
+  })
 })
 
 // ─── Plan metadata ────────────────────────────────────────────────────────────

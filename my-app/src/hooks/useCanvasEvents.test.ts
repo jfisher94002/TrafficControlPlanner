@@ -332,6 +332,122 @@ describe('useCanvasEvents multi-select', () => {
     expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
   })
 
+  it('clicking an already-selected object in a multi-selection starts group drag', () => {
+    const a: CanvasObject = { id: 'a', type: 'sign', x: 10, y: 10, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const b: CanvasObject = { id: 'b', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [a, b],
+      selectedIds: ['a', 'b'],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0, shiftKey: false } } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setSelectedIds).not.toHaveBeenCalledWith(['b'])
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'b',
+        groupOrigPositions: expect.arrayContaining([
+          expect.objectContaining({ id: 'a', ox: 10, oy: 10 }),
+          expect.objectContaining({ id: 'b', ox: 24, oy: 36 }),
+        ]),
+      })
+    )
+  })
+
+  it('marquee mousemove updates marquee rectangle with normalized bounds', () => {
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      drawStart: { x: 50, y: 60, isMarquee: true },
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 20, y: 100 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseMove({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setMarquee).toHaveBeenCalledWith({ x: 20, y: 60, w: 30, h: 40 })
+  })
+
+  it('group drag mousemove updates all selected objects from stored origins', () => {
+    const sign: CanvasObject = { id: 'sign-1', type: 'sign', x: 10, y: 10, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const road: CanvasObject = { id: 'road-1', type: 'road', x1: 0, y1: 0, x2: 12, y2: 4, width: 28, realWidth: 24, lanes: 2, roadType: 'local' }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign, road],
+      drawStart: {
+        x: 10,
+        y: 10,
+        id: 'sign-1',
+        groupOrigPositions: [
+          { id: 'sign-1', ox: 10, oy: 10 },
+          { id: 'road-1', ox: 0, oy: 0, ox2: 12, oy2: 4 },
+        ],
+      },
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 15, y: 18 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseMove({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).toHaveBeenCalledTimes(1)
+    const updater = mocks.setObjects.mock.calls[0][0]
+    const updated = typeof updater === 'function' ? updater([sign, road]) : updater
+    expect(updated).toEqual([
+      expect.objectContaining({ id: 'sign-1', x: 15, y: 18 }),
+      expect.objectContaining({ id: 'road-1', x1: 5, y1: 8, x2: 17, y2: 12 }),
+    ])
+  })
+
+  it('marquee mouseup includes line and multipoint roads based on representative center', () => {
+    const inRoad: CanvasObject = { id: 'in-road', type: 'road', x1: 10, y1: 10, x2: 90, y2: 90, width: 28, realWidth: 24, lanes: 2, roadType: 'local' }
+    const inPolyline: CanvasObject = {
+      id: 'in-poly',
+      type: 'polyline_road',
+      points: [{ x: 30, y: 20 }, { x: 40, y: 30 }, { x: 50, y: 40 }],
+      width: 28,
+      realWidth: 24,
+      lanes: 2,
+      roadType: 'local',
+      smooth: false,
+    }
+    const outRoad: CanvasObject = { id: 'out-road', type: 'road', x1: 200, y1: 200, x2: 260, y2: 260, width: 28, realWidth: 24, lanes: 2, roadType: 'local' }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [inRoad, inPolyline, outRoad],
+      drawStart: { x: 0, y: 0, isMarquee: true },
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 100, y: 100 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setSelectedIds).toHaveBeenCalledWith(['in-road', 'in-poly'])
+    expect(mocks.setMarquee).toHaveBeenCalledWith(null)
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+  })
+
   it('non-shift click on a new object replaces the selection', () => {
     const sign: CanvasObject = { id: 'new-sign', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
     const { props, mocks } = makeProps({

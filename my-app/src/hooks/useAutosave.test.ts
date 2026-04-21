@@ -64,7 +64,7 @@ describe('useAutosave', () => {
       userId: 'user-42',
       canvasZoom: 1.25,
       canvasOffset: { x: 12, y: 34 },
-      metadata: { projectNumber: 'TCP-123', client: 'City DOT' },
+      metadata: { projectNumber: 'TCP-123', client: 'City DOT', location: 'Main St', notes: 'Night work' },
       mapCenter: { lat: 37.77, lon: -122.41, zoom: 14 },
     })
     expect(saved.canvasState.objects).toHaveLength(2)

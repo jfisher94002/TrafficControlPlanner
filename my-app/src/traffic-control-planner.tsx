@@ -240,7 +240,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       if (e.key === 'Tab') {
         const modal = addrModalGoRef.current?.closest('[data-testid="address-required-modal"]');
         if (!modal) return;
-        const focusable = Array.from(modal.querySelectorAll<HTMLElement>('button,input,[tabindex]:not([tabindex="-1"])'));
+        const focusable = Array.from(modal.querySelectorAll<HTMLElement>('a[href],area[href],button,input,select,textarea,iframe,[tabindex]:not([tabindex="-1"])'));
         if (!focusable.length) return;
         const first = focusable[0], last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }

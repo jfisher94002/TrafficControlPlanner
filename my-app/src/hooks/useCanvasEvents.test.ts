@@ -163,6 +163,7 @@ describe('useCanvasEvents null tool selections', () => {
     expect(mocks.setObjects).not.toHaveBeenCalled()
     expect(mocks.pushHistory).not.toHaveBeenCalled()
     expect(mocks.setSelected).not.toHaveBeenCalled()
+    expect(track).not.toHaveBeenCalled()
   })
 
   it('creates a straight road on mouse up when drag distance is sufficient', () => {

@@ -132,12 +132,22 @@ def test_rate_limit_scoped_per_ip(monkeypatch, valid_issue):
 
 def test_rate_limit_window_allows_after_expiry(monkeypatch, valid_issue):
     """Old hits outside the 1-hour window should no longer count."""
+    import main as main_module
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-    headers = {"x-forwarded-for": "192.0.2.44"}
-    # Seed three old hits; at time 4605 they're all outside the rolling window.
-    with patch("main.time.time", return_value=4605):
-        import main
-        main._ip_submissions["192.0.2.44"] = [1000, 1001, 1002]
+    headers = {"x-forwarded-for": "192.0.2.55"}
+    # Clear any state from previous tests for this IP.
+    main_module._ip_submissions.pop("192.0.2.55", None)
+    # Simulate 3 requests at t=1000,1001,1002 then a 4th at t=4605 (>1h later).
+    # The 4th should be allowed past the rate limiter (returns 503 because GITHUB_TOKEN
+    # is unset, not 429 which would mean still rate-limited).
+    # Use itertools.chain so extra calls (middleware, logging) don't exhaust the
+    # iterator and raise StopIteration → RuntimeError inside an async context.
+    import itertools
+    times_iter = itertools.chain([1000, 1001, 1002, 4605], itertools.repeat(4605))
+
+    with patch("main.time.time", side_effect=lambda: next(times_iter)):
+        for _ in range(3):
+            client.post("/create-issue", json=valid_issue, headers=headers)
         res = client.post("/create-issue", json=valid_issue, headers=headers)
         assert res.status_code == 503
 

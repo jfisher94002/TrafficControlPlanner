@@ -51,7 +51,8 @@ function makeRef<T>(value: T): React.RefObject<T> {
 
 function makeProps(overrides: Partial<CanvasEventsProps> = {}) {
   const setObjects = vi.fn()
-  const setSelected = vi.fn()
+  const setSelectedIds = vi.fn()
+  const setMarquee = vi.fn()
   const setZoom = vi.fn()
   const setOffset = vi.fn()
   const setMapCenter = vi.fn()
@@ -71,7 +72,7 @@ function makeProps(overrides: Partial<CanvasEventsProps> = {}) {
     intersectionType: '4way',
     snapEnabled: false,
     objects: [],
-    selected: null,
+    selectedIds: [],
     zoom: 1,
     offset: { x: 0, y: 0 },
     mapCenter: null,
@@ -90,7 +91,8 @@ function makeProps(overrides: Partial<CanvasEventsProps> = {}) {
     lastClickTimeRef: makeRef(0),
     lastClickPosRef: makeRef<Point | null>(null),
     setObjects: setObjects as unknown as React.Dispatch<React.SetStateAction<CanvasObject[]>>,
-    setSelected: setSelected as unknown as React.Dispatch<React.SetStateAction<string | null>>,
+    setSelectedIds: setSelectedIds as unknown as React.Dispatch<React.SetStateAction<string[]>>,
+    setMarquee: setMarquee as unknown as React.Dispatch<React.SetStateAction<{ x: number; y: number; w: number; h: number } | null>>,
     setZoom: setZoom as unknown as React.Dispatch<React.SetStateAction<number>>,
     setOffset: setOffset as unknown as React.Dispatch<React.SetStateAction<Point>>,
     setMapCenter: setMapCenter as unknown as React.Dispatch<React.SetStateAction<MapCenter | null>>,
@@ -110,7 +112,8 @@ function makeProps(overrides: Partial<CanvasEventsProps> = {}) {
     props,
     mocks: {
       setObjects,
-      setSelected,
+      setSelectedIds,
+      setMarquee,
       setDrawStart,
       setSnapIndicator,
       setCursorPos,
@@ -141,7 +144,7 @@ describe('useCanvasEvents null tool selections', () => {
     expect(mocks.setSnapIndicator).toHaveBeenCalledWith(null)
     expect(mocks.setObjects).not.toHaveBeenCalled()
     expect(mocks.pushHistory).not.toHaveBeenCalled()
-    expect(mocks.setSelected).not.toHaveBeenCalled()
+    expect(mocks.setSelectedIds).not.toHaveBeenCalled()
     expect(track).not.toHaveBeenCalled()
   })
 
@@ -162,7 +165,7 @@ describe('useCanvasEvents null tool selections', () => {
     expect(mocks.setSnapIndicator).toHaveBeenCalledWith(null)
     expect(mocks.setObjects).not.toHaveBeenCalled()
     expect(mocks.pushHistory).not.toHaveBeenCalled()
-    expect(mocks.setSelected).not.toHaveBeenCalled()
+    expect(mocks.setSelectedIds).not.toHaveBeenCalled()
     expect(track).not.toHaveBeenCalled()
   })
 
@@ -199,7 +202,7 @@ describe('useCanvasEvents null tool selections', () => {
     })
     expect(nextObjects[0].id).toEqual(expect.any(String))
     expect(mocks.setObjects).not.toHaveBeenCalled()
-    expect(mocks.setSelected).toHaveBeenCalledWith(nextObjects[0].id)
+    expect(mocks.setSelectedIds).toHaveBeenCalledWith([nextObjects[0].id])
     expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
     expect(track).toHaveBeenCalledWith('road_drawn', {
       road_type: ROAD_TYPE.id,
@@ -226,8 +229,220 @@ describe('useCanvasEvents null tool selections', () => {
 
     expect(mocks.setObjects).not.toHaveBeenCalled()
     expect(mocks.pushHistory).not.toHaveBeenCalled()
-    expect(mocks.setSelected).not.toHaveBeenCalled()
+    expect(mocks.setSelectedIds).not.toHaveBeenCalled()
     expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
     expect(track).not.toHaveBeenCalled()
+  })
+})
+
+describe('useCanvasEvents multi-select', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('clicking empty canvas clears selectedIds and starts a marquee drawStart', () => {
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [],
+      selectedIds: ['existing-id'],
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0, shiftKey: false } } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setSelectedIds).toHaveBeenCalledWith([])
+    expect(mocks.setMarquee).toHaveBeenCalledWith(null)
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(
+      expect.objectContaining({ isMarquee: true })
+    )
+  })
+
+  it('shift-click adds a hit object to the selection without clearing others', () => {
+    const sign: CanvasObject = { id: 'sign-1', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign],
+      selectedIds: ['other-id'],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0, shiftKey: true } } as KonvaEventObject<MouseEvent>)
+    })
+
+    // Should have called setSelectedIds with a function (updater) that adds sign-1
+    expect(mocks.setSelectedIds).toHaveBeenCalledTimes(1)
+    const updater = mocks.setSelectedIds.mock.calls[0][0]
+    const result2 = typeof updater === 'function' ? updater(['other-id']) : updater
+    expect(result2).toContain('sign-1')
+    expect(result2).toContain('other-id')
+  })
+
+  it('shift-click removes an already-selected object from the selection', () => {
+    const sign: CanvasObject = { id: 'sign-1', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign],
+      selectedIds: ['sign-1', 'other-id'],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0, shiftKey: true } } as KonvaEventObject<MouseEvent>)
+    })
+
+    const updater = mocks.setSelectedIds.mock.calls[0][0]
+    const result2 = typeof updater === 'function' ? updater(['sign-1', 'other-id']) : updater
+    expect(result2).not.toContain('sign-1')
+    expect(result2).toContain('other-id')
+  })
+
+  it('marquee mouseup selects objects whose center is inside the rect', () => {
+    const inSign: CanvasObject = { id: 'in-sign', type: 'sign', x: 50, y: 50, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const outSign: CanvasObject = { id: 'out-sign', type: 'sign', x: 200, y: 200, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [inSign, outSign],
+      drawStart: { x: 0, y: 0, isMarquee: true },
+      stageRef: makeRef({
+        // mouseup at world (100, 100) — marquee covers (0,0)→(100,100)
+        getPointerPosition: () => ({ x: 100, y: 100 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setSelectedIds).toHaveBeenCalledWith(['in-sign'])
+    expect(mocks.setMarquee).toHaveBeenCalledWith(null)
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+  })
+
+  it('clicking an already-selected object in a multi-selection sets up groupOrigPositionsById on drawStart', () => {
+    const sign1: CanvasObject = { id: 'sign-1', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const sign2: CanvasObject = { id: 'sign-2', type: 'sign', x: 100, y: 100, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign1, sign2],
+      selectedIds: ['sign-1', 'sign-2'],
+      // pointer at sign-1's position
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0, shiftKey: false } } as KonvaEventObject<MouseEvent>)
+    })
+
+    // Should NOT replace selection
+    expect(mocks.setSelectedIds).not.toHaveBeenCalled()
+    // Should set drawStart with groupOrigPositionsById containing both objects
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'sign-1',
+        groupOrigPositionsById: expect.objectContaining({
+          'sign-1': expect.objectContaining({ ox: 24, oy: 36 }),
+          'sign-2': expect.objectContaining({ ox: 100, oy: 100 }),
+        }),
+      })
+    )
+  })
+
+  it('non-shift click on a new object replaces the selection', () => {
+    const sign: CanvasObject = { id: 'new-sign', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign],
+      selectedIds: ['old-id'],
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0, shiftKey: false } } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setSelectedIds).toHaveBeenCalledWith(['new-sign'])
+  })
+
+  it('group drag moves all selected objects together', () => {
+    const sign1: CanvasObject = { id: 'sign-1', type: 'sign', x: 10, y: 20, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const sign2: CanvasObject = { id: 'sign-2', type: 'sign', x: 50, y: 60, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    // drawStart is at pointer (24,36) with groupOrigPositionsById for both signs
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign1, sign2],
+      selectedIds: ['sign-1', 'sign-2'],
+      drawStart: {
+        x: 0, y: 0, id: 'sign-1',
+        groupOrigPositionsById: {
+          'sign-1': { id: 'sign-1', ox: 10, oy: 20 },
+          'sign-2': { id: 'sign-2', ox: 50, oy: 60 },
+        },
+      },
+      // mousemove pointer is at canvas (24, 36) → world (24, 36) → dx=24, dy=36
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseMove({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).toHaveBeenCalledTimes(1)
+    const updater = mocks.setObjects.mock.calls[0][0]
+    const updated = updater([sign1, sign2]) as CanvasObject[]
+    const s1 = updated.find((o) => o.id === 'sign-1') as typeof sign1
+    const s2 = updated.find((o) => o.id === 'sign-2') as typeof sign2
+    // Both signs should have moved by dx=24, dy=36
+    expect(s1.x).toBe(10 + 24)
+    expect(s1.y).toBe(20 + 36)
+    expect(s2.x).toBe(50 + 24)
+    expect(s2.y).toBe(60 + 36)
+  })
+
+  it('click without move does not push history', () => {
+    const sign: CanvasObject = { id: 'sign-1', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign],
+      drawStart: { x: 24, y: 36, id: 'sign-1', ox: 24, oy: 36 },
+      // mouseup pointer at same position — no movement
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.pushHistory).not.toHaveBeenCalled()
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
   })
 })

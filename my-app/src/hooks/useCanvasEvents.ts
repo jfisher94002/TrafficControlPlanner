@@ -5,7 +5,7 @@ import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
   SignObject, DeviceObject, TaperObject, TurnLaneObject,
-  SignData, DeviceData, RoadType, DrawStart, PanStart, MapCenter, Point, SnapResult,
+  SignData, DeviceData, RoadType, DrawStart, GroupOrig, PanStart, MapCenter, Point, SnapResult,
 } from '../types';
 import {
   uid, dist, geoRoadWidthPx, snapToEndpoint, sampleBezier, sampleCubicBezier,
@@ -24,7 +24,7 @@ interface CanvasEventsProps {
   snapEnabled: boolean;
   // World state
   objects: CanvasObject[];
-  selected: string | null;
+  selectedIds: string[];
   zoom: number;
   offset: Point;
   mapCenter: MapCenter | null;
@@ -45,7 +45,8 @@ interface CanvasEventsProps {
   lastClickPosRef: React.RefObject<Point | null>;
   // Setters
   setObjects: React.Dispatch<React.SetStateAction<CanvasObject[]>>;
-  setSelected: React.Dispatch<React.SetStateAction<string | null>>;
+  setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setMarquee: React.Dispatch<React.SetStateAction<{ x: number; y: number; w: number; h: number } | null>>;
   setZoom: React.Dispatch<React.SetStateAction<number>>;
   setOffset: React.Dispatch<React.SetStateAction<Point>>;
   setMapCenter: React.Dispatch<React.SetStateAction<MapCenter | null>>;
@@ -62,12 +63,12 @@ interface CanvasEventsProps {
 
 export function useCanvasEvents({
   tool, roadDrawMode, intersectionType, snapEnabled,
-  objects, selected, zoom, offset, mapCenter,
+  objects, selectedIds, zoom, offset, mapCenter,
   selectedSign, selectedDevice, selectedRoadType,
   polyPoints, curvePoints, cubicPoints,
   drawStart, isPanning, panStart,
   stageRef, lastClickTimeRef, lastClickPosRef,
-  setObjects, setSelected, setZoom, setOffset, setMapCenter,
+  setObjects, setSelectedIds, setMarquee, setZoom, setOffset, setMapCenter,
   setIsPanning, setPanStart, setDrawStart,
   setPolyPoints, setCurvePoints, setCubicPoints,
   setSnapIndicator, setCursorPos,
@@ -149,8 +150,9 @@ export function useCanvasEvents({
     }
 
     if (tool === "select") {
-      if (selected) {
-        const selObj = objects.find((o) => o.id === selected);
+      // Cubic bezier handle drag (only when a single bezier is selected)
+      if (selectedIds.length === 1) {
+        const selObj = objects.find((o) => o.id === selectedIds[0]);
         if (selObj?.type === "cubic_bezier_road") {
           const handleRadius = Math.min(10 / zoom, 20);
           for (let i = 0; i < selObj.points.length; i++) {
@@ -162,16 +164,53 @@ export function useCanvasEvents({
           }
         }
       }
+
       const hit = hitTest(raw.x, raw.y);
-      setSelected(hit ? hit.id : null);
+
+      if (e.evt.shiftKey) {
+        // Shift-click: toggle object in/out of selection
+        if (hit) {
+          setSelectedIds((prev) =>
+            prev.includes(hit.id) ? prev.filter((id) => id !== hit.id) : [...prev, hit.id]
+          );
+        }
+        return;
+      }
+
       if (hit) {
-        setDrawStart({
-          x: raw.x, y: raw.y,
-          ox: isPointObject(hit) ? hit.x : isLineObject(hit) ? hit.x1 : 0,
-          oy: isPointObject(hit) ? hit.y : isLineObject(hit) ? hit.y1 : 0,
-          id: hit.id,
-          origPoints: isMultiPointRoad(hit) ? hit.points.map((p) => ({ ...p })) : null,
-        });
+        if (selectedIds.includes(hit.id) && selectedIds.length > 1) {
+          // Clicking an already-selected object in a multi-selection → start group drag
+          // Use a Record for O(1) lookup per object during mousemove
+          const groupOrigPositionsById: Record<string, GroupOrig> = {};
+          for (const id of selectedIds) {
+            const o = objects.find((obj) => obj.id === id);
+            if (!o) { groupOrigPositionsById[id] = { id }; continue; }
+            groupOrigPositionsById[id] = {
+              id,
+              ox: isPointObject(o) ? o.x : isLineObject(o) ? o.x1 : undefined,
+              oy: isPointObject(o) ? o.y : isLineObject(o) ? o.y1 : undefined,
+              ox2: isLineObject(o) ? o.x2 : undefined,
+              oy2: isLineObject(o) ? o.y2 : undefined,
+              origPoints: isMultiPointRoad(o) ? o.points.map((p) => ({ ...p })) : null,
+            };
+          }
+          setDrawStart({ x: raw.x, y: raw.y, id: hit.id, groupOrigPositionsById });
+        } else {
+          // Select only this object and prepare single drag
+          setSelectedIds([hit.id]);
+          setDrawStart({
+            x: raw.x, y: raw.y,
+            ox: isPointObject(hit) ? hit.x : isLineObject(hit) ? hit.x1 : 0,
+            oy: isPointObject(hit) ? hit.y : isLineObject(hit) ? hit.y1 : 0,
+            id: hit.id,
+            origPoints: isMultiPointRoad(hit) ? hit.points.map((p) => ({ ...p })) : null,
+          });
+        }
+      } else {
+        // Empty canvas: clear selection and start marquee
+        setSelectedIds([]);
+        setMarquee(null);
+        setDrawStart({ x: raw.x, y: raw.y, isMarquee: true });
       }
       return;
     }
@@ -180,7 +219,7 @@ export function useCanvasEvents({
       const hit = hitTest(raw.x, raw.y);
       if (hit) {
         const newObjs = objects.filter((o) => o.id !== hit.id);
-        pushHistory(newObjs); setSelected(null);
+        pushHistory(newObjs); setSelectedIds([]);
       }
       return;
     }
@@ -189,7 +228,7 @@ export function useCanvasEvents({
       if (!selectedSign) return;
       const newSign: SignObject = { id: uid(), type: "sign", x: raw.x, y: raw.y, signData: selectedSign, rotation: 0, scale: 1 };
       const newObjs = [...objects, newSign];
-      pushHistory(newObjs); setSelected(newSign.id);
+      pushHistory(newObjs); setSelectedIds([newSign.id]);
       const isCustom = selectedSign.id.startsWith('custom_');
       track('sign_placed', { sign_id: selectedSign.id, sign_source: isCustom ? 'custom' : 'builtin', ...(isCustom ? {} : { sign_label: selectedSign.label }) });
       return;
@@ -199,7 +238,7 @@ export function useCanvasEvents({
       if (!selectedDevice) return;
       const newDev: DeviceObject = { id: uid(), type: "device", x: raw.x, y: raw.y, deviceData: selectedDevice, rotation: 0 };
       const newObjs = [...objects, newDev];
-      pushHistory(newObjs); setSelected(newDev.id);
+      pushHistory(newObjs); setSelectedIds([newDev.id]);
       return;
     }
 
@@ -207,14 +246,14 @@ export function useCanvasEvents({
       const speed = 45, laneWidth = 12;
       const newTaper: TaperObject = { id: uid(), type: "taper", x: raw.x, y: raw.y, rotation: 0, speed, laneWidth, taperLength: calcTaperLength(speed, laneWidth), manualLength: false, numLanes: 1 };
       const newObjs = [...objects, newTaper];
-      pushHistory(newObjs); setSelected(newTaper.id);
+      pushHistory(newObjs); setSelectedIds([newTaper.id]);
       return;
     }
 
     if (tool === "turn_lane") {
       const newTL: TurnLaneObject = { id: uid(), type: "turn_lane", x: raw.x, y: raw.y, rotation: 0, laneWidth: 20, taperLength: 80, runLength: 100, side: 'right', turnDir: 'right' };
       const newObjs = [...objects, newTL];
-      pushHistory(newObjs); setSelected(newTL.id);
+      pushHistory(newObjs); setSelectedIds([newTL.id]);
       return;
     }
 
@@ -223,7 +262,7 @@ export function useCanvasEvents({
       if (textVal) {
         const newText = { id: uid(), type: "text" as const, x: raw.x, y: raw.y, text: textVal, fontSize: 14, bold: false, color: "#ffffff" };
         const newObjs = [...objects, newText];
-        pushHistory(newObjs); setSelected(newText.id);
+        pushHistory(newObjs); setSelectedIds([newText.id]);
       }
       return;
     }
@@ -240,7 +279,7 @@ export function useCanvasEvents({
         if (isDouble && polyPoints.length >= 2) {
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
-          pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          pushHistory(newObjs); setSelectedIds([newRoad.id]); setPolyPoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         } else {
           setPolyPoints((prev) => [...prev, { x, y }]);
@@ -253,7 +292,7 @@ export function useCanvasEvents({
         if (newCurvePts.length === 3) {
           const newRoad: CurveRoadObject = { id: uid(), type: "curve_road", points: newCurvePts as [Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
-          pushHistory(newObjs); setSelected(newRoad.id); setCurvePoints([]);
+          pushHistory(newObjs); setSelectedIds([newRoad.id]); setCurvePoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'curve', point_count: 3 });
         } else { setCurvePoints(newCurvePts); }
         return;
@@ -264,7 +303,7 @@ export function useCanvasEvents({
         if (newCubicPts.length === 4) {
           const newRoad: CubicBezierRoadObject = { id: uid(), type: "cubic_bezier_road", points: newCubicPts as [Point, Point, Point, Point], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
           const newObjs = [...objects, newRoad];
-          pushHistory(newObjs); setSelected(newRoad.id); setCubicPoints([]);
+          pushHistory(newObjs); setSelectedIds([newRoad.id]); setCubicPoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'cubic', point_count: 4 });
         } else { setCubicPoints(newCubicPts); }
         return;
@@ -274,7 +313,7 @@ export function useCanvasEvents({
     if (tool === "intersection") {
       const roads = createIntersectionRoads(x, y, intersectionType, selectedRoadType);
       const newObjs = [...objects, ...roads];
-      pushHistory(newObjs); setSelected(roads[roads.length - 1].id);
+      pushHistory(newObjs); setSelectedIds([roads[roads.length - 1].id]);
       track('road_drawn', { road_type: selectedRoadType.id, draw_mode: intersectionType === '4way' ? 'intersection_4way' : 'intersection_t' });
       return;
     }
@@ -284,12 +323,12 @@ export function useCanvasEvents({
     }
   }, [
     tool, roadDrawMode, intersectionType, snapEnabled,
-    objects, selected, zoom, offset, mapCenter,
+    objects, selectedIds, zoom, offset, mapCenter,
     selectedSign, selectedDevice, selectedRoadType,
     polyPoints, curvePoints, cubicPoints,
     stageRef, lastClickTimeRef, lastClickPosRef,
     toWorld, trySnap, hitTest,
-    setObjects, setSelected, setIsPanning, setPanStart, setDrawStart,
+    setObjects, setSelectedIds, setMarquee, setIsPanning, setPanStart, setDrawStart,
     setPolyPoints, setCurvePoints, setCubicPoints,
     setSnapIndicator, setCursorPos, pushHistory,
   ]);
@@ -321,39 +360,105 @@ export function useCanvasEvents({
       return;
     }
 
-    if (tool === "select" && drawStart && drawStart.id) {
-      const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
-      setObjects((prev) => prev.map((o) => {
-        if (o.id !== drawStart.id) return o;
-        if (o.type === "cubic_bezier_road" && drawStart.origPoints) {
-          if (drawStart.handleIndex != null) {
-            const newPoints = drawStart.origPoints.map((p, i) =>
-              i === drawStart.handleIndex ? { x: p.x + dx, y: p.y + dy } : { ...p }
-            ) as [Point, Point, Point, Point];
-            return { ...o, points: newPoints };
-          }
-          return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point, Point] };
+    if (tool === "select" && drawStart) {
+      // Marquee update
+      if (drawStart.isMarquee) {
+        const mx = Math.min(drawStart.x, raw.x);
+        const my = Math.min(drawStart.y, raw.y);
+        const mw = Math.abs(raw.x - drawStart.x);
+        const mh = Math.abs(raw.y - drawStart.y);
+        setMarquee({ x: mx, y: my, w: mw, h: mh });
+        return;
+      }
+
+      if (drawStart.id) {
+        const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
+
+        if (drawStart.groupOrigPositionsById) {
+          // Group drag: O(1) lookup per object using pre-built map
+          setObjects((prev) => prev.map((o) => {
+            const orig = drawStart.groupOrigPositionsById![o.id];
+            if (!orig) return o;
+            if (orig.origPoints) {
+              return { ...o, points: orig.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
+            }
+            if (isPointObject(o)) {
+              return { ...o, x: (orig.ox ?? 0) + dx, y: (orig.oy ?? 0) + dy } as CanvasObject;
+            }
+            if (isLineObject(o)) {
+              return { ...o, x1: (orig.ox ?? 0) + dx, y1: (orig.oy ?? 0) + dy, x2: (orig.ox2 ?? 0) + dx, y2: (orig.oy2 ?? 0) + dy } as CanvasObject;
+            }
+            return o;
+          }));
+        } else {
+          // Single object drag
+          setObjects((prev) => prev.map((o) => {
+            if (o.id !== drawStart.id) return o;
+            if (o.type === "cubic_bezier_road" && drawStart.origPoints) {
+              if (drawStart.handleIndex != null) {
+                const newPoints = drawStart.origPoints.map((p, i) =>
+                  i === drawStart.handleIndex ? { x: p.x + dx, y: p.y + dy } : { ...p }
+                ) as [Point, Point, Point, Point];
+                return { ...o, points: newPoints };
+              }
+              return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) as [Point, Point, Point, Point] };
+            }
+            if ((o.type === "polyline_road" || o.type === "curve_road") && drawStart.origPoints) {
+              return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
+            }
+            if (isPointObject(o)) {
+              return { ...o, x: (drawStart.ox ?? 0) + dx, y: (drawStart.oy ?? 0) + dy } as CanvasObject;
+            }
+            if (isLineObject(o)) {
+              const sdx = o.x2 - o.x1, sdy = o.y2 - o.y1;
+              return { ...o, x1: (drawStart.ox ?? 0) + dx, y1: (drawStart.oy ?? 0) + dy, x2: (drawStart.ox ?? 0) + dx + sdx, y2: (drawStart.oy ?? 0) + dy + sdy } as CanvasObject;
+            }
+            return o;
+          }));
         }
-        if ((o.type === "polyline_road" || o.type === "curve_road") && drawStart.origPoints) {
-          return { ...o, points: drawStart.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
-        }
-        if (isPointObject(o)) {
-          return { ...o, x: (drawStart.ox ?? 0) + dx, y: (drawStart.oy ?? 0) + dy } as CanvasObject;
-        }
-        if (isLineObject(o)) {
-          const sdx = o.x2 - o.x1, sdy = o.y2 - o.y1;
-          return { ...o, x1: (drawStart.ox ?? 0) + dx, y1: (drawStart.oy ?? 0) + dy, x2: (drawStart.ox ?? 0) + dx + sdx, y2: (drawStart.oy ?? 0) + dy + sdy } as CanvasObject;
-        }
-        return o;
-      }));
+      }
     }
-  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom, offset, mapCenter, setMapCenter, stageRef, setObjects, setOffset, setSnapIndicator, setCursorPos]);
+  }, [isPanning, panStart, toWorld, tool, drawStart, snapEnabled, objects, zoom, offset, mapCenter, setMapCenter, stageRef, setObjects, setOffset, setMarquee, setSnapIndicator, setCursorPos]);
 
   const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (isPanning) { setIsPanning(false); setPanStart(null); return; }
 
-    if (tool === "select" && drawStart && drawStart.id) {
-      pushHistory(objects); setDrawStart(null); return;
+    if (tool === "select" && drawStart) {
+      if (drawStart.isMarquee) {
+        const raw = toWorld();
+        const mx1 = Math.min(drawStart.x, raw.x);
+        const my1 = Math.min(drawStart.y, raw.y);
+        const mx2 = Math.max(drawStart.x, raw.x);
+        const my2 = Math.max(drawStart.y, raw.y);
+        // Select all objects whose representative point falls inside the marquee
+        const inside = objects.filter((o) => {
+          if (isPointObject(o)) return o.x >= mx1 && o.x <= mx2 && o.y >= my1 && o.y <= my2;
+          if (isLineObject(o)) {
+            const cx = (o.x1 + o.x2) / 2, cy = (o.y1 + o.y2) / 2;
+            return cx >= mx1 && cx <= mx2 && cy >= my1 && cy <= my2;
+          }
+          if (isMultiPointRoad(o) && o.points.length > 0) {
+            const cx = o.points.reduce((s, p) => s + p.x, 0) / o.points.length;
+            const cy = o.points.reduce((s, p) => s + p.y, 0) / o.points.length;
+            return cx >= mx1 && cx <= mx2 && cy >= my1 && cy <= my2;
+          }
+          return false;
+        }).map((o) => o.id);
+        setSelectedIds(inside);
+        setMarquee(null);
+        setDrawStart(null);
+        return;
+      }
+      if (drawStart.id) {
+        // Only snapshot history when the object actually moved
+        const raw = toWorld();
+        const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) pushHistory(objects);
+        setDrawStart(null);
+        return;
+      }
+      setDrawStart(null);
+      return;
     }
 
     if (drawStart && tool === "road" && roadDrawMode === "straight") {
@@ -363,7 +468,7 @@ export function useCanvasEvents({
       if (d < 5) { setDrawStart(null); return; }
       const newRoad: StraightRoadObject = { id: uid(), type: "road", x1: drawStart.x, y1: drawStart.y, x2: x, y2: y, width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id };
       const newObjs = [...objects, newRoad];
-      pushHistory(newObjs); setSelected(newRoad.id);
+      pushHistory(newObjs); setSelectedIds([newRoad.id]);
       track('road_drawn', { road_type: selectedRoadType.id, draw_mode: 'straight' });
       setDrawStart(null);
       return;
@@ -387,11 +492,11 @@ export function useCanvasEvents({
       }
       if (newObj) {
         const newObjs = [...objects, newObj];
-        pushHistory(newObjs); setSelected(newObj.id);
+        pushHistory(newObjs); setSelectedIds([newObj.id]);
       }
       setDrawStart(null);
     }
-  }, [isPanning, drawStart, tool, roadDrawMode, toWorld, trySnap, objects, selectedRoadType, pushHistory, setObjects, setSelected, setIsPanning, setPanStart, setDrawStart]);
+  }, [isPanning, drawStart, tool, roadDrawMode, toWorld, trySnap, objects, selectedRoadType, pushHistory, setObjects, setSelectedIds, setMarquee, setIsPanning, setPanStart, setDrawStart]);
 
   const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
     const pos = stageRef.current?.getPointerPosition();

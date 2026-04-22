@@ -139,7 +139,7 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
               </div>
               <button type="button"
                 aria-pressed={showSpacingGuide}
-                style={{ ...panelBtnStyle(showSpacingGuide), background: showSpacingGuide ? COLORS.info : undefined, color: showSpacingGuide ? '#fff' : undefined, width: '100%', marginBottom: 6 }}
+                style={{ ...panelBtnStyle, background: showSpacingGuide ? COLORS.info : undefined, color: showSpacingGuide ? '#fff' : undefined, width: '100%', marginBottom: 6 }}
                 onClick={onToggleSpacingGuide}>
                 {showSpacingGuide ? 'Hide Spacing Guide' : 'Show Spacing Guide'}
               </button>
@@ -148,7 +148,7 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
               </div>
               <button type="button"
                 aria-pressed={showBufferZone}
-                style={{ ...panelBtnStyle(showBufferZone), background: showBufferZone ? 'rgba(249,115,22,0.75)' : undefined, color: showBufferZone ? '#fff' : undefined, width: '100%', marginBottom: 8 }}
+                style={{ ...panelBtnStyle, background: showBufferZone ? 'rgba(249,115,22,0.75)' : undefined, color: showBufferZone ? '#fff' : undefined, width: '100%', marginBottom: 8 }}
                 onClick={onToggleBufferZone}>
                 {showBufferZone ? 'Hide Buffer Zone' : 'Show Buffer Zone'}
               </button>

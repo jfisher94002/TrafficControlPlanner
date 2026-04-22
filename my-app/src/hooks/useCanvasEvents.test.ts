@@ -332,6 +332,39 @@ describe('useCanvasEvents multi-select', () => {
     expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
   })
 
+  it('clicking an already-selected object in a multi-selection sets up groupOrigPositionsById on drawStart', () => {
+    const sign1: CanvasObject = { id: 'sign-1', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const sign2: CanvasObject = { id: 'sign-2', type: 'sign', x: 100, y: 100, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign1, sign2],
+      selectedIds: ['sign-1', 'sign-2'],
+      // pointer at sign-1's position
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseDown({ evt: { button: 0, shiftKey: false } } as KonvaEventObject<MouseEvent>)
+    })
+
+    // Should NOT replace selection
+    expect(mocks.setSelectedIds).not.toHaveBeenCalled()
+    // Should set drawStart with groupOrigPositionsById containing both objects
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'sign-1',
+        groupOrigPositionsById: expect.objectContaining({
+          'sign-1': expect.objectContaining({ ox: 24, oy: 36 }),
+          'sign-2': expect.objectContaining({ ox: 100, oy: 100 }),
+        }),
+      })
+    )
+  })
+
   it('non-shift click on a new object replaces the selection', () => {
     const sign: CanvasObject = { id: 'new-sign', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
     const { props, mocks } = makeProps({

@@ -60,7 +60,6 @@ describe('BufferZoneOverlay geometry', () => {
 
   it('buffer rect right edge aligns with taper origin for any speed', () => {
     for (const speed of [35, 45, 55, 65, 75]) {
-      const taper = makeTaper({ speed })
       const spacingPx = mutcdSignSpacingFt(speed) * TAPER_SCALE
       expect(-spacingPx + spacingPx).toBe(0)   // rectX + rectW = 0
     }

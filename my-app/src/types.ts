@@ -260,7 +260,7 @@ export interface DrawStart {
   id?: string;
   origPoints?: Point[] | null;
   handleIndex?: number | null; // index of the handle being dragged (cubic bezier only)
-  groupOrigPositions?: GroupOrig[];
+  groupOrigPositionsById?: Record<string, GroupOrig>; // O(1) lookup for group drag
   isMarquee?: boolean;
 }
 

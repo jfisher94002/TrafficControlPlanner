@@ -351,4 +351,65 @@ describe('useCanvasEvents multi-select', () => {
 
     expect(mocks.setSelectedIds).toHaveBeenCalledWith(['new-sign'])
   })
+
+  it('group drag moves all selected objects together', () => {
+    const sign1: CanvasObject = { id: 'sign-1', type: 'sign', x: 10, y: 20, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const sign2: CanvasObject = { id: 'sign-2', type: 'sign', x: 50, y: 60, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    // drawStart is at pointer (24,36) with groupOrigPositionsById for both signs
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign1, sign2],
+      selectedIds: ['sign-1', 'sign-2'],
+      drawStart: {
+        x: 0, y: 0, id: 'sign-1',
+        groupOrigPositionsById: {
+          'sign-1': { id: 'sign-1', ox: 10, oy: 20 },
+          'sign-2': { id: 'sign-2', ox: 50, oy: 60 },
+        },
+      },
+      // mousemove pointer is at canvas (24, 36) → world (24, 36) → dx=24, dy=36
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseMove({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setObjects).toHaveBeenCalledTimes(1)
+    const updater = mocks.setObjects.mock.calls[0][0]
+    const updated = updater([sign1, sign2]) as CanvasObject[]
+    const s1 = updated.find((o) => o.id === 'sign-1') as typeof sign1
+    const s2 = updated.find((o) => o.id === 'sign-2') as typeof sign2
+    // Both signs should have moved by dx=24, dy=36
+    expect(s1.x).toBe(10 + 24)
+    expect(s1.y).toBe(20 + 36)
+    expect(s2.x).toBe(50 + 24)
+    expect(s2.y).toBe(60 + 36)
+  })
+
+  it('click without move does not push history', () => {
+    const sign: CanvasObject = { id: 'sign-1', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [sign],
+      drawStart: { x: 24, y: 36, id: 'sign-1', ox: 24, oy: 36 },
+      // mouseup pointer at same position — no movement
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 24, y: 36 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.pushHistory).not.toHaveBeenCalled()
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+  })
 })

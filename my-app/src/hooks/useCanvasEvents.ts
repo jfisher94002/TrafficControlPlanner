@@ -180,10 +180,12 @@ export function useCanvasEvents({
       if (hit) {
         if (selectedIds.includes(hit.id) && selectedIds.length > 1) {
           // Clicking an already-selected object in a multi-selection → start group drag
-          const groupOrigPositions: GroupOrig[] = selectedIds.map((id) => {
+          // Use a Record for O(1) lookup per object during mousemove
+          const groupOrigPositionsById: Record<string, GroupOrig> = {};
+          for (const id of selectedIds) {
             const o = objects.find((obj) => obj.id === id);
-            if (!o) return { id };
-            return {
+            if (!o) { groupOrigPositionsById[id] = { id }; continue; }
+            groupOrigPositionsById[id] = {
               id,
               ox: isPointObject(o) ? o.x : isLineObject(o) ? o.x1 : undefined,
               oy: isPointObject(o) ? o.y : isLineObject(o) ? o.y1 : undefined,
@@ -191,8 +193,8 @@ export function useCanvasEvents({
               oy2: isLineObject(o) ? o.y2 : undefined,
               origPoints: isMultiPointRoad(o) ? o.points.map((p) => ({ ...p })) : null,
             };
-          });
-          setDrawStart({ x: raw.x, y: raw.y, id: hit.id, groupOrigPositions });
+          }
+          setDrawStart({ x: raw.x, y: raw.y, id: hit.id, groupOrigPositionsById });
         } else {
           // Select only this object and prepare single drag
           setSelectedIds([hit.id]);
@@ -372,10 +374,10 @@ export function useCanvasEvents({
       if (drawStart.id) {
         const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
 
-        if (drawStart.groupOrigPositions?.length) {
-          // Group drag: move all selected objects using their stored originals
+        if (drawStart.groupOrigPositionsById) {
+          // Group drag: O(1) lookup per object using pre-built map
           setObjects((prev) => prev.map((o) => {
-            const orig = drawStart.groupOrigPositions!.find((g) => g.id === o.id);
+            const orig = drawStart.groupOrigPositionsById![o.id];
             if (!orig) return o;
             if (orig.origPoints) {
               return { ...o, points: orig.origPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as CanvasObject;
@@ -448,7 +450,12 @@ export function useCanvasEvents({
         return;
       }
       if (drawStart.id) {
-        pushHistory(objects); setDrawStart(null); return;
+        // Only snapshot history when the object actually moved
+        const raw = toWorld();
+        const dx = raw.x - drawStart.x, dy = raw.y - drawStart.y;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) pushHistory(objects);
+        setDrawStart(null);
+        return;
       }
       setDrawStart(null);
       return;

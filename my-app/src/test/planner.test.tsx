@@ -7,6 +7,12 @@ import * as planStorage from '../planStorage'
 import * as analytics from '../analytics'
 import { DEFAULT_TILE_URL, resolveTileUrl, buildTileUrl } from '../utils'
 
+vi.mock('../components/tcp/canvas/SpacingOverlay', () => ({
+  SpacingOverlay: ({ taper }: { taper: { id: string } }) => (
+    <div data-testid="spacing-overlay" data-taper-id={taper.id} />
+  ),
+}))
+
 beforeEach(() => {
   localStorage.clear()
   // Seed a mapCenter so drawing tools are not blocked by the address guard in any test
@@ -453,6 +459,33 @@ describe('Taper tool', () => {
     fireEvent.keyDown(window, { key: 'P' })
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
     expect(within(screen.getByTestId('right-panel')).getByText(/taper Properties/i)).toBeInTheDocument()
+  })
+})
+
+// ─── Spacing guide overlay ────────────────────────────────────────────────────
+describe('Spacing guide overlay', () => {
+  it('renders overlay only when enabled for a selected taper', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    expect(screen.queryByTestId('spacing-overlay')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /show spacing guide/i }))
+    expect(screen.getByTestId('spacing-overlay')).toBeInTheDocument()
+  })
+
+  it('hides overlay when a non-taper object becomes selected', async () => {
+    const { user } = setup()
+    const canvas = screen.getByTestId('konva-stage')
+
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(canvas)
+    await user.click(screen.getByRole('button', { name: /show spacing guide/i }))
+    expect(screen.getByTestId('spacing-overlay')).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(canvas)
+    expect(screen.queryByTestId('spacing-overlay')).not.toBeInTheDocument()
   })
 })
 

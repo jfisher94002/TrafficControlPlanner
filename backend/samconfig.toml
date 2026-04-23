@@ -15,13 +15,13 @@ resolve_s3        = true
 confirm_changeset = true
 parameter_overrides = [
   "Stage=dev",
-  "AllowedOrigins=*",
-  "CognitoUserPoolId=us-west-1_6NB2hiHif",
-  "PlansBucket=tcplanpro-user-data-658558598738-us-west-1-an"
+  "AllowedOrigins=*"
 ]
-# GitHubToken must be supplied at deploy time — do NOT commit it here:
-#   sam deploy --parameter-overrides "GitHubToken=github_pat_..."
-# PlansBucket: find in S3 console — looks like amplify-tcplanpro-dev-... or similar
+# Supply these at deploy time — do NOT commit real values here:
+#   sam deploy --parameter-overrides \
+#     "GitHubToken=github_pat_..." \
+#     "CognitoUserPoolId=<your-user-pool-id>" \
+#     "PlansBucket=<your-amplify-plans-bucket>"
 
 [staging.global.parameters]
 stack_name = "tcp-backend-staging"
@@ -36,10 +36,10 @@ resolve_s3        = true
 confirm_changeset = true
 parameter_overrides = [
   "Stage=staging",
-  "AllowedOrigins=https://staging.tcplanpro.com,https://staging.d1i0disr0t50m8.amplifyapp.com",
-  "CognitoUserPoolId=us-west-1_6NB2hiHif",
-  "PlansBucket=tcplanpro-user-data-658558598738-us-west-1-an"
+  "AllowedOrigins=https://staging.tcplanpro.com,https://staging.d1i0disr0t50m8.amplifyapp.com"
 ]
-# GitHubToken must be supplied at deploy time:
-#   sam deploy --config-env staging --parameter-overrides "GitHubToken=github_pat_..."
-# PlansBucket: find in S3 console — looks like amplify-tcplanpro-staging-... or similar
+# Supply these at deploy time — do NOT commit real values here:
+#   sam deploy --config-env staging --parameter-overrides \
+#     "GitHubToken=github_pat_..." \
+#     "CognitoUserPoolId=<your-user-pool-id>" \
+#     "PlansBucket=<your-amplify-plans-bucket>"

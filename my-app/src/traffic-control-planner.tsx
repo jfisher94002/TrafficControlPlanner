@@ -21,6 +21,7 @@ import { DEVICES, ROAD_TYPES, SIGN_CATEGORIES, TOOLS, TOOLS_REQUIRING_MAP } from
 import { GridLines, ObjectShape } from './components/tcp/canvas/ObjectShapes';
 import { DrawingOverlays } from './components/tcp/canvas/DrawingOverlays';
 import { SpacingOverlay } from './components/tcp/canvas/SpacingOverlay';
+import { BufferZoneOverlay } from './components/tcp/canvas/BufferZoneOverlay';
 import { ToolButton } from './components/tcp/ui/ToolButton';
 import { SignEditorPanel } from './components/tcp/panels/SignEditorPanel';
 import { COLORS, MIN_ZOOM, MAX_ZOOM } from './features/tcp/constants';
@@ -97,6 +98,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const qcTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showSpacingGuide, setShowSpacingGuide] = useState(false);
+  const [showBufferZone, setShowBufferZone] = useState(false);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -735,9 +737,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     return [...builtIn, ...custom]
   })()
 
-  const selectedTaper = showSpacingGuide
-    ? objects.find((o): o is TaperObject => o.id === selected && o.type === 'taper') ?? null
-    : null;
+  const selectedTaperObj = objects.find((o): o is TaperObject => o.id === selected && o.type === 'taper') ?? null;
+  const selectedTaper = showSpacingGuide ? selectedTaperObj : null;
+  const selectedTaperForBuffer = showBufferZone ? selectedTaperObj : null;
 
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
@@ -1198,6 +1200,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 cubicPoints={cubicPoints}
               />
               {selectedTaper && <SpacingOverlay taper={selectedTaper} />}
+              {selectedTaperForBuffer && <BufferZoneOverlay taper={selectedTaperForBuffer} />}
               {marquee && (
                 <Rect
                   x={marquee.x} y={marquee.y}
@@ -1364,7 +1367,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
-              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} onAutoChannelize={handleAutoChannelize} showSpacingGuide={showSpacingGuide} onToggleSpacingGuide={() => setShowSpacingGuide((v) => !v)} />
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} onAutoChannelize={handleAutoChannelize} showSpacingGuide={showSpacingGuide} onToggleSpacingGuide={() => setShowSpacingGuide((v) => !v)} showBufferZone={showBufferZone} onToggleBufferZone={() => setShowBufferZone((v) => !v)} />
               : rightTab === "manifest"
               ? <ManifestPanel objects={objects} />
               : <QCPanel issues={qcIssues} />

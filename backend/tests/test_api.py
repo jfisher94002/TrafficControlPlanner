@@ -1,5 +1,8 @@
 import os
 import re
+import json
+import base64
+from datetime import datetime, timezone
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
@@ -709,3 +712,184 @@ def test_ses_not_called_when_github_fails(monkeypatch):
         })
     assert res.status_code == 502
     mock_ses.send_email.assert_not_called()
+
+
+# ─── Admin API tests ──────────────────────────────────────────────────────────
+
+def _make_jwt(claims: dict) -> str:
+    """Build an unsigned JWT string suitable for local claim parsing tests."""
+    header = {"alg": "none", "typ": "JWT"}
+
+    def _b64(data: dict) -> str:
+        raw = json.dumps(data).encode("utf-8")
+        return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
+
+    return f"{_b64(header)}.{_b64(claims)}.sig"
+
+
+def test_admin_users_requires_bearer_token():
+    res = client.get("/admin/users")
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Missing or invalid Authorization header."
+
+
+def test_admin_users_rejects_non_admin_group():
+    token = _make_jwt({"sub": "user-1", "cognito:groups": ["users"]})
+    res = client.get("/admin/users", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Admin access required."
+
+
+def test_admin_users_rejects_malformed_jwt():
+    res = client.get("/admin/users", headers={"Authorization": "Bearer not-a-jwt"})
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Malformed token."
+
+
+def test_admin_users_requires_user_pool_config(monkeypatch):
+    monkeypatch.delenv("COGNITO_USER_POOL_ID", raising=False)
+    token = _make_jwt({"sub": "admin-1", "cognito:groups": ["admins"]})
+    res = client.get("/admin/users", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 503
+    assert res.json()["detail"] == "Admin not configured (missing COGNITO_USER_POOL_ID)."
+
+
+def test_admin_users_returns_paginated_cognito_users(monkeypatch):
+    monkeypatch.setenv("COGNITO_USER_POOL_ID", "us-east-1_testpool")
+    token = _make_jwt({"sub": "admin-1", "cognito:groups": ["admins"]})
+    created_one = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    created_two = datetime(2026, 1, 3, 4, 5, 6, tzinfo=timezone.utc)
+
+    mock_cognito = MagicMock()
+    mock_cognito.list_users.side_effect = [
+        {
+            "Users": [
+                {
+                    "Username": "alice",
+                    "UserStatus": "CONFIRMED",
+                    "UserCreateDate": created_one,
+                    "Enabled": True,
+                    "UserAttributes": [
+                        {"Name": "sub", "Value": "sub-alice"},
+                        {"Name": "email", "Value": "alice@example.com"},
+                    ],
+                }
+            ],
+            "PaginationToken": "next-page",
+        },
+        {
+            "Users": [
+                {
+                    "Username": "bob",
+                    "UserStatus": "FORCE_CHANGE_PASSWORD",
+                    "UserCreateDate": created_two,
+                    "Enabled": False,
+                    # No `sub` attribute → should fall back to Username
+                    "UserAttributes": [{"Name": "email", "Value": "bob@example.com"}],
+                }
+            ]
+        },
+    ]
+
+    with patch("boto3.client", return_value=mock_cognito):
+        res = client.get("/admin/users", headers={"Authorization": f"Bearer {token}"})
+
+    assert res.status_code == 200
+    data = res.json()["users"]
+    assert data == [
+        {
+            "sub": "sub-alice",
+            "email": "alice@example.com",
+            "username": "alice",
+            "status": "CONFIRMED",
+            "created": created_one.isoformat(),
+            "enabled": True,
+        },
+        {
+            "sub": "bob",
+            "email": "bob@example.com",
+            "username": "bob",
+            "status": "FORCE_CHANGE_PASSWORD",
+            "created": created_two.isoformat(),
+            "enabled": False,
+        },
+    ]
+    assert mock_cognito.list_users.call_count == 2
+    assert mock_cognito.list_users.call_args_list[0].kwargs == {
+        "UserPoolId": "us-east-1_testpool",
+        "Limit": 60,
+    }
+    assert mock_cognito.list_users.call_args_list[1].kwargs == {
+        "UserPoolId": "us-east-1_testpool",
+        "Limit": 60,
+        "PaginationToken": "next-page",
+    }
+
+
+def test_admin_user_plans_requires_admin_group():
+    token = _make_jwt({"sub": "user-1", "cognito:groups": ["users"]})
+    res = client.get("/admin/users/user-1/plans", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Admin access required."
+
+
+def test_admin_user_plans_requires_bucket_config(monkeypatch):
+    monkeypatch.delenv("PLANS_BUCKET", raising=False)
+    token = _make_jwt({"sub": "admin-1", "cognito:groups": ["admins"]})
+    res = client.get("/admin/users/user-1/plans", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 503
+    assert res.json()["detail"] == "Admin not configured (missing PLANS_BUCKET)."
+
+
+def test_admin_user_plans_filters_tcp_json_and_paginates(monkeypatch):
+    monkeypatch.setenv("PLANS_BUCKET", "tcp-plans")
+    token = _make_jwt({"sub": "admin-1", "cognito:groups": ["admins"]})
+    last_modified_one = datetime(2026, 2, 1, 1, 0, 0, tzinfo=timezone.utc)
+    last_modified_two = datetime(2026, 2, 2, 2, 0, 0, tzinfo=timezone.utc)
+
+    mock_s3 = MagicMock()
+    mock_s3.list_objects_v2.side_effect = [
+        {
+            "Contents": [
+                {"Key": "plans/user-1/first.tcp.json", "Size": 1234, "LastModified": last_modified_one},
+                {"Key": "plans/user-1/readme.txt", "Size": 40, "LastModified": last_modified_one},
+            ],
+            "IsTruncated": True,
+            "NextContinuationToken": "next-token",
+        },
+        {
+            "Contents": [
+                {"Key": "plans/user-1/second.tcp.json", "Size": 2345, "LastModified": last_modified_two}
+            ],
+            "IsTruncated": False,
+        },
+    ]
+
+    with patch("boto3.client", return_value=mock_s3):
+        res = client.get("/admin/users/user-1/plans", headers={"Authorization": f"Bearer {token}"})
+
+    assert res.status_code == 200
+    assert res.json()["plans"] == [
+        {
+            "key": "plans/user-1/first.tcp.json",
+            "planId": "first",
+            "size": 1234,
+            "lastModified": last_modified_one.isoformat(),
+        },
+        {
+            "key": "plans/user-1/second.tcp.json",
+            "planId": "second",
+            "size": 2345,
+            "lastModified": last_modified_two.isoformat(),
+        },
+    ]
+    assert mock_s3.list_objects_v2.call_count == 2
+    assert mock_s3.list_objects_v2.call_args_list[0].kwargs == {
+        "Bucket": "tcp-plans",
+        "Prefix": "plans/user-1/",
+    }
+    assert mock_s3.list_objects_v2.call_args_list[1].kwargs == {
+        "Bucket": "tcp-plans",
+        "Prefix": "plans/user-1/",
+        "ContinuationToken": "next-token",
+    }

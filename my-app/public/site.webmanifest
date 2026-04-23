@@ -1,9 +1,10 @@
 {
+  "id": "/app",
   "name": "TCP Plan Pro",
   "short_name": "TCP Plan Pro",
   "description": "Browser-based traffic control plan software built for the field.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/app",
+  "scope": "/app/",
   "display": "standalone",
   "background_color": "#F8FAFC",
   "theme_color": "#1A6EFF",

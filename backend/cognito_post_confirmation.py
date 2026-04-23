@@ -16,10 +16,10 @@ def _build_signup_email(event: dict) -> tuple[str, str]:
     name = attrs.get("name") or "—"
     email = attrs.get("email") or "—"
     user_sub = attrs.get("sub") or "—"
-    confirmed_at = datetime.now(timezone.utc).isoformat()
+    notification_sent_at = datetime.now(timezone.utc).isoformat()
     app_env = os.getenv("APP_ENV", os.getenv("STAGE", "unknown"))
 
-    subject = f"New TCP Plan Pro signup: {email if email != '—' else username}"
+    subject = f"New TCP Plan Pro signup: {email if email != '—' else (username or '—')}"
     body = "\n".join([
         "A new user completed signup for TCP Plan Pro.",
         "",
@@ -28,7 +28,7 @@ def _build_signup_email(event: dict) -> tuple[str, str]:
         f"Username: {username or '—'}",
         f"User Sub: {user_sub}",
         f"Trigger Source: {trigger_source or '—'}",
-        f"Confirmed At: {confirmed_at}",
+        f"Notification Sent At: {notification_sent_at}",
         f"Environment: {app_env}",
     ])
     return subject, body

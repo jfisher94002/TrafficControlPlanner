@@ -20,6 +20,10 @@ Globals:
 Conditions:
   HasSesSenderEmail: !Not [!Equals [!Ref SesSenderEmail, ""]]
   HasSignupNotifyEmail: !Not [!Equals [!Ref SignupNotifyEmail, ""]]
+  # Both sender and notify email must be set before granting SES permissions to SignupNotifyFunction
+  HasSignupNotifyConfig: !And
+    - !Condition HasSesSenderEmail
+    - !Condition HasSignupNotifyEmail
 
 Parameters:
   Stage:
@@ -83,13 +87,13 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: cognito_post_confirmation.handler
-      Description: Sends email notification for each confirmed Cognito signup
+      Description: Sends email notification when a new user completes Cognito signup (PostConfirmation_ConfirmSignUp only)
       Environment:
         Variables:
           SIGNUP_NOTIFY_EMAIL: !Ref SignupNotifyEmail
       Policies:
         - !If
-          - HasSesSenderEmail
+          - HasSignupNotifyConfig
           - Statement:
               - Effect: Allow
                 Action: ses:SendEmail

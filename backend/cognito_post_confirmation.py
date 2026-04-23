@@ -58,9 +58,9 @@ def _send_signup_email(subject: str, body_text: str) -> None:
 
 
 def handler(event, context):
-    # Only notify on user-confirmation flows; return event unchanged for Cognito.
+    # Only notify on newly confirmed signups; return event unchanged for Cognito.
     trigger_source = event.get("triggerSource", "")
-    if trigger_source not in {"PostConfirmation_ConfirmSignUp", "PostConfirmation_ConfirmForgotPassword"}:
+    if trigger_source != "PostConfirmation_ConfirmSignUp":
         return event
 
     try:

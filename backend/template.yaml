@@ -15,9 +15,11 @@ Globals:
         GITHUB_REPO: !Ref GitHubRepo
         ASSETS_BUCKET: !Ref TcpAssetsBucket
         SES_SENDER_EMAIL: !Ref SesSenderEmail
+        APP_ENV: !Ref Stage
 
 Conditions:
   HasSesSenderEmail: !Not [!Equals [!Ref SesSenderEmail, ""]]
+  HasSignupNotifyEmail: !Not [!Equals [!Ref SignupNotifyEmail, ""]]
 
 Parameters:
   Stage:
@@ -41,6 +43,10 @@ Parameters:
     Type: String
     Default: ""
     Description: "SES-verified From/To address for feedback notifications (e.g. jfisher@fisherconsulting.org)"
+  SignupNotifyEmail:
+    Type: String
+    Default: ""
+    Description: "Email address to notify for each confirmed Cognito signup"
 
 Resources:
 
@@ -64,6 +70,24 @@ Resources:
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref TcpAssetsBucket
+        - !If
+          - HasSesSenderEmail
+          - Statement:
+              - Effect: Allow
+                Action: ses:SendEmail
+                Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SesSenderEmail}"
+          - !Ref AWS::NoValue
+
+  SignupNotifyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: cognito_post_confirmation.handler
+      Description: Sends email notification for each confirmed Cognito signup
+      Environment:
+        Variables:
+          SIGNUP_NOTIFY_EMAIL: !Ref SignupNotifyEmail
+      Policies:
         - !If
           - HasSesSenderEmail
           - Statement:
@@ -112,3 +136,6 @@ Outputs:
   FunctionArn:
     Description: "Lambda function ARN"
     Value: !GetAtt TcpApiFunction.Arn
+  SignupNotifyFunctionArn:
+    Description: "Lambda function ARN for Cognito post-confirmation notifications"
+    Value: !GetAtt SignupNotifyFunction.Arn

@@ -1,3 +1,5 @@
+import atexit
+import base64
 import json
 import logging
 import os
@@ -8,6 +10,7 @@ from collections import defaultdict
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from posthog import Posthog
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +21,14 @@ from models import CreateIssueRequest, ExportRequest
 from pdf_generator import build_pdf
 
 logger = logging.getLogger(__name__)
+
+# ─── POSTHOG ─────────────────────────────────────────────────────────────────
+posthog_client = Posthog(
+    api_key=os.getenv("POSTHOG_PROJECT_TOKEN", ""),
+    host=os.getenv("POSTHOG_HOST"),
+    enable_exception_autocapture=True,
+)
+atexit.register(posthog_client.shutdown)
 
 # ─── IP RATE LIMITER ─────────────────────────────────────────────────────────
 # In-memory per Lambda instance: max 3 submissions per IP per hour.
@@ -35,6 +46,12 @@ def _check_rate_limit(ip: str) -> None:
     hits = [t for t in _ip_submissions[ip] if t > window_start]
     if len(hits) >= _RATE_LIMIT_MAX:
         logger.warning("Rate limit hit for IP %s", ip)
+        posthog_client.capture(
+            "anonymous",
+            "feedback_rate_limited",
+            properties={"submissions_in_window": len(hits)},
+        )
+        posthog_client.flush()
         raise HTTPException(status_code=429, detail="Too many submissions. Please try again later.")
     hits.append(now)
     _ip_submissions[ip] = hits
@@ -62,14 +79,37 @@ def health():
 
 @app.post("/export-pdf")
 def export_pdf(payload: ExportRequest) -> Response:
+    distinct_id = payload.userId or "anonymous"
     try:
         pdf_bytes = build_pdf(payload)
-    except Exception:
+    except Exception as exc:
         logger.exception("PDF generation failed")
+        posthog_client.capture_exception(exc, distinct_id=distinct_id)
+        posthog_client.capture(
+            distinct_id,
+            "pdf_export_failed",
+            properties={
+                "object_count": len(payload.canvasState.objects),
+                "has_canvas_image": payload.canvas_image_b64 is not None,
+            },
+        )
+        posthog_client.flush()
         raise HTTPException(status_code=500, detail="PDF generation failed")
 
     safe = "".join(c if (c.isascii() and c.isalnum()) or c in "-_ " else "_" for c in payload.name)[:40].strip() or "plan"
     filename = f"{safe}.pdf"
+
+    posthog_client.capture(
+        distinct_id,
+        "pdf_exported",
+        properties={
+            "object_count": len(payload.canvasState.objects),
+            "has_canvas_image": payload.canvas_image_b64 is not None,
+            "has_map_center": payload.mapCenter is not None,
+            "pdf_size_bytes": len(pdf_bytes),
+        },
+    )
+    posthog_client.flush()
 
     return Response(
         content=pdf_bytes,
@@ -93,11 +133,23 @@ def create_issue(payload: CreateIssueRequest, request: Request):
     # Honeypot — should always be empty for real users
     if payload.website:
         logger.warning("Honeypot triggered — dropping submission")
+        posthog_client.capture(
+            "anonymous",
+            "feedback_blocked_honeypot",
+            properties={"issue_type": payload.issue_type},
+        )
+        posthog_client.flush()
         raise HTTPException(status_code=400, detail="Invalid submission.")
 
     # Time-on-form check — bots submit instantly
     if payload.time_on_form < 3:
         logger.warning("Submission too fast (%.1fs) — dropping", payload.time_on_form)
+        posthog_client.capture(
+            "anonymous",
+            "feedback_blocked_speed",
+            properties={"time_on_form": payload.time_on_form, "issue_type": payload.issue_type},
+        )
+        posthog_client.flush()
         raise HTTPException(status_code=400, detail="Invalid submission.")
 
     ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
@@ -158,6 +210,21 @@ def create_issue(payload: CreateIssueRequest, request: Request):
 
     _send_feedback_email(payload, issue["number"], issue["html_url"])
 
+    distinct_id = payload.submitter_id or "anonymous"
+    posthog_client.capture(
+        distinct_id,
+        "feedback_submitted",
+        properties={
+            "issue_type": payload.issue_type,
+            "priority": payload.priority,
+            "issue_number": issue["number"],
+            "title_length": len(payload.title),
+            "body_length": len(payload.body),
+            "has_submitter_id": payload.submitter_id is not None,
+        },
+    )
+    posthog_client.flush()
+
     return {"issue_number": issue["number"], "html_url": issue["html_url"]}
 
 
@@ -206,6 +273,93 @@ def _send_feedback_email(payload: CreateIssueRequest, issue_number: int, issue_u
         ses.send_email(**send_kwargs)
     except (ClientError, BotoCoreError, Exception):
         logger.exception("SES email failed — continuing")
+
+
+# ─── ADMIN ───────────────────────────────────────────────────────────────────
+
+def _decode_jwt_payload(token: str) -> dict:
+    """Base64url-decode the JWT payload segment (no signature verification).
+    Signature integrity is delegated to Cognito at issuance; we only need the
+    claims to check group membership for the admin guard."""
+    try:
+        payload_b64 = token.split(".")[1]
+        # JWT base64url may omit padding
+        padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)
+        return json.loads(base64.urlsafe_b64decode(padded))
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Malformed token.") from exc
+
+
+def _require_admin(request: Request) -> dict:
+    """Verify the caller's Cognito JWT and assert membership in the admins group."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header.")
+    claims = _decode_jwt_payload(auth.removeprefix("Bearer ").strip())
+    if "admins" not in claims.get("cognito:groups", []):
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return claims
+
+
+@app.get("/admin/users")
+def admin_list_users(request: Request):
+    """List all Cognito user pool users. Requires admins group membership."""
+    _require_admin(request)
+    user_pool_id = os.getenv("COGNITO_USER_POOL_ID", "")
+    if not user_pool_id:
+        raise HTTPException(status_code=503, detail="Admin not configured (missing COGNITO_USER_POOL_ID).")
+
+    cognito = boto3.client("cognito-idp")
+    users: list[dict] = []
+    kwargs: dict = {"UserPoolId": user_pool_id, "Limit": 60}
+    while True:
+        page = cognito.list_users(**kwargs)
+        for u in page.get("Users", []):
+            attrs = {a["Name"]: a["Value"] for a in u.get("UserAttributes", [])}
+            users.append({
+                "sub":      attrs.get("sub", u["Username"]),
+                "email":    attrs.get("email", ""),
+                "username": u["Username"],
+                "status":   u["UserStatus"],
+                "created":  u["UserCreateDate"].isoformat(),
+                "enabled":  u["Enabled"],
+            })
+        token = page.get("PaginationToken")
+        if not token:
+            break
+        kwargs["PaginationToken"] = token
+
+    return {"users": users}
+
+
+@app.get("/admin/users/{user_sub}/plans")
+def admin_list_user_plans(user_sub: str, request: Request):
+    """List S3 plan objects for a given user sub. Requires admins group membership."""
+    _require_admin(request)
+    plans_bucket = os.getenv("PLANS_BUCKET", "")
+    if not plans_bucket:
+        raise HTTPException(status_code=503, detail="Admin not configured (missing PLANS_BUCKET).")
+
+    s3 = boto3.client("s3")
+    prefix = f"plans/{user_sub}/"
+    plans: list[dict] = []
+    kwargs: dict = {"Bucket": plans_bucket, "Prefix": prefix}
+    while True:
+        page = s3.list_objects_v2(**kwargs)
+        for obj in page.get("Contents", []):
+            key: str = obj["Key"]
+            if key.endswith(".tcp.json"):
+                plans.append({
+                    "key":          key,
+                    "planId":       key.split("/")[-1].replace(".tcp.json", ""),
+                    "size":         obj["Size"],
+                    "lastModified": obj["LastModified"].isoformat(),
+                })
+        if not page.get("IsTruncated"):
+            break
+        kwargs["ContinuationToken"] = page["NextContinuationToken"]
+
+    return {"plans": plans}
 
 
 # AWS Lambda entrypoint

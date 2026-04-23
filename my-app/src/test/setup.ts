@@ -99,6 +99,7 @@ globalThis.URL.revokeObjectURL = vi.fn()
 vi.mock('posthog-js', () => ({
   default: {
     init: vi.fn(),
+    register: vi.fn(),
     identify: vi.fn(),
     reset: vi.fn(),
     capture: vi.fn(),

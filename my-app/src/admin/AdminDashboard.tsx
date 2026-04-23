@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback, type CSSProperties } from 'react'
 
 const API_BASE = (import.meta.env.VITE_EXPORT_API_BASE ?? '').replace(/\/$/, '')
 
@@ -54,7 +54,7 @@ function useAdminFetch<T>(path: string, accessToken: string) {
 
 function UserPlans({ sub, accessToken }: { sub: string; accessToken: string }) {
   const { data, loading, error } = useAdminFetch<{ plans: PlanMeta[] }>(
-    `/admin/users/${sub}/plans`,
+    `/admin/users/${encodeURIComponent(sub)}/plans`,
     accessToken,
   )
 
@@ -121,9 +121,8 @@ export function AdminDashboard({ accessToken, onSignOut }: AdminDashboardProps) 
           </thead>
           <tbody>
             {users.map(u => (
-              <>
+              <Fragment key={u.sub}>
                 <tr
-                  key={u.sub}
                   style={{ ...styles.row, opacity: u.enabled ? 1 : 0.5 }}
                   onClick={() => setExpandedSub(expandedSub === u.sub ? null : u.sub)}
                 >
@@ -141,13 +140,13 @@ export function AdminDashboard({ accessToken, onSignOut }: AdminDashboardProps) 
                   </td>
                 </tr>
                 {expandedSub === u.sub && (
-                  <tr key={`${u.sub}-plans`}>
+                  <tr>
                     <td colSpan={4} style={styles.planCell}>
                       <UserPlans sub={u.sub} accessToken={accessToken} />
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -158,7 +157,7 @@ export function AdminDashboard({ accessToken, onSignOut }: AdminDashboardProps) 
 
 // ─── Inline styles (no extra CSS deps) ───────────────────────────────────────
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: '100vh',
     background: '#111',

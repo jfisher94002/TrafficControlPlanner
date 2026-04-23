@@ -16,7 +16,7 @@ export default function App() {
 
   const { userId, userEmail, isAdmin, accessToken, showSignIn, openSignIn, closeSignIn, handleSignOut } = useAuthSession(AUTH_ENABLED)
 
-  const isAdminRoute = window.location.pathname === '/admin'
+  const isAdminRoute = window.location.pathname === '/app/admin'
 
   if (!AUTH_ENABLED) {
     return <TrafficControlPlanner userId={null} userEmail={null} />

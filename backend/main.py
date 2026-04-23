@@ -1,5 +1,4 @@
 import atexit
-import base64
 import json
 import logging
 import os
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ─── POSTHOG ─────────────────────────────────────────────────────────────────
 posthog_client = Posthog(
-    api_key=os.getenv("POSTHOG_PROJECT_TOKEN", ""),
+    os.getenv("POSTHOG_PROJECT_TOKEN", ""),
     host=os.getenv("POSTHOG_HOST"),
     enable_exception_autocapture=True,
 )
@@ -277,28 +276,48 @@ def _send_feedback_email(payload: CreateIssueRequest, issue_number: int, issue_u
 
 # ─── ADMIN ───────────────────────────────────────────────────────────────────
 
-def _decode_jwt_payload(token: str) -> dict:
-    """Base64url-decode the JWT payload segment (no signature verification).
-    Signature integrity is delegated to Cognito at issuance; we only need the
-    claims to check group membership for the admin guard."""
-    try:
-        payload_b64 = token.split(".")[1]
-        # JWT base64url may omit padding
-        padded = payload_b64 + "=" * (4 - len(payload_b64) % 4)
-        return json.loads(base64.urlsafe_b64decode(padded))
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail="Malformed token.") from exc
+def _require_admin(request: Request) -> str:
+    """Verify the caller's Cognito access token and assert membership in the admins group.
 
+    Uses cognito-idp:GetUser to cryptographically validate the token server-side
+    (Cognito rejects expired/invalid/forged tokens), then checks group membership
+    via cognito-idp:AdminListGroupsForUser.  Returns the verified Cognito username.
+    """
+    user_pool_id = os.getenv("COGNITO_USER_POOL_ID", "")
+    if not user_pool_id:
+        raise HTTPException(status_code=503, detail="Admin not configured (missing COGNITO_USER_POOL_ID).")
 
-def _require_admin(request: Request) -> dict:
-    """Verify the caller's Cognito JWT and assert membership in the admins group."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header.")
-    claims = _decode_jwt_payload(auth.removeprefix("Bearer ").strip())
-    if "admins" not in claims.get("cognito:groups", []):
+    token = auth.removeprefix("Bearer ").strip()
+
+    cognito = boto3.client("cognito-idp")
+
+    # Step 1 — validate token signature + expiry via Cognito (no local crypto needed)
+    try:
+        user_info = cognito.get_user(AccessToken=token)
+    except (ClientError, BotoCoreError) as exc:
+        logger.warning("Cognito get_user rejected token: %s", exc)
+        raise HTTPException(status_code=401, detail="Invalid or expired token.") from exc
+
+    username = user_info["Username"]
+
+    # Step 2 — verify group membership server-side (can't be spoofed via token claims)
+    try:
+        groups_resp = cognito.admin_list_groups_for_user(
+            Username=username,
+            UserPoolId=user_pool_id,
+        )
+    except (ClientError, BotoCoreError) as exc:
+        logger.warning("Cognito admin_list_groups_for_user failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Could not verify group membership.") from exc
+
+    group_names = [g["GroupName"] for g in groups_resp.get("Groups", [])]
+    if "admins" not in group_names:
         raise HTTPException(status_code=403, detail="Admin access required.")
-    return claims
+
+    return username
 
 
 @app.get("/admin/users")

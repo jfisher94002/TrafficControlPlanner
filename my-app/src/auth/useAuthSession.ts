@@ -32,7 +32,9 @@ export function useAuthSession(authEnabled: boolean): AuthSession {
       const groups = (payload?.['cognito:groups'] as string[] | undefined) ?? []
       setIsAdmin(groups.includes('admins'))
     } catch {
-      /* session fetch failed — not an admin */
+      // session fetch failed — reset to safe defaults
+      setIsAdmin(false)
+      setAccessToken(null)
     }
   }, [])
 
@@ -79,7 +81,7 @@ export function useAuthSession(authEnabled: boolean): AuthSession {
     })
 
     return unsubscribe
-  }, [authEnabled, handleSignOut])
+  }, [authEnabled, handleSignOut, _hydrateSession])
 
   return {
     userId,

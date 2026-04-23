@@ -15,6 +15,8 @@ Globals:
         GITHUB_REPO: !Ref GitHubRepo
         ASSETS_BUCKET: !Ref TcpAssetsBucket
         SES_SENDER_EMAIL: !Ref SesSenderEmail
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+        PLANS_BUCKET: !Ref PlansBucket
         APP_ENV: !Ref Stage
 
 Conditions:
@@ -24,6 +26,8 @@ Conditions:
   HasSignupNotifyConfig: !And
     - !Condition HasSesSenderEmail
     - !Condition HasSignupNotifyEmail
+  HasCognitoUserPoolId: !Not [!Equals [!Ref CognitoUserPoolId, ""]]
+  HasPlansBucket: !Not [!Equals [!Ref PlansBucket, ""]]
 
 Parameters:
   Stage:
@@ -51,6 +55,14 @@ Parameters:
     Type: String
     Default: ""
     Description: "Email address to notify for each confirmed Cognito signup"
+  CognitoUserPoolId:
+    Type: String
+    Default: ""
+    Description: "Cognito User Pool ID — used by admin endpoints to list users"
+  PlansBucket:
+    Type: String
+    Default: ""
+    Description: "S3 bucket name where Amplify Storage writes user plans (plans/{sub}/*.tcp.json)"
 
 Resources:
 
@@ -80,6 +92,27 @@ Resources:
               - Effect: Allow
                 Action: ses:SendEmail
                 Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SesSenderEmail}"
+          - !Ref AWS::NoValue
+        - !If
+          - HasCognitoUserPoolId
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:ListUsers
+                  - cognito-idp:GetUser
+                  - cognito-idp:AdminListGroupsForUser
+                Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
+          - !Ref AWS::NoValue
+        - !If
+          - HasPlansBucket
+          - Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:aws:s3:::${PlansBucket}"
+                Condition:
+                  StringLike:
+                    "s3:prefix": ["plans/*"]
           - !Ref AWS::NoValue
 
   SignupNotifyFunction:

@@ -3,7 +3,7 @@ import { Stage, Layer, Rect, Image as KonvaImage } from "react-konva";
 import type Konva from 'konva';
 import type React from 'react';
 import type {
-  CanvasObject, PolylineRoadObject,
+  CanvasObject, PolylineRoadObject, TaperObject,
   SignData, DeviceData, RoadType, DrawStart, PanStart,
   MapCenter, PlanMeta, Point,
   GeocodeResult,
@@ -20,6 +20,8 @@ import { track } from './analytics';
 import { DEVICES, ROAD_TYPES, SIGN_CATEGORIES, TOOLS, TOOLS_REQUIRING_MAP } from './features/tcp/tcpCatalog';
 import { GridLines, ObjectShape } from './components/tcp/canvas/ObjectShapes';
 import { DrawingOverlays } from './components/tcp/canvas/DrawingOverlays';
+import { SpacingOverlay } from './components/tcp/canvas/SpacingOverlay';
+import { BufferZoneOverlay } from './components/tcp/canvas/BufferZoneOverlay';
 import { ToolButton } from './components/tcp/ui/ToolButton';
 import { SignEditorPanel } from './components/tcp/panels/SignEditorPanel';
 import { COLORS, MIN_ZOOM, MAX_ZOOM } from './features/tcp/constants';
@@ -75,7 +77,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   // Core state
   const [tool, setTool] = useState("select");
   const { objects, setObjects, pushHistory, undo, redo, resetHistory } = useHistory(initialAutosave?.canvasState?.objects ?? []);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selected = selectedIds[selectedIds.length - 1] ?? null;
+  const setSelected = (id: string | null) => setSelectedIds(id ? [id] : []);
   const [zoom, setZoom] = useState<number>(() => initialAutosave?.canvasZoom ?? 1);
   const [offset, setOffset] = useState<Point>(() => initialAutosave?.canvasOffset ?? { x: 0, y: 0 });
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 600 });
@@ -93,6 +97,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const manifestTabRef = useRef<HTMLButtonElement | null>(null);
   const qcTabRef = useRef<HTMLButtonElement | null>(null);
   const [showGrid, setShowGrid] = useState(true);
+  const [showSpacingGuide, setShowSpacingGuide] = useState(false);
+  const [showBufferZone, setShowBufferZone] = useState(false);
   const [showNorthArrow, setShowNorthArrow] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -100,7 +106,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [planId, setPlanId] = useState<string>(() => initialAutosave?.id ?? uid());
   const [planCreatedAt, setPlanCreatedAt] = useState<string>(() => initialAutosave?.createdAt ?? new Date().toISOString());
   const [planMeta, setPlanMeta] = useState<PlanMeta>(() => initialAutosave?.metadata ?? { projectNumber: "", client: "", location: "", notes: "" });
-  const [clipboard, setClipboard] = useState<CanvasObject | null>(null);
+  const [clipboard, setClipboard] = useState<CanvasObject[] | null>(null);
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [exportPreview, setExportPreview] = useState<Record<string, unknown> | null>(null);
@@ -261,36 +268,37 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       const key = e.key.toUpperCase();
 
       if (e.metaKey || e.ctrlKey) {
-        if (key === "Z" && e.shiftKey) { e.preventDefault(); redo(); setSelected(null); return; }
-        if (key === "Z") { e.preventDefault(); undo(); setSelected(null); return; }
-        if (key === "Y") { e.preventDefault(); redo(); setSelected(null); return; }
-        if (key === "C" && selected) {
+        if (key === "Z" && e.shiftKey) { e.preventDefault(); redo(); setSelectedIds([]); return; }
+        if (key === "Z") { e.preventDefault(); undo(); setSelectedIds([]); return; }
+        if (key === "Y") { e.preventDefault(); redo(); setSelectedIds([]); return; }
+        if (key === "C" && selectedIds.length > 0) {
           e.preventDefault();
-          const obj = objects.find((o) => o.id === selected);
-          if (obj) setClipboard(obj);
+          const objs = objects.filter((o) => selectedIds.includes(o.id));
+          if (objs.length > 0) setClipboard(objs);
           return;
         }
         if (key === "V" && clipboard) {
           e.preventDefault();
-          const clone = cloneObject(clipboard);
-          const newObjs = [...objects, clone];
-          pushHistory(newObjs); setSelected(clone.id);
-          setClipboard(clone); // shift clipboard so repeated Ctrl+V continues to offset
+          const clones = clipboard.map((o) => cloneObject(o));
+          const newObjs = [...objects, ...clones];
+          pushHistory(newObjs); setSelectedIds(clones.map((c) => c.id));
+          setClipboard(clones); // shift clipboard so repeated Ctrl+V continues to offset
           return;
         }
-        if (key === "D" && selected) {
+        if (key === "D" && selectedIds.length > 0) {
           e.preventDefault();
-          const obj = objects.find((o) => o.id === selected);
-          if (obj) {
-            const clone = cloneObject(obj);
-            const newObjs = [...objects, clone];
-            pushHistory(newObjs); setSelected(clone.id);
+          const objs = objects.filter((o) => selectedIds.includes(o.id));
+          if (objs.length > 0) {
+            const clones = objs.map((o) => cloneObject(o));
+            pushHistory([...objects, ...clones]);
+            setSelectedIds(clones.map((c) => c.id));
           }
           return;
         }
       }
 
       if (key === "ESCAPE") {
+        setSelectedIds([]); setMarquee(null);
         setPolyPoints([]); setCurvePoints([]); setCubicPoints([]); setDrawStart(null); return;
       }
 
@@ -298,16 +306,16 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         if (tool === "road" && (roadDrawMode === "poly" || roadDrawMode === "smooth") && polyPoints.length >= 2) {
           const newRoad: PolylineRoadObject = { id: uid(), type: "polyline_road", points: [...polyPoints], width: selectedRoadType.width, realWidth: selectedRoadType.realWidth, lanes: selectedRoadType.lanes, roadType: selectedRoadType.id, smooth: roadDrawMode === "smooth" };
           const newObjs = [...objects, newRoad];
-          pushHistory(newObjs); setSelected(newRoad.id); setPolyPoints([]);
+          pushHistory(newObjs); setSelectedIds([newRoad.id]); setPolyPoints([]);
           track('road_drawn', { road_type: selectedRoadType.id, draw_mode: roadDrawMode, point_count: polyPoints.length });
         }
         return;
       }
 
       if (key === "DELETE" || key === "BACKSPACE") {
-        if (selected) {
-          const newObjs = objects.filter((o) => o.id !== selected);
-          pushHistory(newObjs); setSelected(null);
+        if (selectedIds.length > 0) {
+          const newObjs = objects.filter((o) => !selectedIds.includes(o.id));
+          pushHistory(newObjs); setSelectedIds([]);
         }
         return;
       }
@@ -322,17 +330,17 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [selected, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, requestTool]);
+  }, [selectedIds, objects, clipboard, undo, redo, pushHistory, tool, roadDrawMode, polyPoints, selectedRoadType, requestTool, setMarquee]);
 
   // Mouse handlers + toWorld/trySnap/hitTest — managed by useCanvasEvents hook
   const { handleMouseDown, handleMouseMove, handleMouseUp, handleWheel } = useCanvasEvents({
     tool, roadDrawMode, intersectionType, snapEnabled,
-    objects, selected, zoom, offset, mapCenter,
+    objects, selectedIds, zoom, offset, mapCenter,
     selectedSign, selectedDevice, selectedRoadType,
     polyPoints, curvePoints, cubicPoints,
     drawStart, isPanning, panStart,
     stageRef, lastClickTimeRef, lastClickPosRef,
-    setObjects, setSelected, setZoom, setOffset, setMapCenter,
+    setObjects, setSelectedIds, setMarquee, setZoom, setOffset, setMapCenter,
     setIsPanning, setPanStart, setDrawStart,
     setPolyPoints, setCurvePoints, setCubicPoints,
     setSnapIndicator, setCursorPos, pushHistory,
@@ -728,6 +736,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
       .map(s => ({ sign: s, catLabel: "Custom", catColor: COLORS.textMuted }))
     return [...builtIn, ...custom]
   })()
+
+  const selectedTaperObj = objects.find((o): o is TaperObject => o.id === selected && o.type === 'taper') ?? null;
+  const selectedTaper = showSpacingGuide ? selectedTaperObj : null;
+  const selectedTaperForBuffer = showBufferZone ? selectedTaperObj : null;
 
   return (
     <div style={{ width: "100%", height: "100vh", display: "flex", flexDirection: "column", background: COLORS.bg, color: COLORS.text, fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace", overflow: "hidden", userSelect: "none" }}>
@@ -1167,7 +1179,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             <Layer x={offset.x} y={offset.y} scaleX={zoom} scaleY={zoom}>
               {showGrid && <GridLines offset={offset} zoom={zoom} canvasSize={canvasSize} />}
               {objects.map((obj) => {
-                const isSel = obj.id === selected;
+                const isSel = selectedIds.includes(obj.id);
                 const robj = ('realWidth' in obj && (obj as { realWidth?: number }).realWidth && mapCenter)
                   ? { ...obj, width: geoRoadWidthPx(obj as { width: number; realWidth?: number }, mapCenter) }
                   : obj;
@@ -1187,6 +1199,19 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                 curvePoints={curvePoints}
                 cubicPoints={cubicPoints}
               />
+              {selectedTaper && <SpacingOverlay taper={selectedTaper} />}
+              {selectedTaperForBuffer && <BufferZoneOverlay taper={selectedTaperForBuffer} />}
+              {marquee && (
+                <Rect
+                  x={marquee.x} y={marquee.y}
+                  width={marquee.w} height={marquee.h}
+                  fill="rgba(99,179,237,0.08)"
+                  stroke="rgba(99,179,237,0.7)"
+                  strokeWidth={1 / zoom}
+                  dash={[6 / zoom, 4 / zoom]}
+                  listening={false}
+                />
+              )}
             </Layer>
           </Stage>
 
@@ -1342,7 +1367,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
               <button type="button" onClick={() => setRightPanel(false)} data-testid="close-right-panel" style={{ background: "none", border: "none", color: COLORS.textDim, cursor: "pointer", fontSize: 14, padding: "0 10px" }}>×</button>
             </div>
             {rightTab === "properties"
-              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} onAutoChannelize={handleAutoChannelize} />
+              ? <PropertyPanel selected={selected} objects={objects} onUpdate={updateObject} onDelete={deleteObject} onReorder={reorderObject} planMeta={planMeta} onUpdateMeta={setPlanMeta} onAutoChannelize={handleAutoChannelize} showSpacingGuide={showSpacingGuide} onToggleSpacingGuide={() => setShowSpacingGuide((v) => !v)} showBufferZone={showBufferZone} onToggleBufferZone={() => setShowBufferZone((v) => !v)} />
               : rightTab === "manifest"
               ? <ManifestPanel objects={objects} />
               : <QCPanel issues={qcIssues} />

@@ -6,3 +6,4 @@ pydantic==2.10.3
 reportlab==4.2.5
 Pillow==11.1.0
 uvicorn==0.32.1
+posthog==5.4.0

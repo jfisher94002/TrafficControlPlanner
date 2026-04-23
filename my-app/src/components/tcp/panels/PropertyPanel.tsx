@@ -15,9 +15,13 @@ interface PropertyPanelProps {
   planMeta: PlanMeta;
   onUpdateMeta: (meta: PlanMeta) => void;
   onAutoChannelize: (taperId: string, workZoneLengthFt: number) => void;
+  showSpacingGuide: boolean;
+  onToggleSpacingGuide: () => void;
+  showBufferZone: boolean;
+  onToggleBufferZone: () => void;
 }
 
-export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta, onAutoChannelize }: PropertyPanelProps) {
+export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder, planMeta, onUpdateMeta, onAutoChannelize, showSpacingGuide, onToggleSpacingGuide, showBufferZone, onToggleBufferZone }: PropertyPanelProps) {
   const [workZoneLength, setWorkZoneLength] = useState(500);
   if (!selected) {
     return (
@@ -128,6 +132,27 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
                 style={{ width: "100%", accentColor: COLORS.accent }}
                 onChange={(e) => onUpdate(t.id, { rotation: +e.target.value })} />
             </label>
+            <div style={{ borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: 8, marginTop: 4 }}>
+              {sectionTitle("Compliance Overlays")}
+              <div style={{ fontSize: 10, color: COLORS.textDim, marginBottom: 6 }}>
+                Show MUTCD Table 6H-3 advance warning sign distances on canvas
+              </div>
+              <button type="button"
+                aria-pressed={showSpacingGuide}
+                style={{ ...panelBtnStyle(showSpacingGuide), background: showSpacingGuide ? COLORS.info : undefined, color: showSpacingGuide ? '#fff' : undefined, width: '100%', marginBottom: 6 }}
+                onClick={onToggleSpacingGuide}>
+                {showSpacingGuide ? 'Hide Spacing Guide' : 'Show Spacing Guide'}
+              </button>
+              <div style={{ fontSize: 10, color: COLORS.textDim, marginBottom: 6 }}>
+                Show MUTCD Part 6C buffer zone between taper and first advance sign
+              </div>
+              <button type="button"
+                aria-pressed={showBufferZone}
+                style={{ ...panelBtnStyle(showBufferZone), background: showBufferZone ? 'rgba(249,115,22,0.75)' : undefined, color: showBufferZone ? '#fff' : undefined, width: '100%', marginBottom: 8 }}
+                onClick={onToggleBufferZone}>
+                {showBufferZone ? 'Hide Buffer Zone' : 'Show Buffer Zone'}
+              </button>
+            </div>
             <div style={{ borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: 8, marginTop: 4 }}>
               {sectionTitle("Auto-Channelize")}
               <label style={{ fontSize: 11, color: COLORS.textMuted }}>

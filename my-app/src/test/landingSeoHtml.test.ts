@@ -19,7 +19,8 @@ describe('landing page SEO HTML contract', () => {
     const canonical = documentFromHtml.querySelector('link[rel="canonical"]')?.getAttribute('href')
     const ogUrl = getMetaContent('property', 'og:url')
 
-    expect(canonical).toBe('https://tcplanpro.com/')
+    // URLs use %VITE_SITE_URL% template — substituted at build time, not test time
+    expect(canonical).toContain('%VITE_SITE_URL%')
     expect(ogUrl).toBe(canonical)
   })
 
@@ -27,7 +28,9 @@ describe('landing page SEO HTML contract', () => {
     const ogImage = getMetaContent('property', 'og:image')
     const twitterImage = getMetaContent('name', 'twitter:image')
 
-    expect(ogImage).toBe('https://tcplanpro.com/og-image.png')
+    // Images use %VITE_SITE_URL% template — substituted at build time, not test time
+    expect(ogImage).toContain('%VITE_SITE_URL%')
+    expect(ogImage).toContain('og-image.png')
     expect(twitterImage).toBe(ogImage)
   })
 
@@ -59,7 +62,7 @@ describe('landing page SEO HTML contract', () => {
   it('keeps the hero h1 aligned with the SEO headline', () => {
     const heading = documentFromHtml.querySelector('section.hero h1')
 
-    expect(heading?.textContent).toContain('Traffic control plan software')
+    expect(heading?.textContent).toContain('Traffic Control Plan Software')
     expect(heading?.textContent?.toLowerCase()).toContain('built for the field')
   })
 })

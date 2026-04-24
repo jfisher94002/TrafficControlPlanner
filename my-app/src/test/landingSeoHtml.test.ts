@@ -34,11 +34,21 @@ describe('landing page SEO HTML contract', () => {
     expect(twitterImage).toBe(ogImage)
   })
 
+  it('includes og:image dimensions and alt text', () => {
+    expect(getMetaContent('property', 'og:image:width')).toBe('1200')
+    expect(getMetaContent('property', 'og:image:height')).toBe('630')
+    expect(getMetaContent('property', 'og:image:alt')).toBeTruthy()
+  })
+
   it('includes core social/SEO metadata fields', () => {
     expect(getMetaContent('name', 'description')).toBeTruthy()
     expect(getMetaContent('name', 'robots')).toBe('index, follow')
     expect(getMetaContent('property', 'og:type')).toBe('website')
     expect(getMetaContent('name', 'twitter:card')).toBe('summary_large_image')
+  })
+
+  it('does not include the keywords meta tag (ignored/penalized by crawlers)', () => {
+    expect(documentFromHtml.querySelector('meta[name="keywords"]')).toBeNull()
   })
 
   it('ships the favicon/manifest links added for browsers', () => {
@@ -59,10 +69,34 @@ describe('landing page SEO HTML contract', () => {
     ).toBeTruthy()
   })
 
+  it('includes msapplication tile image and color', () => {
+    expect(getMetaContent('name', 'msapplication-TileImage')).toBe('/mstile-150x150.png')
+    expect(getMetaContent('name', 'msapplication-TileColor')).toBeTruthy()
+  })
+
+  it('has a valid heading hierarchy (h1 → h2s)', () => {
+    const h1s = documentFromHtml.querySelectorAll('h1')
+    const h2s = documentFromHtml.querySelectorAll('h2')
+
+    expect(h1s).toHaveLength(1)
+    expect(h2s.length).toBeGreaterThanOrEqual(3)
+  })
+
   it('keeps the hero h1 aligned with the SEO headline', () => {
     const heading = documentFromHtml.querySelector('section.hero h1')
 
     expect(heading?.textContent).toContain('Traffic Control Plan Software')
     expect(heading?.textContent?.toLowerCase()).toContain('built for the field')
+  })
+
+  it('includes JSON-LD SoftwareApplication structured data', () => {
+    const ldScript = documentFromHtml.querySelector('script[type="application/ld+json"]')
+    expect(ldScript).toBeTruthy()
+
+    const schema = JSON.parse(ldScript!.textContent!)
+    expect(schema['@type']).toBe('SoftwareApplication')
+    expect(schema.name).toBe('TCP Plan Pro')
+    expect(schema.applicationCategory).toBeTruthy()
+    expect(schema.offers).toBeTruthy()
   })
 })

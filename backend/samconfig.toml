@@ -17,8 +17,11 @@ parameter_overrides = [
   "Stage=dev",
   "AllowedOrigins=*"
 ]
-# GitHubToken must be supplied at deploy time — do NOT commit it here:
-#   sam deploy --parameter-overrides "GitHubToken=github_pat_..."
+# Supply these at deploy time — do NOT commit real values here:
+#   sam deploy --parameter-overrides \
+#     "GitHubToken=github_pat_..." \
+#     "CognitoUserPoolId=<your-user-pool-id>" \
+#     "PlansBucket=<your-amplify-plans-bucket>"
 
 [staging.global.parameters]
 stack_name = "tcp-backend-staging"
@@ -35,5 +38,8 @@ parameter_overrides = [
   "Stage=staging",
   "AllowedOrigins=https://staging.tcplanpro.com,https://staging.d1i0disr0t50m8.amplifyapp.com"
 ]
-# GitHubToken must be supplied at deploy time:
-#   sam deploy --config-env staging --parameter-overrides "GitHubToken=github_pat_..."
+# Supply these at deploy time — do NOT commit real values here:
+#   sam deploy --config-env staging --parameter-overrides \
+#     "GitHubToken=github_pat_..." \
+#     "CognitoUserPoolId=<your-user-pool-id>" \
+#     "PlansBucket=<your-amplify-plans-bucket>"

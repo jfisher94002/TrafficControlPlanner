@@ -9,7 +9,6 @@ import { initAnalytics, identifyUser, resetAnalytics, track } from './analytics'
 describe('analytics — key absent (dev/CI)', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_POSTHOG_KEY', '')
-    vi.stubEnv('MODE', 'test')
     vi.clearAllMocks()
   })
   afterEach(() => vi.unstubAllEnvs())
@@ -41,7 +40,6 @@ describe('analytics — key absent (dev/CI)', () => {
 describe('analytics — key present', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_POSTHOG_KEY', 'phc_testkey')
-    vi.stubEnv('MODE', 'test')
     resetAnalytics()
     vi.clearAllMocks()
   })
@@ -52,18 +50,16 @@ describe('analytics — key present', () => {
     expect(posthog.init).toHaveBeenCalledWith('phc_testkey', expect.objectContaining({
       api_host: 'https://us.i.posthog.com',
     }))
-    expect(posthog.register).toHaveBeenCalledWith({
+    expect(posthog.register).toHaveBeenCalledWith(expect.objectContaining({
       auth_state: 'anonymous',
-      environment: 'test',
-    })
+    }))
   })
 
   it('identifyUser calls posthog.identify with userId and email', () => {
     identifyUser('uid-123', 'user@example.com')
-    expect(posthog.register).toHaveBeenCalledWith({
+    expect(posthog.register).toHaveBeenCalledWith(expect.objectContaining({
       auth_state: 'identified',
-      environment: 'test',
-    })
+    }))
     expect(posthog.identify).toHaveBeenCalledWith('uid-123', { email: 'user@example.com' })
   })
 
@@ -77,51 +73,25 @@ describe('analytics — key present', () => {
     vi.clearAllMocks()
     resetAnalytics()
     expect(posthog.reset).toHaveBeenCalledOnce()
-    expect(posthog.register).toHaveBeenCalledWith({
+    expect(posthog.register).toHaveBeenCalledWith(expect.objectContaining({
       auth_state: 'anonymous',
-      environment: 'test',
-    })
+    }))
   })
 
-  it('track calls posthog.capture with base and custom properties', () => {
+  it('track calls posthog.capture with caller-supplied properties', () => {
     track('plan_exported_pdf', { object_count: 3 })
-    expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', {
-      auth_state: 'anonymous',
-      environment: 'test',
-      object_count: 3,
-    })
+    expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', { object_count: 3 })
   })
 
-  it('track uses identified auth_state after identifyUser', () => {
-    identifyUser('uid-123', 'user@example.com')
-    vi.clearAllMocks()
-
+  it('track passes undefined properties when none supplied', () => {
     track('plan_exported_pdf')
-    expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', {
-      auth_state: 'identified',
-      environment: 'test',
-    })
+    expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', undefined)
   })
 
-  it('uses VITE_APP_ENV when MODE is absent', () => {
-    vi.stubEnv('MODE', '')
-    vi.stubEnv('VITE_APP_ENV', 'staging')
-
-    track('plan_exported_pdf')
-    expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', {
-      auth_state: 'anonymous',
-      environment: 'staging',
-    })
-  })
-
-  it('uses unknown environment when MODE and VITE_APP_ENV are absent', () => {
-    vi.stubEnv('MODE', '')
-    vi.stubEnv('VITE_APP_ENV', '')
-
-    track('plan_exported_pdf')
-    expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', {
-      auth_state: 'anonymous',
-      environment: 'unknown',
-    })
+  it('track does not pass auth_state or environment (handled by posthog.register super-properties)', () => {
+    track('plan_exported_pdf', { object_count: 3 })
+    const [, capturedProps] = vi.mocked(posthog.capture).mock.calls[0]
+    expect(capturedProps).not.toHaveProperty('auth_state')
+    expect(capturedProps).not.toHaveProperty('environment')
   })
 })

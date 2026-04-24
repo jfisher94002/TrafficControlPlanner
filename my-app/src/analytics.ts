@@ -5,20 +5,16 @@ function getKey(): string | undefined {
   return import.meta.env.VITE_POSTHOG_KEY as string | undefined
 }
 
-function getEnvironment(): string {
-  return (import.meta.env.MODE as string | undefined)
-    || (import.meta.env.VITE_APP_ENV as string | undefined)
-    || 'unknown'
-}
+const environment: string =
+  (import.meta.env.MODE as string | undefined) ||
+  (import.meta.env.VITE_APP_ENV as string | undefined) ||
+  'unknown'
 
 type AnalyticsAuthState = 'identified' | 'anonymous'
 let authState: AnalyticsAuthState = 'anonymous'
 
 function getBaseProperties(): Record<string, unknown> {
-  return {
-    auth_state: authState,
-    environment: getEnvironment(),
-  }
+  return { auth_state: authState, environment }
 }
 
 function registerBaseProperties() {
@@ -58,8 +54,5 @@ export function resetAnalytics() {
 /** Track a named event with optional properties. */
 export function track(event: string, properties?: Record<string, unknown>) {
   if (!getKey()) return
-  posthog.capture(event, {
-    ...getBaseProperties(),
-    ...properties,
-  })
+  posthog.capture(event, properties)
 }

@@ -489,6 +489,7 @@ describe('Buffer zone overlay', () => {
     expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /hide buffer zone/i })).not.toBeInTheDocument()
   })
 
   it('hides the overlay when selection changes from taper to non-taper object', async () => {

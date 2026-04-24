@@ -41,6 +41,18 @@ describe('landing page SEO HTML contract', () => {
     expect(getMetaContent('name', 'twitter:card')).toBe('summary_large_image')
   })
 
+  it('keeps the HTML title and social headlines in sync', () => {
+    const pageTitle = documentFromHtml.querySelector('title')?.textContent?.trim()
+    const ogTitle = getMetaContent('property', 'og:title')
+    const twitterTitle = getMetaContent('name', 'twitter:title')
+
+    expect(pageTitle).toBeTruthy()
+    expect(ogTitle).toBe(pageTitle)
+    expect(twitterTitle).toBe(pageTitle)
+    expect(documentFromHtml.querySelectorAll('meta[property="og:title"]')).toHaveLength(1)
+    expect(documentFromHtml.querySelectorAll('meta[name="twitter:title"]')).toHaveLength(1)
+  })
+
   it('ships the favicon/manifest links added for browsers', () => {
     expect(
       documentFromHtml.querySelector('link[rel="icon"][href="/favicon.ico"][sizes="any"]'),

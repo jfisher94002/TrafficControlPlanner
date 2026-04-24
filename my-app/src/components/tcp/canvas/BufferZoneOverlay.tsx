@@ -9,28 +9,45 @@ const BUFFER_STROKE = 'rgba(249,115,22,0.7)';
 const HATCH_COLOR   = 'rgba(249,115,22,0.25)';
 const LABEL_COLOR   = 'rgba(249,115,22,0.95)';
 
+export interface BufferZoneGeometry {
+  /** Left edge of buffer rect in taper-local x (negative = upstream) */
+  rectX: number;
+  /** Width of buffer rect in px (= 1× advance sign spacing) */
+  rectW: number;
+  /** Height of buffer rect in px (= full road width) */
+  rectH: number;
+  /** Half road width in px */
+  hw: number;
+  /** Buffer distance in feet, for the label */
+  spacingFt: number;
+}
+
+/** Pure geometry calculation — exported for testability. */
+export function getBufferZoneGeometry(taper: TaperObject): BufferZoneGeometry {
+  const spacingFt = mutcdSignSpacingFt(taper.speed);
+  const spacingPx = spacingFt * TAPER_SCALE;
+  const hw = (taper.laneWidth * taper.numLanes * TAPER_SCALE) / 2;
+  return {
+    rectX: -spacingPx,
+    rectW: spacingPx,
+    rectH: hw * 2,
+    hw,
+    spacingFt,
+  };
+}
+
 interface BufferZoneOverlayProps {
   taper: TaperObject;
 }
 
 export function BufferZoneOverlay({ taper }: BufferZoneOverlayProps) {
-  const spacingFt = mutcdSignSpacingFt(taper.speed);
-  const spacingPx = spacingFt * TAPER_SCALE;
-  const hw = (taper.laneWidth * taper.numLanes * TAPER_SCALE) / 2;
-
-  // Buffer rect in taper-local space:
-  //   x: from -spacingPx (first advance sign) to 0 (taper origin)
-  //   y: from -hw to +hw (road width)
-  const rectX = -spacingPx;
-  const rectW = spacingPx;
-  const rectH = hw * 2;
+  const { rectX, rectW, rectH, hw, spacingFt } = getBufferZoneGeometry(taper);
 
   // Diagonal hatch lines at 45°, spaced every 12px
   const hatchSpacing = 12;
   const hatchLines: number[][] = [];
-  const diagRange = rectW + rectH;
-  for (let d = -rectH; d <= diagRange; d += hatchSpacing) {
-    // Line from top-left corner to bottom-right, clipped to rect by clipRect on Group
+  for (let d = -rectH; d <= rectW + rectH; d += hatchSpacing) {
+    // Line clipped to rect by Group clipX/clipY/clipWidth/clipHeight
     hatchLines.push([rectX + d, -hw, rectX + d + rectH, hw]);
   }
 
@@ -47,7 +64,7 @@ export function BufferZoneOverlay({ taper }: BufferZoneOverlayProps) {
         listening={false}
       />
 
-      {/* Hatch lines clipped to the buffer rect */}
+      {/* Hatch lines clipped by clipX/clipY/clipWidth/clipHeight on Group */}
       <Group
         clipX={rectX} clipY={-hw}
         clipWidth={rectW} clipHeight={rectH}
@@ -64,7 +81,7 @@ export function BufferZoneOverlay({ taper }: BufferZoneOverlayProps) {
         ))}
       </Group>
 
-      {/* "BUFFER" label centred in the zone */}
+      {/* "BUFFER" label — top-left of the zone */}
       <Text
         x={rectX + 4}
         y={-hw + 4}

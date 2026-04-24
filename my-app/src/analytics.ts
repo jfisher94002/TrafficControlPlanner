@@ -5,6 +5,23 @@ function getKey(): string | undefined {
   return import.meta.env.VITE_POSTHOG_KEY as string | undefined
 }
 
+const environment: string =
+  (import.meta.env.MODE as string | undefined) ||
+  (import.meta.env.VITE_APP_ENV as string | undefined) ||
+  'unknown'
+
+type AnalyticsAuthState = 'identified' | 'anonymous'
+let authState: AnalyticsAuthState = 'anonymous'
+
+function getBaseProperties(): Record<string, unknown> {
+  return { auth_state: authState, environment }
+}
+
+function registerBaseProperties() {
+  if (!getKey()) return
+  posthog.register(getBaseProperties())
+}
+
 /** Call once at app startup. No-ops silently when the key is absent. */
 export function initAnalytics() {
   const key = getKey()
@@ -15,11 +32,14 @@ export function initAnalytics() {
     capture_pageview: true,
     autocapture: false,
   })
+  registerBaseProperties()
 }
 
 /** Tie all future events to the signed-in user. */
 export function identifyUser(userId: string, email: string | null) {
   if (!getKey()) return
+  authState = 'identified'
+  registerBaseProperties()
   posthog.identify(userId, { email: email ?? undefined })
 }
 
@@ -27,6 +47,8 @@ export function identifyUser(userId: string, email: string | null) {
 export function resetAnalytics() {
   if (!getKey()) return
   posthog.reset()
+  authState = 'anonymous'
+  registerBaseProperties()
 }
 
 /** Track a named event with optional properties. */

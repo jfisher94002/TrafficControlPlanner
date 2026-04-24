@@ -96,6 +96,7 @@ describe('landing page SEO HTML contract', () => {
     const schema = JSON.parse(ldScript!.textContent!)
     expect(schema['@type']).toBe('SoftwareApplication')
     expect(schema.name).toBe('TCP Plan Pro')
+    expect(schema.url).toContain('%VITE_SITE_URL%')
     expect(schema.applicationCategory).toBeTruthy()
     expect(schema.offers).toBeTruthy()
   })

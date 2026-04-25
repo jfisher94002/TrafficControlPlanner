@@ -17,6 +17,7 @@ beforeEach(() => {
   localStorage.clear()
   // Seed a mapCenter so drawing tools are not blocked by the address guard in any test
   localStorage.setItem('tcp_autosave', JSON.stringify({ mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 15 } }))
+  window.history.pushState({}, '', '/')
   vi.restoreAllMocks()
 })
 
@@ -599,6 +600,117 @@ describe('localStorage auto-save', () => {
     expect(autosaveCalls.length).toBeGreaterThan(0)
     const payload = JSON.parse(autosaveCalls[autosaveCalls.length - 1][1] as string)
     expect(payload.userId).toBe('user-42')
+  })
+})
+
+// ─── JSON seed import ─────────────────────────────────────────────────────────
+describe('JSON seed import', () => {
+  const AUTOSAVE_KEY = 'tcp_autosave'
+
+  const seedSign = (id?: string) => ({
+    ...(id ? { id } : {}),
+    type: 'sign',
+    x: 120,
+    y: 240,
+    rotation: 0,
+    scale: 1,
+    signData: {
+      id: 'roadwork',
+      label: 'ROAD WORK',
+      shape: 'diamond',
+      color: '#f97316',
+      textColor: '#111',
+      mutcd: 'W20-1',
+    },
+  })
+
+  const savedPlan = () => JSON.parse(localStorage.getItem(AUTOSAVE_KEY) ?? 'null')
+
+  it('applies ?seed JSON on mount, replaces autosaved objects, and resets undo history', async () => {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+      canvasState: { objects: [seedSign('old-autosave-sign')] },
+      mapCenter: { lat: 37, lng: -122, zoom: 15 },
+    }))
+    const seed = {
+      mapCenter: { lat: 37.7749, lng: -122.4194 },
+      objects: [seedSign('url-seeded-sign')],
+    }
+    window.history.pushState({}, '', `/?seed=${window.btoa(JSON.stringify(seed))}`)
+
+    const { user } = setup()
+
+    await waitFor(() => expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects'))
+    await waitFor(() => {
+      const saved = savedPlan()
+      expect(saved.canvasState.objects.map((o: { id: string }) => o.id)).toEqual(['url-seeded-sign'])
+      expect(saved.mapCenter).toEqual({ lat: 37.7749, lon: -122.4194, zoom: 16 })
+    })
+
+    await user.click(screen.getByTestId('undo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    expect(savedPlan().canvasState.objects.map((o: { id: string }) => o.id)).toEqual(['url-seeded-sign'])
+  })
+
+  it('generates ids for seed objects that omit ids', async () => {
+    window.history.pushState({}, '', `/?seed=${window.btoa(JSON.stringify({ objects: [seedSign()] }))}`)
+
+    setup()
+
+    await waitFor(() => {
+      const [{ id }] = savedPlan().canvasState.objects as { id?: string }[]
+      expect(id).toEqual(expect.any(String))
+      expect(id).not.toHaveLength(0)
+    })
+  })
+
+  it('exposes window.__tcpSeed for automation and reports invalid seed errors', async () => {
+    setup()
+
+    await waitFor(() => expect((window as unknown as { __tcpSeed?: unknown }).__tcpSeed).toEqual(expect.any(Function)))
+    const seedResult = (window as unknown as { __tcpSeed: (raw: unknown) => string }).__tcpSeed({
+      mapCenter: { lat: 38, lon: -121, zoom: 17 },
+      objects: [seedSign('hook-seeded-sign')],
+    })
+
+    expect(seedResult).toBe('ok')
+    await waitFor(() => expect(savedPlan().canvasState.objects[0].id).toBe('hook-seeded-sign'))
+    expect((window as unknown as { __tcpSeed: (raw: unknown) => string }).__tcpSeed(null)).toContain('Seed must be a JSON object')
+  })
+
+  it('imports pasted JSON from the toolbar modal and replaces current canvas objects', async () => {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+      canvasState: { objects: [seedSign('old-autosave-sign')] },
+      mapCenter: { lat: 37, lng: -122, zoom: 15 },
+    }))
+    const { user } = setup()
+
+    await user.click(screen.getByTestId('import-json-button'))
+    fireEvent.change(screen.getByTestId('seed-input'), { target: { value: JSON.stringify({
+      mapCenter: { lat: 40, lon: -120, zoom: 18 },
+      objects: [seedSign('modal-seeded-sign')],
+    }) } })
+    await user.click(screen.getByTestId('seed-apply-button'))
+
+    await waitFor(() => expect(screen.queryByTestId('seed-input')).not.toBeInTheDocument())
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    await waitFor(() => {
+      const saved = savedPlan()
+      expect(saved.canvasState.objects.map((o: { id: string }) => o.id)).toEqual(['modal-seeded-sign'])
+      expect(saved.mapCenter).toEqual({ lat: 40, lon: -120, zoom: 18 })
+    })
+  })
+
+  it('keeps the import modal open and preserves state when pasted JSON is invalid', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    const { user } = setup()
+
+    await user.click(screen.getByTestId('import-json-button'))
+    fireEvent.change(screen.getByTestId('seed-input'), { target: { value: '{not json' } })
+    await user.click(screen.getByTestId('seed-apply-button'))
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid JSON'))
+    expect(screen.getByTestId('seed-input')).toBeInTheDocument()
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
   })
 })
 

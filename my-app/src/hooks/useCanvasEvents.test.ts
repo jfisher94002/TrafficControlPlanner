@@ -425,16 +425,18 @@ describe('useCanvasEvents multi-select', () => {
   })
 
   it('group drag preserves line length while moving both endpoints', () => {
-    const arrow: CanvasObject = { id: 'arrow-1', type: 'arrow', x1: 10, y1: 20, x2: 60, y2: 45, color: '#fff' }
-    const unselectedArrow: CanvasObject = { id: 'arrow-2', type: 'arrow', x1: 100, y1: 110, x2: 130, y2: 140, color: '#fff' }
+    const arrow1: CanvasObject = { id: 'arrow-1', type: 'arrow', x1: 10, y1: 20, x2: 60, y2: 45, color: '#fff' }
+    const arrow2: CanvasObject = { id: 'arrow-2', type: 'arrow', x1: 5, y1: 5, x2: 25, y2: 25, color: '#fff' }
+    const unselectedArrow: CanvasObject = { id: 'arrow-3', type: 'arrow', x1: 100, y1: 110, x2: 130, y2: 140, color: '#fff' }
     const { props, mocks } = makeProps({
       tool: 'select',
-      objects: [arrow, unselectedArrow],
-      selectedIds: ['arrow-1'],
+      objects: [arrow1, arrow2, unselectedArrow],
+      selectedIds: ['arrow-1', 'arrow-2'],
       drawStart: {
         x: 5, y: 10, id: 'arrow-1',
         groupOrigPositionsById: {
           'arrow-1': { id: 'arrow-1', ox: 10, oy: 20, ox2: 60, oy2: 45 },
+          'arrow-2': { id: 'arrow-2', ox: 5, oy: 5, ox2: 25, oy2: 25 },
         },
       },
       stageRef: makeRef({
@@ -449,9 +451,12 @@ describe('useCanvasEvents multi-select', () => {
     })
 
     const updater = mocks.setObjects.mock.calls[0][0]
-    const updated = updater([arrow, unselectedArrow]) as CanvasObject[]
+    const updated = updater([arrow1, arrow2, unselectedArrow]) as CanvasObject[]
+    // Both selected arrows move by dx=15, dy=25
     expect(updated[0]).toMatchObject({ x1: 25, y1: 45, x2: 75, y2: 70 })
-    expect(updated[1]).toEqual(unselectedArrow)
+    expect(updated[1]).toMatchObject({ x1: 20, y1: 30, x2: 40, y2: 50 })
+    // Unselected arrow is unchanged
+    expect(updated[2]).toEqual(unselectedArrow)
   })
 
   it('group drag moves every point of selected multi-point roads from their original positions', () => {
@@ -465,14 +470,16 @@ describe('useCanvasEvents multi-select', () => {
       roadType: ROAD_TYPE.id,
       smooth: false,
     }
+    const anchorSign: CanvasObject = { id: 'sign-1', type: 'sign', x: 0, y: 0, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
     const { props, mocks } = makeProps({
       tool: 'select',
-      objects: [polyline],
-      selectedIds: ['poly-1'],
+      objects: [polyline, anchorSign],
+      selectedIds: ['poly-1', 'sign-1'],
       drawStart: {
         x: 10, y: 15, id: 'poly-1',
         groupOrigPositionsById: {
           'poly-1': { id: 'poly-1', origPoints: polyline.points.map((p) => ({ ...p })) },
+          'sign-1': { id: 'sign-1', ox: 0, oy: 0 },
         },
       },
       stageRef: makeRef({
@@ -487,7 +494,8 @@ describe('useCanvasEvents multi-select', () => {
     })
 
     const updater = mocks.setObjects.mock.calls[0][0]
-    const updated = updater([polyline]) as CanvasObject[]
+    const updated = updater([polyline, anchorSign]) as CanvasObject[]
+    // All polyline points move by dx=15, dy=-10
     expect(updated[0]).toMatchObject({
       points: [{ x: 25, y: 0 }, { x: 45, y: 10 }, { x: 60, y: 25 }],
     })

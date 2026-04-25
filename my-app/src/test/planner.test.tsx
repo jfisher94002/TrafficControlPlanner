@@ -7,6 +7,12 @@ import * as planStorage from '../planStorage'
 import * as analytics from '../analytics'
 import { DEFAULT_TILE_URL, resolveTileUrl, buildTileUrl } from '../utils'
 
+vi.mock('../components/tcp/canvas/BufferZoneOverlay', () => ({
+  BufferZoneOverlay: ({ taper }: { taper: { id: string } }) => (
+    <div data-testid="buffer-zone-overlay" data-taper-id={taper.id} />
+  ),
+}))
+
 beforeEach(() => {
   localStorage.clear()
   // Seed a mapCenter so drawing tools are not blocked by the address guard in any test
@@ -453,6 +459,77 @@ describe('Taper tool', () => {
     fireEvent.keyDown(window, { key: 'P' })
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
     expect(within(screen.getByTestId('right-panel')).getByText(/taper Properties/i)).toBeInTheDocument()
+  })
+})
+
+// ─── Buffer zone overlay ──────────────────────────────────────────────────────
+describe('Buffer zone overlay', () => {
+  function placeTaper() {
+    fireEvent.keyDown(window, { key: 'P' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+  }
+
+  it('does not render the buffer zone overlay by default after placing a taper', () => {
+    setup()
+    placeTaper()
+    const rightPanel = screen.getByTestId('right-panel')
+    const toggle = within(rightPanel).getByRole('button', { name: /show buffer zone/i })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
+  })
+
+  it('renders the buffer zone overlay when toggled on for a selected taper', async () => {
+    const { user } = setup()
+    placeTaper()
+    const rightPanel = screen.getByTestId('right-panel')
+    await user.click(within(rightPanel).getByRole('button', { name: /show buffer zone/i }))
+    expect(within(rightPanel).getByRole('button', { name: /hide buffer zone/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+
+    await user.click(within(rightPanel).getByRole('button', { name: /hide buffer zone/i }))
+    expect(within(rightPanel).getByRole('button', { name: /show buffer zone/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
+  })
+
+  it('hides the overlay when taper selection is cleared', async () => {
+    const { user } = setup()
+    placeTaper()
+    await user.click(screen.getByRole('button', { name: /show buffer zone/i }))
+    expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /hide buffer zone/i })).not.toBeInTheDocument()
+  })
+
+  it('hides the overlay when selection changes from taper to non-taper object', async () => {
+    const { user } = setup()
+    placeTaper()
+    await user.click(screen.getByRole('button', { name: /show buffer zone/i }))
+    expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(within(screen.getByTestId('right-panel')).getByText(/sign Properties/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /hide buffer zone/i })).not.toBeInTheDocument()
+  })
+
+  it('restores the overlay automatically when a taper is re-selected after deselection', async () => {
+    const { user } = setup()
+    placeTaper()
+    await user.click(screen.getByRole('button', { name: /show buffer zone/i }))
+    expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+
+    // Deselect — overlay hides but toggle state is preserved in component
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
+
+    // Re-select the taper (V = select tool, then click where taper was placed)
+    fireEvent.keyDown(window, { key: 'V' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    // Overlay reappears without clicking toggle again — toggle state persisted
+    expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide buffer zone/i })).toBeInTheDocument()
   })
 })
 

@@ -709,6 +709,17 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setSearchQuery(formatSearchPrimary(result));
     const lat = Number(result?.lat), lon = Number(result?.lon);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      // If the map is already set and objects exist, confirm before moving —
+      // objects are stored in canvas coords and will appear at the wrong location
+      // after the map center changes.
+      if (mapCenter && objects.length > 0) {
+        const confirmed = window.confirm(
+          `Moving to a new address will leave your ${objects.length} existing object${objects.length === 1 ? '' : 's'} at the wrong location.\n\nClear the canvas and start fresh at the new address?`
+        );
+        if (!confirmed) { setSearchOpen(false); return; }
+        resetHistory([]);
+        setSelectedIds([]);
+      }
       setMapCenter({ lat, lon, zoom: 16 }); setOffset({ x: 0, y: 0 }); setZoom(1); setV1NoMapBanner(false);
       setSearchStatus(`Centered on ${formatSearchPrimary(result)}`);
     } else { setSearchStatus("Selected result has no coordinates."); }

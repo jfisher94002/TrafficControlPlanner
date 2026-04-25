@@ -402,7 +402,7 @@ describe('JSON seed import', () => {
   it('keeps the import dialog open and reports invalid seed JSON', async () => {
     const { user } = setup()
     await user.click(screen.getByTestId('import-json-button'))
-    fireEvent.change(screen.getByTestId('seed-input'), { target: { value: '[]' } })
+    fireEvent.change(screen.getByTestId('seed-input'), { target: { value: 'null' } })
     await user.click(screen.getByTestId('seed-apply-button'))
 
     expect(screen.getByText(/invalid json: seed must be a json object/i)).toBeInTheDocument()

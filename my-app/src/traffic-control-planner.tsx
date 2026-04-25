@@ -1167,7 +1167,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
                       </div>
                       <div style={{ display: "flex", gap: 2 }}>
                         {rt.id === 'bike_lane'
-                          ? <div style={{ width: 6, height: 20, background: '#166534', borderRadius: 1, border: '1px solid #4ade80' }} />
+                          ? <div style={{ width: 6, height: 20, background: COLORS.bikeLane, borderRadius: 1, border: `1px solid ${COLORS.bikeLaneStripe}` }} />
                           : Array(rt.lanes).fill(0).map((_, i) => (
                               <div key={i} style={{ width: 4, height: 20, background: COLORS.road, borderRadius: 1, border: `1px solid ${COLORS.panelBorder}` }} />
                             ))

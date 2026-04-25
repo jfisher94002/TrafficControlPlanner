@@ -84,6 +84,7 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
                 {(['right', 'left', 'caution', 'flashing'] as ArrowBoardMode[]).map((mode) => (
                   <button
                     key={mode}
+                    aria-pressed={(obj.arrowBoardMode ?? 'right') === mode}
                     onClick={() => onUpdate(obj.id, { arrowBoardMode: mode })}
                     style={{
                       padding: "5px 4px", fontSize: 10, borderRadius: 4, cursor: "pointer",

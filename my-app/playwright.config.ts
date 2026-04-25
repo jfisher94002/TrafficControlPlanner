@@ -24,7 +24,7 @@ export default defineConfig({
       name: 'setup',
       testMatch: '**/auth.setup.ts',
     },
-    // All other tests reuse the signed-in state
+    // All other tests reuse the signed-in state (used in CI / against staging)
     {
       name: 'chromium',
       use: {
@@ -39,6 +39,13 @@ export default defineConfig({
       name: 'auth',
       use: { ...devices['Desktop Chrome'] },
       testMatch: '**/auth.spec.ts',
+    },
+    // Local dev — no auth setup required; canvas works anonymously
+    // Usage: STAGING_URL=http://localhost:5173 npx playwright test --project=local
+    {
+      name: 'local',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: ['**/auth.setup.ts', '**/auth.spec.ts'],
     },
   ],
 })

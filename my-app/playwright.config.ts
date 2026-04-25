@@ -9,7 +9,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   timeout: 60_000,
-  reporter: [['html', { open: 'never' }], ['list']],
+  reporter: [['html', { open: process.env.CI ? 'never' : 'always' }], ['list']],
 
   use: {
     baseURL: STAGING_URL,
@@ -44,7 +44,10 @@ export default defineConfig({
     // Usage: STAGING_URL=http://localhost:5173 npx playwright test --project=local
     {
       name: 'local',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        screenshot: 'on',
+      },
       testIgnore: ['**/auth.setup.ts', '**/auth.spec.ts'],
     },
   ],

@@ -424,7 +424,7 @@ export function SignShape({ obj, isSelected }: SignShapeProps) {
         ctx.font = `bold ${Math.max(4, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(label, 0, shp === "triangle" ? 4 : 0);
+        ctx.fillText(label, 0, shp === "triangle" ? s * 0.3 : 0);
       }}
     />
   );

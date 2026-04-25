@@ -7,7 +7,7 @@ export function drawSign(
   isSelected: boolean,
 ): void {
   const { x, y, signData, rotation = 0, scale = 1 } = sign;
-  const s = 18 * scale;
+  const s = 12 * scale;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate((rotation * Math.PI) / 180);
@@ -58,10 +58,10 @@ export function drawSign(
 
   ctx.fillStyle = signData.textColor || "#fff";
   const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
-  const baseFontSize = label.length <= 4 ? 13 : label.length <= 8 ? 11 : 8;
-  ctx.font = `bold ${Math.max(6, baseFontSize * scale)}px 'JetBrains Mono', monospace`;
+  const baseFontSize = label.length <= 4 ? 8 : label.length <= 8 ? 6.5 : 5;
+  ctx.font = `bold ${Math.max(4, baseFontSize * scale)}px 'JetBrains Mono', monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(label, 0, shape === "triangle" ? 4 : 0);
+  ctx.fillText(label, 0, shape === "triangle" ? s * 0.3 : 0);
   ctx.restore();
 }

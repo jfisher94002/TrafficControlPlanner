@@ -424,6 +424,99 @@ describe('useCanvasEvents multi-select', () => {
     expect(s2.y).toBe(60 + 36)
   })
 
+  it('group drag preserves line length while moving both endpoints', () => {
+    const arrow: CanvasObject = { id: 'arrow-1', type: 'arrow', x1: 10, y1: 20, x2: 60, y2: 45, color: '#fff' }
+    const unselectedArrow: CanvasObject = { id: 'arrow-2', type: 'arrow', x1: 100, y1: 110, x2: 130, y2: 140, color: '#fff' }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [arrow, unselectedArrow],
+      selectedIds: ['arrow-1'],
+      drawStart: {
+        x: 5, y: 10, id: 'arrow-1',
+        groupOrigPositionsById: {
+          'arrow-1': { id: 'arrow-1', ox: 10, oy: 20, ox2: 60, oy2: 45 },
+        },
+      },
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 20, y: 35 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseMove({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    const updater = mocks.setObjects.mock.calls[0][0]
+    const updated = updater([arrow, unselectedArrow]) as CanvasObject[]
+    expect(updated[0]).toMatchObject({ x1: 25, y1: 45, x2: 75, y2: 70 })
+    expect(updated[1]).toEqual(unselectedArrow)
+  })
+
+  it('group drag moves every point of selected multi-point roads from their original positions', () => {
+    const polyline: CanvasObject = {
+      id: 'poly-1',
+      type: 'polyline_road',
+      points: [{ x: 10, y: 10 }, { x: 30, y: 20 }, { x: 45, y: 35 }],
+      width: 28,
+      realWidth: 24,
+      lanes: 2,
+      roadType: ROAD_TYPE.id,
+      smooth: false,
+    }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [polyline],
+      selectedIds: ['poly-1'],
+      drawStart: {
+        x: 10, y: 15, id: 'poly-1',
+        groupOrigPositionsById: {
+          'poly-1': { id: 'poly-1', origPoints: polyline.points.map((p) => ({ ...p })) },
+        },
+      },
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 25, y: 5 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseMove({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    const updater = mocks.setObjects.mock.calls[0][0]
+    const updated = updater([polyline]) as CanvasObject[]
+    expect(updated[0]).toMatchObject({
+      points: [{ x: 25, y: 0 }, { x: 45, y: 10 }, { x: 60, y: 25 }],
+    })
+    expect(updated[0]).not.toBe(polyline)
+  })
+
+  it('marquee mouseup handles drags from bottom-right to top-left', () => {
+    const road: CanvasObject = { id: 'road-1', type: 'road', x1: 40, y1: 40, x2: 80, y2: 80, width: 28, realWidth: 24, lanes: 2, roadType: ROAD_TYPE.id }
+    const outSign: CanvasObject = { id: 'out-sign', type: 'sign', x: 10, y: 10, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
+    const { props, mocks } = makeProps({
+      tool: 'select',
+      objects: [road, outSign],
+      drawStart: { x: 100, y: 100, isMarquee: true },
+      stageRef: makeRef({
+        getPointerPosition: () => ({ x: 20, y: 20 }),
+      } as unknown as Konva.Stage | null),
+    })
+
+    const { result } = renderHook(() => useCanvasEvents(props))
+
+    act(() => {
+      result.current.handleMouseUp({ evt: {} } as KonvaEventObject<MouseEvent>)
+    })
+
+    expect(mocks.setSelectedIds).toHaveBeenCalledWith(['road-1'])
+    expect(mocks.setMarquee).toHaveBeenCalledWith(null)
+    expect(mocks.setDrawStart).toHaveBeenCalledWith(null)
+  })
+
   it('click without move does not push history', () => {
     const sign: CanvasObject = { id: 'sign-1', type: 'sign', x: 24, y: 36, rotation: 0, scale: 1, signData: { id: 'r1-1', label: 'STOP', shape: 'octagon', color: '#f00', textColor: '#fff' } }
     const { props, mocks } = makeProps({

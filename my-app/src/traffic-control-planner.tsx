@@ -110,6 +110,8 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showSeedModal, setShowSeedModal] = useState(false);
+  const [seedInput, setSeedInput] = useState("");
   const [exportPreview, setExportPreview] = useState<Record<string, unknown> | null>(null);
   const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
@@ -398,6 +400,43 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setZoom(1);
     setLastKnownUpdatedAt(null);
   };
+
+  /** Apply a seed plan from parsed JSON — used by URL param and paste dialog. */
+  const applySeed = useCallback((raw: unknown) => {
+    if (typeof raw !== 'object' || raw === null) throw new Error('Seed must be a JSON object');
+    const seed = raw as Record<string, unknown>;
+    if (seed.mapCenter) {
+      const mc = seed.mapCenter as { lat: number; lon?: number; lng?: number; zoom?: number };
+      const lon = mc.lon ?? mc.lng;
+      if (typeof mc.lat === 'number' && typeof lon === 'number') {
+        setMapCenter({ lat: mc.lat, lon, zoom: typeof mc.zoom === 'number' ? mc.zoom : 16 });
+        setOffset({ x: 0, y: 0 }); setZoom(1);
+      }
+    }
+    if (Array.isArray(seed.objects)) {
+      const seeded = (seed.objects as CanvasObject[]).map(o => ({ ...o, id: o.id ?? uid() }));
+      resetHistory(seeded);
+      setSelectedIds([]);
+    }
+  }, [resetHistory, setOffset, setZoom]);
+
+  // Load seed from ?seed=<base64url-json> on mount
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('seed');
+    if (!param) return;
+    try { applySeed(JSON.parse(atob(param))); }
+    catch (e) { console.warn('[TCP] ?seed param invalid:', e); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Expose window.__tcpSeed() for Playwright tests
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__tcpSeed = (raw: unknown) => {
+      try { applySeed(raw); return 'ok'; }
+      catch (e) { return String(e); }
+    };
+    return () => { delete (window as unknown as Record<string, unknown>).__tcpSeed; };
+  }, [applySeed]);
 
   const handleTemplateApply = useCallback((templateObjects: CanvasObject[], mode: 'replace' | 'merge') => {
     // Reset any in-progress draw state so partial roads don't persist after apply
@@ -706,9 +745,21 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const selectAddressResult = (result: GeocodeResult) => {
-    setSearchQuery(formatSearchPrimary(result));
     const lat = Number(result?.lat), lon = Number(result?.lon);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      // If the map is already set and objects exist, confirm before moving —
+      // objects are stored in canvas coords and will appear at the wrong location
+      // after the map center changes.
+      if (mapCenter && objects.length > 0) {
+        const confirmed = window.confirm(
+          `Moving to a new address will leave your ${objects.length} existing object${objects.length === 1 ? '' : 's'} at the wrong location.\n\nClear the canvas and start fresh at the new address?`
+        );
+        if (!confirmed) { setSearchOpen(false); return; }
+        // Use resetHistory so undo cannot restore objects at the now-wrong location
+        resetHistory([]);
+        setSelectedIds([]);
+      }
+      setSearchQuery(formatSearchPrimary(result));
       setMapCenter({ lat, lon, zoom: 16 }); setOffset({ x: 0, y: 0 }); setZoom(1); setV1NoMapBanner(false);
       setSearchStatus(`Centered on ${formatSearchPrimary(result)}`);
     } else { setSearchStatus("Selected result has no coordinates."); }
@@ -775,13 +826,14 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             data-testid="plan-title"
             value={planTitle}
             onChange={(e) => setPlanTitle(e.target.value)}
-            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, width: 220, padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
+            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, minWidth: 60, flex: "0 1 180px", padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
           />
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
           <button onClick={() => setShowTemplatePicker(true)} data-testid="templates-button" style={panelBtnStyle(false)} title="Start from a template">Templates</button>
+          <button onClick={() => { setSeedInput(""); setShowSeedModal(true); }} data-testid="import-json-button" style={panelBtnStyle(false)} title="Import plan objects from JSON">Import JSON</button>
           {userId && CLOUD_ENABLED && (<>
             <button onClick={handleCloudSave} data-testid="cloud-save-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Save plan to cloud (S3)">☁ Save{cloudSaveStatus ? ` — ${cloudSaveStatus}` : ''}</button>
             <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
@@ -1413,6 +1465,36 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         )}
       </div>
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {showSeedModal && (
+        <div onClick={() => setShowSeedModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 8, padding: 24, width: 520, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.text }}>Import Plan JSON</div>
+            <div style={{ fontSize: 11, color: COLORS.textDim }}>Paste a seed object with <code>mapCenter</code> and/or <code>objects</code> array. Replaces the current canvas.</div>
+            <textarea
+              data-testid="seed-input"
+              value={seedInput}
+              onChange={e => setSeedInput(e.target.value)}
+              placeholder={'{\n  "mapCenter": { "lat": 37.77, "lon": -122.41, "zoom": 16 },\n  "objects": []\n}'}
+              style={{ width: "100%", height: 220, background: COLORS.bg, color: COLORS.text, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 4, padding: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, resize: "vertical", boxSizing: "border-box" }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowSeedModal(false)} style={panelBtnStyle(false)}>Cancel</button>
+              <button
+                data-testid="seed-apply-button"
+                onClick={() => {
+                  try {
+                    applySeed(JSON.parse(seedInput));
+                    setShowSeedModal(false);
+                  } catch (e) {
+                    alert(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+                  }
+                }}
+                style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }}
+              >Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showDashboard && userId && CLOUD_ENABLED && (
         <PlanDashboard
           userId={userId}

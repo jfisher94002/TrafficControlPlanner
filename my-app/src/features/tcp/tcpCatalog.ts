@@ -276,10 +276,11 @@ export const DEVICES: DeviceData[] = [
 
 // realWidth = diagram-scale meters (≈3× real-world so roads are wide enough to work with on screen)
 export const ROAD_TYPES: RoadType[] = [
-  { id: "2lane",   label: "2-Lane Road",     lanes: 2, width: 80,  realWidth: 22 },
-  { id: "4lane",   label: "4-Lane Road",     lanes: 4, width: 150, realWidth: 44 },
-  { id: "6lane",   label: "6-Lane Divided",  lanes: 6, width: 220, realWidth: 66 },
-  { id: "highway", label: "Highway",         lanes: 4, width: 180, realWidth: 58 },
+  { id: "2lane",     label: "2-Lane Road",     lanes: 2, width: 80,  realWidth: 22 },
+  { id: "4lane",     label: "4-Lane Road",     lanes: 4, width: 150, realWidth: 44 },
+  { id: "6lane",     label: "6-Lane Divided",  lanes: 6, width: 220, realWidth: 66 },
+  { id: "highway",   label: "Highway",         lanes: 4, width: 180, realWidth: 58 },
+  { id: "bike_lane", label: "Bike Lane",       lanes: 1, width: 22,  realWidth: 6  },
 ];
 
 export const TOOLS: ToolDef[] = [

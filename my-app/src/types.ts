@@ -108,6 +108,8 @@ export interface SignObject {
   scale: number;
 }
 
+export type ArrowBoardMode = 'right' | 'left' | 'caution' | 'flashing';
+
 export interface DeviceObject {
   id: string;
   type: 'device';
@@ -115,6 +117,8 @@ export interface DeviceObject {
   y: number;
   deviceData: DeviceData;
   rotation: number;
+  /** Only applicable when deviceData.id === 'arrow_board' */
+  arrowBoardMode?: ArrowBoardMode;
 }
 
 export interface ZoneObject {

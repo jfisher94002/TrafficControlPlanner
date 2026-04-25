@@ -717,7 +717,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           `Moving to a new address will leave your ${objects.length} existing object${objects.length === 1 ? '' : 's'} at the wrong location.\n\nClear the canvas and start fresh at the new address?`
         );
         if (!confirmed) { setSearchOpen(false); return; }
-        setObjects([]);
+        resetHistory([]);
         setSelectedIds([]);
       }
       setMapCenter({ lat, lon, zoom: 16 }); setOffset({ x: 0, y: 0 }); setZoom(1); setV1NoMapBanner(false);

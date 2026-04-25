@@ -429,14 +429,16 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Expose window.__tcpSeed() for Playwright tests
+  // Expose window.__tcpSeed() and window.__tcpGetObjects() for Playwright tests
   useEffect(() => {
-    (window as unknown as Record<string, unknown>).__tcpSeed = (raw: unknown) => {
+    const w = window as unknown as Record<string, unknown>;
+    w.__tcpSeed = (raw: unknown) => {
       try { applySeed(raw); return 'ok'; }
       catch (e) { return String(e); }
     };
-    return () => { delete (window as unknown as Record<string, unknown>).__tcpSeed; };
-  }, [applySeed]);
+    w.__tcpGetObjects = () => objects;
+    return () => { delete w.__tcpSeed; delete w.__tcpGetObjects; };
+  }, [applySeed, objects]);
 
   const handleTemplateApply = useCallback((templateObjects: CanvasObject[], mode: 'replace' | 'merge') => {
     // Reset any in-progress draw state so partial roads don't persist after apply

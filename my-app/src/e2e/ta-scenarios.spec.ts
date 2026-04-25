@@ -36,16 +36,19 @@ async function seedAndLoad(page: Page, seed: Record<string, unknown>) {
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 }
 
-/** Returns all object types currently on the canvas via window.__tcpSeed state. */
-async function getObjectTypes(page: Page): Promise<string[]> {
+type CanvasObj = { type: string; signData?: { id: string }; deviceData?: { id: string }; taperLength?: number }
+
+/** Returns live canvas objects via window.__tcpGetObjects (set by the planner on every render). */
+async function getObjects(page: Page): Promise<CanvasObj[]> {
   return page.evaluate(() => {
-    const raw = localStorage.getItem('tcp_autosave')
-    if (!raw) return []
-    try {
-      const save = JSON.parse(raw)
-      return (save.canvasState?.objects ?? []).map((o: { type: string }) => o.type)
-    } catch { return [] }
+    const fn = (window as unknown as Record<string, unknown>).__tcpGetObjects
+    return typeof fn === 'function' ? (fn as () => CanvasObj[])() : []
   })
+}
+
+/** Returns all object types currently on the canvas. */
+async function getObjectTypes(page: Page): Promise<string[]> {
+  return (await getObjects(page)).map(o => o.type)
 }
 
 /** Asserts the canvas contains at least one object of each given type. */
@@ -56,33 +59,17 @@ async function expectObjectTypes(page: Page, ...types: string[]) {
   }
 }
 
-/** Assert at least one sign with the given MUTCD id exists on canvas. */
+/** Assert at least one sign with the given signData.id exists on canvas. */
 async function expectSign(page: Page, signId: string) {
-  const found = await page.evaluate((id) => {
-    const raw = localStorage.getItem('tcp_autosave')
-    if (!raw) return false
-    try {
-      const save = JSON.parse(raw)
-      return (save.canvasState?.objects ?? []).some(
-        (o: { type: string; signData?: { id: string } }) => o.type === 'sign' && o.signData?.id === id
-      )
-    } catch { return false }
-  }, signId)
+  const objs = await getObjects(page)
+  const found = objs.some(o => o.type === 'sign' && o.signData?.id === signId)
   expect(found, `Expected sign "${signId}" on canvas`).toBe(true)
 }
 
 /** Assert at least one device with the given deviceData.id exists on canvas. */
 async function expectDevice(page: Page, deviceId: string) {
-  const found = await page.evaluate((id) => {
-    const raw = localStorage.getItem('tcp_autosave')
-    if (!raw) return false
-    try {
-      const save = JSON.parse(raw)
-      return (save.canvasState?.objects ?? []).some(
-        (o: { type: string; deviceData?: { id: string } }) => o.type === 'device' && o.deviceData?.id === id
-      )
-    } catch { return false }
-  }, deviceId)
+  const objs = await getObjects(page)
+  const found = objs.some(o => o.type === 'device' && o.deviceData?.id === deviceId)
   expect(found, `Expected device "${deviceId}" on canvas`).toBe(true)
 }
 
@@ -203,8 +190,8 @@ test('TA-11: Lane closure low volume — taper only, no devices', async ({ page 
   await expectObjectTypes(page, 'taper', 'zone')
 
   // No flagger devices required for low volume
-  const types = await getObjectTypes(page)
-  expect(types.filter(t => t === 'device').length).toBe(0)
+  const objs = await getObjects(page)
+  expect(objs.filter(o => o.type === 'device').length).toBe(0)
 })
 
 // ─── TA-12: Lane Closure using Traffic Control Signals ────────────────────────
@@ -226,17 +213,9 @@ test('TA-12: Lane closure with signals — temp signal device at each end', asyn
   await expectObjectTypes(page, 'taper', 'zone')
 
   // Must have at least 2 signal devices
-  const found = await page.evaluate(() => {
-    const raw = localStorage.getItem('tcp_autosave')
-    if (!raw) return 0
-    try {
-      const save = JSON.parse(raw)
-      return (save.canvasState?.objects ?? []).filter(
-        (o: { type: string; deviceData?: { id: string } }) => o.type === 'device' && o.deviceData?.id === 'temp_signal'
-      ).length
-    } catch { return 0 }
-  })
-  expect(found).toBeGreaterThanOrEqual(2)
+  const objs = await getObjects(page)
+  const sigCount = objs.filter(o => o.type === 'device' && o.deviceData?.id === 'temp_signal').length
+  expect(sigCount).toBeGreaterThanOrEqual(2)
 })
 
 // ─── TA-21: Lane Closure Near Side of Intersection ────────────────────────────
@@ -295,17 +274,10 @@ test('TA-33: Divided highway lane closure — long taper (L=W×S) + arrow board'
   await expectDevice(page, 'arrow_board')
   await expectObjectTypes(page, 'taper', 'zone')
 
-  // Verify taper length matches formula
-  const taperLength = await page.evaluate((expected) => {
-    const raw = localStorage.getItem('tcp_autosave')
-    if (!raw) return null
-    try {
-      const save = JSON.parse(raw)
-      const t = (save.canvasState?.objects ?? []).find((o: { type: string }) => o.type === 'taper')
-      return t?.taperLength === expected
-    } catch { return null }
-  }, expectedTaperLength)
-  expect(taperLength).toBe(true)
+  // Verify taper length matches formula L = W × S
+  const objs = await getObjects(page)
+  const t = objs.find(o => o.type === 'taper')
+  expect(t?.taperLength, `Expected taper length ${expectedTaperLength} ft`).toBe(expectedTaperLength)
 
   // TODO #324: assert arrow_board.mode === 'right' once Arrow Board modes are implemented
 })
@@ -330,21 +302,9 @@ test('TA-37: Double lane freeway closure — two tapers, two arrow boards', asyn
   await expectDevice(page, 'arrow_board')
 
   // Must have at least 2 tapers and 2 arrow boards
-  const counts = await page.evaluate(() => {
-    const raw = localStorage.getItem('tcp_autosave')
-    if (!raw) return { tapers: 0, boards: 0 }
-    try {
-      const objs = JSON.parse(raw).canvasState?.objects ?? []
-      return {
-        tapers: objs.filter((o: { type: string }) => o.type === 'taper').length,
-        boards: objs.filter((o: { type: string; deviceData?: { id: string } }) =>
-          o.type === 'device' && o.deviceData?.id === 'arrow_board'
-        ).length,
-      }
-    } catch { return { tapers: 0, boards: 0 } }
-  })
-  expect(counts.tapers).toBeGreaterThanOrEqual(2)
-  expect(counts.boards).toBeGreaterThanOrEqual(2)
+  const allObjs = await getObjects(page)
+  expect(allObjs.filter(o => o.type === 'taper').length).toBeGreaterThanOrEqual(2)
+  expect(allObjs.filter(o => o.type === 'device' && o.deviceData?.id === 'arrow_board').length).toBeGreaterThanOrEqual(2)
 })
 
 // ─── TA-101(CA): Right Lane + Bike Lane Closure ───────────────────────────────

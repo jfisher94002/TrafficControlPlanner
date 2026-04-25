@@ -7,6 +7,11 @@ import * as planStorage from '../planStorage'
 import * as analytics from '../analytics'
 import { DEFAULT_TILE_URL, resolveTileUrl, buildTileUrl } from '../utils'
 
+type TcpSeedWindow = Window & typeof globalThis & {
+  __tcpSeed?: (raw: unknown) => string
+  __tcpGetObjects?: () => Array<Record<string, unknown>>
+}
+
 vi.mock('../components/tcp/canvas/BufferZoneOverlay', () => ({
   BufferZoneOverlay: ({ taper }: { taper: { id: string } }) => (
     <div data-testid="buffer-zone-overlay" data-taper-id={taper.id} />
@@ -15,6 +20,7 @@ vi.mock('../components/tcp/canvas/BufferZoneOverlay', () => ({
 
 beforeEach(() => {
   localStorage.clear()
+  window.history.replaceState({}, '', '/')
   // Seed a mapCenter so drawing tools are not blocked by the address guard in any test
   localStorage.setItem('tcp_autosave', JSON.stringify({ mapCenter: { lat: 37.7749, lng: -122.4194, zoom: 15 } }))
   vi.restoreAllMocks()
@@ -316,6 +322,92 @@ describe('Object creation', () => {
     fireEvent.mouseDown(canvas)
     const rightPanel = screen.getByTestId('right-panel')
     expect(within(rightPanel).getByText(/sign Properties/i)).toBeInTheDocument()
+  })
+})
+
+// ─── JSON seed / import ───────────────────────────────────────────────────────
+describe('JSON seed import', () => {
+  const tcpWindow = () => window as TcpSeedWindow
+
+  const waitForSeedApi = async () => {
+    await waitFor(() => expect(tcpWindow().__tcpSeed).toBeTypeOf('function'))
+  }
+
+  it('replaces current objects and resets undo history when seeded via test API', async () => {
+    const { user } = setup()
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+
+    await waitForSeedApi()
+    act(() => {
+      expect(tcpWindow().__tcpSeed?.({
+        objects: [{ type: 'zone', x: 10, y: 20, w: 100, h: 60 }],
+      })).toBe('ok')
+    })
+
+    await waitFor(() => {
+      expect(tcpWindow().__tcpGetObjects?.()).toEqual([
+        expect.objectContaining({ type: 'zone', x: 10, y: 20, w: 100, h: 60 }),
+      ])
+    })
+
+    await user.click(screen.getByTestId('undo-button'))
+    expect(tcpWindow().__tcpGetObjects?.()).toEqual([
+      expect.objectContaining({ type: 'zone' }),
+    ])
+  })
+
+  it('normalizes legacy lng map centers and caps oversized seeded work zones', async () => {
+    setup()
+    await waitForSeedApi()
+
+    act(() => {
+      expect(tcpWindow().__tcpSeed?.({
+        mapCenter: { lat: 37.7, lng: -122.4 },
+        objects: [{ id: 'huge-zone', type: 'zone', x: 0, y: 0, w: 9000, h: 6000 }],
+      })).toBe('ok')
+    })
+
+    await waitFor(() => {
+      expect(tcpWindow().__tcpGetObjects?.()).toEqual([
+        expect.objectContaining({ id: 'huge-zone', w: 5000, h: 5000 }),
+      ])
+    })
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') ?? '{}')
+      expect(saved.mapCenter).toMatchObject({ lat: 37.7, lon: -122.4, zoom: 16 })
+    })
+  })
+
+  it('loads base64url seed query params on mount', async () => {
+    const seed = {
+      mapCenter: { lat: 38.1, lon: -121.9, zoom: 15 },
+      objects: [{ id: 'query-zone', type: 'zone', x: 1, y: 2, w: 30, h: 40 }],
+    }
+    const encoded = btoa(JSON.stringify(seed)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    window.history.replaceState({}, '', `/?seed=${encoded}`)
+
+    setup()
+
+    await waitFor(() => {
+      expect(tcpWindow().__tcpGetObjects?.()).toEqual([
+        expect.objectContaining({ id: 'query-zone', type: 'zone' }),
+      ])
+    })
+    const saved = JSON.parse(localStorage.getItem('tcp_autosave') ?? '{}')
+    expect(saved.mapCenter).toMatchObject({ lat: 38.1, lon: -121.9, zoom: 15 })
+  })
+
+  it('keeps the import dialog open and reports invalid seed JSON', async () => {
+    const { user } = setup()
+    await user.click(screen.getByTestId('import-json-button'))
+    fireEvent.change(screen.getByTestId('seed-input'), { target: { value: 'null' } })
+    await user.click(screen.getByTestId('seed-apply-button'))
+
+    expect(screen.getByText(/invalid json: seed must be a json object/i)).toBeInTheDocument()
+    expect(screen.getByText(/import plan json/i)).toBeInTheDocument()
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
   })
 })
 

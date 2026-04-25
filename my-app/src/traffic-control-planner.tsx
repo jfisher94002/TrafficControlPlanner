@@ -776,7 +776,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
 
       {/* ─── TOP BAR ─── */}
       <div style={{ height: 48, display: "flex", alignItems: "center", padding: "0 16px", borderBottom: `1px solid ${COLORS.panelBorder}`, background: COLORS.panel, flexShrink: 0, gap: 12 }}>
-        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 320px", minWidth: 0, overflow: "hidden" }}>
+        <div data-testid="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 320px", minWidth: 0, overflow: "visible" }}>
           <a href="/" data-testid="home-link" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }} title="Back to home">
             <span style={{ fontSize: 20, color: COLORS.accent }}>◆</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.accent, letterSpacing: 1 }}>TCP</span>
@@ -786,7 +786,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             data-testid="plan-title"
             value={planTitle}
             onChange={(e) => setPlanTitle(e.target.value)}
-            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, width: 220, padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
+            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, minWidth: 60, flex: "0 1 180px", padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
           />
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>

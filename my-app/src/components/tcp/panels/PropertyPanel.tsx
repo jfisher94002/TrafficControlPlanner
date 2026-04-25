@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type {
-  CanvasObject, TaperObject, TurnLaneObject, LaneMaskObject, CrosswalkObject, PlanMeta,
+  CanvasObject, TaperObject, TurnLaneObject, LaneMaskObject, CrosswalkObject, PlanMeta, ArrowBoardMode,
 } from '../../../types';
 import { isPointObject, isLineObject, isMultiPointRoad, calcTaperLength } from '../../../utils';
 import { COLORS } from '../../../features/tcp/constants';
@@ -70,12 +70,36 @@ export function PropertyPanel({ selected, objects, onUpdate, onDelete, onReorder
       )}
 
       {obj.type === "device" && (
-        <label style={{ fontSize: 11, color: COLORS.textMuted }}>
-          Rotation: {obj.rotation || 0}°
-          <input type="range" min="0" max="360" value={obj.rotation || 0}
-            onChange={(e) => onUpdate(obj.id, { rotation: +e.target.value })}
-            style={{ width: "100%", accentColor: COLORS.accent }} />
-        </label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 11, color: COLORS.textMuted }}>
+            Rotation: {obj.rotation || 0}°
+            <input type="range" min="0" max="360" value={obj.rotation || 0}
+              onChange={(e) => onUpdate(obj.id, { rotation: +e.target.value })}
+              style={{ width: "100%", accentColor: COLORS.accent }} />
+          </label>
+          {obj.deviceData.id === 'arrow_board' && (
+            <div>
+              <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>Arrow Board Mode</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                {(['right', 'left', 'caution', 'flashing'] as ArrowBoardMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => onUpdate(obj.id, { arrowBoardMode: mode })}
+                    style={{
+                      padding: "5px 4px", fontSize: 10, borderRadius: 4, cursor: "pointer",
+                      background: (obj.arrowBoardMode ?? 'right') === mode ? COLORS.accentDim : 'transparent',
+                      color: (obj.arrowBoardMode ?? 'right') === mode ? COLORS.accent : COLORS.textMuted,
+                      border: (obj.arrowBoardMode ?? 'right') === mode ? `1px solid rgba(245,158,11,0.35)` : `1px solid ${COLORS.panelBorder}`,
+                      textTransform: 'uppercase', letterSpacing: 0.5,
+                    }}
+                  >
+                    {mode === 'right' ? '→ Right' : mode === 'left' ? '← Left' : mode === 'caution' ? '◇ Caution' : '✦ Flash'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {obj.type === "taper" && (() => {

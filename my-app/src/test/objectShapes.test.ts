@@ -103,10 +103,69 @@ describe('buildOffsetSpine', () => {
 // these tests only verify that each road component renders without throwing for
 // various shoulder/sidewalk configurations.
 
-import { render } from '@testing-library/react'
 import React from 'react'
-import { PolylineRoad, CurveRoad, CubicBezierRoad } from '../components/tcp/canvas/ObjectShapes'
-import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject } from '../types'
+import { render } from '@testing-library/react'
+import { PolylineRoad, CurveRoad, CubicBezierRoad, WorkZone } from '../components/tcp/canvas/ObjectShapes'
+import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ZoneObject } from '../types'
+
+// ─── WorkZone ─────────────────────────────────────────────────────────────────
+
+describe('WorkZone rendering contract', () => {
+  const zone: ZoneObject = { id: 'zone1', type: 'zone', x: 10, y: 20, w: 100, h: 60 }
+
+  const getWorkZoneChildren = (isSelected = false) => {
+    const element = WorkZone({ obj: zone, isSelected })
+    if (!React.isValidElement(element)) throw new Error('WorkZone did not return a React element')
+    const [rect, hatches, label] = React.Children.toArray(element.props.children)
+    return {
+      rect: rect as React.ReactElement<Record<string, unknown>>,
+      hatches: hatches as React.ReactElement<Record<string, unknown>>[],
+      label: label as React.ReactElement<Record<string, unknown>>,
+    }
+  }
+
+  it('uses high-visibility fill, stroke, and hatch styling', () => {
+    const { rect, hatches } = getWorkZoneChildren()
+
+    expect(rect.props).toMatchObject({
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 60,
+      fill: 'rgba(245,158,11,0.22)',
+      stroke: 'rgba(245,158,11,0.85)',
+      strokeWidth: 2,
+      dash: [8, 6],
+    })
+    expect(hatches).toHaveLength(15)
+    expect(hatches[0].props).toMatchObject({
+      stroke: 'rgba(245,158,11,0.35)',
+      strokeWidth: 1.5,
+      listening: false,
+    })
+  })
+
+  it('preserves the selected stroke while keeping the stronger fill', () => {
+    const { rect } = getWorkZoneChildren(true)
+
+    expect(rect.props.fill).toBe('rgba(245,158,11,0.22)')
+    expect(rect.props.stroke).not.toBe('rgba(245,158,11,0.85)')
+  })
+
+  it('keeps the centered WORK ZONE label aligned with the zone bounds', () => {
+    const { label } = getWorkZoneChildren()
+
+    expect(label.props).toMatchObject({
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 60,
+      text: 'WORK ZONE',
+      align: 'center',
+      verticalAlign: 'middle',
+    })
+  })
+})
 
 // ─── PolylineRoad ─────────────────────────────────────────────────────────────
 

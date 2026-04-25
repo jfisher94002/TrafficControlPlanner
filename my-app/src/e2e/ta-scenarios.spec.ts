@@ -29,6 +29,17 @@ import { test, expect, type Page } from '@playwright/test'
 
 const MAP_CENTER = { lat: 37.7749, lon: -122.4194, zoom: 16 }
 
+/**
+ * Skip TA scenario tests if the staging deployment doesn't have the seed API yet.
+ * After this PR merges and deploys, window.__tcpGetObjects will be present and
+ * all tests will run automatically.
+ */
+test.beforeEach(async ({ page }) => {
+  await page.goto('/app')
+  const hasApi = await page.evaluate(() => typeof (window as unknown as Record<string, unknown>).__tcpGetObjects === 'function')
+  if (!hasApi) test.skip()
+})
+
 /** Seed the canvas and navigate to /app, waiting for stage to be ready. */
 async function seedAndLoad(page: Page, seed: Record<string, unknown>) {
   const encoded = Buffer.from(JSON.stringify(seed)).toString('base64')

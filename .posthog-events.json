@@ -1,0 +1,22 @@
+[
+  {
+    "event": "plan_deleted_cloud",
+    "description": "User confirms deletion of a cloud-saved plan from the Plan Dashboard",
+    "file": "my-app/src/PlanDashboard.tsx"
+  },
+  {
+    "event": "help_viewed",
+    "description": "User opens the Help modal (keyboard shortcuts and tool guide)",
+    "file": "my-app/src/traffic-control-planner.tsx"
+  },
+  {
+    "event": "pdf_export_previewed",
+    "description": "User opens the PDF export preview modal — top of the PDF export conversion funnel",
+    "file": "my-app/src/traffic-control-planner.tsx"
+  },
+  {
+    "event": "plan_dashboard_opened",
+    "description": "User opens the Cloud Plans dashboard to browse saved plans",
+    "file": "my-app/src/traffic-control-planner.tsx"
+  }
+]

@@ -3,9 +3,14 @@
  * Covers sign-up, sign-in, sign-out, and regression cases for #147/#148.
  */
 import { test, expect } from '@playwright/test'
-import { writeFileSync } from 'fs'
+import { execSync } from 'child_process'
+import { writeFileSync, readFileSync, existsSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { expectSignedIn, openSignInModal } from './openSignInModal'
+
+const COGNITO_POOL_ID = process.env.COGNITO_USER_POOL_ID ?? 'us-west-1_6NB2hiHif'
+const COGNITO_REGION  = process.env.COGNITO_REGION       ?? 'us-west-1'
+const CREATED_USER_FILE = join(process.cwd(), '.e2e-created-user')
 
 const E2E_EMAIL    = process.env.E2E_TEST_EMAIL    ?? 'e2e-test@tcplanpro.com'
 const E2E_PASSWORD = process.env.E2E_TEST_PASSWORD ?? 'E2eTestPass2026!'
@@ -31,6 +36,28 @@ test.describe('Sign In', () => {
 })
 
 test.describe('Create Account', () => {
+  test.afterAll(() => {
+    if (!existsSync(CREATED_USER_FILE)) return
+    const email = readFileSync(CREATED_USER_FILE, 'utf-8').trim()
+    unlinkSync(CREATED_USER_FILE)
+    if (!email) return
+    try {
+      // Look up username by email, then delete
+      const result = execSync(
+        `aws cognito-idp list-users --user-pool-id ${COGNITO_POOL_ID} --region ${COGNITO_REGION} --filter 'email = "${email}"' --query 'Users[0].Username' --output text`,
+        { encoding: 'utf-8' },
+      ).trim()
+      if (result && result !== 'None') {
+        execSync(
+          `aws cognito-idp admin-delete-user --user-pool-id ${COGNITO_POOL_ID} --region ${COGNITO_REGION} --username "${result}"`,
+        )
+        console.log(`[auth cleanup] deleted test user: ${email}`)
+      }
+    } catch (err) {
+      console.warn(`[auth cleanup] failed to delete ${email}:`, err)
+    }
+  })
+
   test.beforeEach(async ({ page }) => {
     await openSignInModal(page)
     await page.getByRole('tab', { name: 'Create Account' }).click()
@@ -73,8 +100,8 @@ test.describe('Create Account', () => {
     await page.getByRole('button', { name: 'Create Account' }).click()
     // Should reach the confirmation code step
     await expect(page.getByText(/confirmation code/i)).toBeVisible({ timeout: 15_000 })
-    // Record the created email so the CI cleanup step can delete it from Cognito
-    writeFileSync(join(process.cwd(), '.e2e-created-user'), unique)
+    // Record the created email for afterAll cleanup
+    writeFileSync(CREATED_USER_FILE, unique)
   })
 })
 

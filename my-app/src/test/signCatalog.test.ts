@@ -33,6 +33,39 @@ describe('SIGN_CATEGORIES — ID uniqueness', () => {
   })
 })
 
+describe('SIGN_CATEGORIES — work-zone warning coverage', () => {
+  it('includes the MUTCD work-zone warning signs added for activity areas', () => {
+    const warningSigns = new Map(SIGN_CATEGORIES.warning.signs.map((sign) => [sign.id, sign]))
+
+    expect(Object.fromEntries(
+      [
+        'endsroadwork',
+        'prepstop',
+        'surveycrew',
+        'utilcrew',
+        'nightwork',
+        'roadworknextmi',
+      ].map((id) => {
+        const sign = warningSigns.get(id)
+        return [id, sign && {
+          label: sign.label,
+          shape: sign.shape,
+          color: sign.color,
+          textColor: sign.textColor,
+          mutcd: sign.mutcd,
+        }]
+      }),
+    )).toEqual({
+      endsroadwork: { label: 'ENDS RD WORK', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-2' },
+      prepstop: { label: 'PREP TO STOP', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W3-4' },
+      surveycrew: { label: 'SURVEY CREW', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W21-6' },
+      utilcrew: { label: 'UTIL CREW', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W21-7' },
+      nightwork: { label: 'NIGHT WORK', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-14' },
+      roadworknextmi: { label: 'RD WORK X MI', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1a' },
+    })
+  })
+})
+
 // ─── Label length ─────────────────────────────────────────────────────────────
 
 describe('SIGN_CATEGORIES — label length', () => {

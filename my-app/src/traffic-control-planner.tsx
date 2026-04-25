@@ -715,10 +715,15 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         const confirmed = window.confirm(
           `Moving to a new address will leave your ${objects.length} existing object${objects.length === 1 ? '' : 's'} at the wrong location.\n\nClear the canvas and start fresh at the new address?`
         );
-        if (!confirmed) { setSearchOpen(false); return; }
+        if (!confirmed) { return; }
         // Use resetHistory so undo cannot restore objects at the now-wrong location
         resetHistory([]);
         setSelectedIds([]);
+        // Clear any in-progress draw state so the new map starts clean
+        setDrawStart(null);
+        setPolyPoints([]);
+        setCurvePoints([]);
+        setCubicPoints([]);
       }
       setSearchQuery(formatSearchPrimary(result));
       setMapCenter({ lat, lon, zoom: 16 }); setOffset({ x: 0, y: 0 }); setZoom(1); setV1NoMapBanner(false);

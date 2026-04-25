@@ -461,13 +461,13 @@ export function WorkZone({ obj, isSelected }: WorkZoneProps) {
   const maxD = Math.max(w, h);
   for (let i = -maxD; i < maxD * 2; i += 20) {
     hatches.push(
-      <Line key={i} points={[x + i, y, x + i + h, y + h]} stroke="rgba(245,158,11,0.12)" strokeWidth={1} listening={false} />
+      <Line key={i} points={[x + i, y, x + i + h, y + h]} stroke="rgba(245,158,11,0.35)" strokeWidth={1.5} listening={false} />
     );
   }
   return (
     <Group listening={false}>
-      <Rect x={x} y={y} width={w} height={h} fill="rgba(245,158,11,0.08)"
-        stroke={isSelected ? COLORS.selected : "rgba(245,158,11,0.5)"} strokeWidth={2} dash={[8, 6]} />
+      <Rect x={x} y={y} width={w} height={h} fill="rgba(245,158,11,0.22)"
+        stroke={isSelected ? COLORS.selected : "rgba(245,158,11,0.85)"} strokeWidth={2} dash={[8, 6]} />
       {hatches}
       <KonvaText x={x} y={y} width={w} height={h} text="WORK ZONE"
         fontSize={11} fontStyle="bold" fontFamily="'JetBrains Mono', monospace"

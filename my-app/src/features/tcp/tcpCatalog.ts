@@ -127,6 +127,12 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "bridgefreezes",  label: "BRDG MAY ICE", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-13" },
       { id: "fogahead",       label: "FOG AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-5b" },
       { id: "gradecrossing",  label: "GRADE CROSS",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W10-1" },
+      { id: "endsroadwork",   label: "ENDS RD WORK", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-2" },
+      { id: "prepstop",       label: "PREP TO STOP", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W3-4" },
+      { id: "surveycrew",     label: "SURVEY CREW",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-6" },
+      { id: "utilcrew",       label: "UTIL CREW",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-7" },
+      { id: "nightwork",      label: "NIGHT WORK",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-14" },
+      { id: "roadworknextmi", label: "RD WORK X MI", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1a" },
     ],
   },
   temporary: {

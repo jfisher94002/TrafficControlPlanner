@@ -543,7 +543,10 @@ export function WorkZone({ obj, isSelected }: WorkZoneProps) {
     <Group listening={false}>
       <Rect x={x} y={y} width={w} height={h} fill="rgba(245,158,11,0.22)"
         stroke={isSelected ? COLORS.selected : "rgba(245,158,11,0.85)"} strokeWidth={2} dash={[8, 6]} />
-      {hatches}
+      {/* Clip hatching to the zone rectangle so it doesn't spill outside the border */}
+      <Group clipX={x} clipY={y} clipWidth={w} clipHeight={h}>
+        {hatches}
+      </Group>
       <KonvaText x={x} y={y} width={w} height={h} text="WORK ZONE"
         fontSize={11} fontStyle="bold" fontFamily="'JetBrains Mono', monospace"
         fill={COLORS.accent} align="center" verticalAlign="middle" />

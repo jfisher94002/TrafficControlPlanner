@@ -55,6 +55,9 @@ const SR  = 540   // sign x, right shoulder
 const SL  = 260   // sign x, left shoulder (opposing traffic)
 const WY  = 500   // work-zone centre Y
 const TY  = 430   // taper / end-device Y
+// Work zone anchor X: just past the right shoulder edge of a 2-lane road
+// (road right edge = CX+40, shoulder = +20, +5 gap → 465)
+const WX  = 465   // work-zone left edge X for right-shoulder / beyond-shoulder TAs
 
 // ─── Road builders ────────────────────────────────────────────────────────────
 
@@ -180,7 +183,7 @@ export const TA_SCENARIOS: TAScenario[] = [
       objects: [
         road2(),
         sign('roadwork', SR, 280),
-        zone('zone-1', CX + 75, WY - 30, 100, 80),
+        zone('zone-1', WX, WY - 50, 90, 100),
       ],
     },
     assert: {

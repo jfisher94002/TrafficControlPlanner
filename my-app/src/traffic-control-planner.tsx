@@ -110,6 +110,9 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showSeedModal, setShowSeedModal] = useState(false);
+  const [seedInput, setSeedInput] = useState("");
+  const [seedError, setSeedError] = useState<string | null>(null);
   const [exportPreview, setExportPreview] = useState<Record<string, unknown> | null>(null);
   const qcIssues: QCIssue[] = useMemo(() => runQCChecks(objects), [objects]);
   const [cloudSaveStatus, setCloudSaveStatus] = useState<string | null>(null);
@@ -398,6 +401,60 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
     setZoom(1);
     setLastKnownUpdatedAt(null);
   };
+
+  /** Apply a seed plan from parsed JSON — used by URL param and paste dialog. */
+  const applySeed = useCallback((raw: unknown) => {
+    if (typeof raw !== 'object' || raw === null) throw new Error('Seed must be a JSON object');
+    const seed = raw as Record<string, unknown>;
+    if (seed.mapCenter) {
+      const mc = seed.mapCenter as { lat: number; lon?: number; lng?: number; zoom?: number };
+      const lon = mc.lon ?? mc.lng;
+      if (typeof mc.lat === 'number' && typeof lon === 'number') {
+        setMapCenter({ lat: mc.lat, lon, zoom: typeof mc.zoom === 'number' ? mc.zoom : 16 });
+        setOffset({ x: 0, y: 0 }); setZoom(1);
+      }
+    }
+    if (Array.isArray(seed.objects)) {
+      const MAX_ZONE_DIM = 5000; // cap zone dimensions to prevent render DoS via crafted seeds
+      const seeded = (seed.objects as CanvasObject[]).map(o => {
+        const obj = { ...o, id: (o as unknown as Record<string, unknown>).id as string ?? uid() };
+        // Cap work zone dimensions
+        if (obj.type === 'zone') {
+          const z = obj as unknown as { w?: number; h?: number };
+          if (typeof z.w === 'number') z.w = Math.min(z.w, MAX_ZONE_DIM);
+          if (typeof z.h === 'number') z.h = Math.min(z.h, MAX_ZONE_DIM);
+        }
+        return obj;
+      });
+      resetHistory(seeded);
+      setSelectedIds([]);
+    }
+  }, [resetHistory, setOffset, setZoom]);
+
+  // Load seed from ?seed=<base64-json> on mount.
+  // Handles both standard base64 (from Buffer.from().toString('base64')) and base64url.
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('seed');
+    if (!param) return;
+    try {
+      // Normalize base64url → standard base64, then restore padding
+      const b64 = param.replace(/-/g, '+').replace(/_/g, '/').replace(/%3D/g, '=');
+      applySeed(JSON.parse(atob(b64)));
+    }
+    catch (e) { console.warn('[TCP] ?seed param invalid:', e); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Expose window.__tcpSeed() and window.__tcpGetObjects() for Playwright tests
+  useEffect(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w.__tcpSeed = (raw: unknown) => {
+      try { applySeed(raw); return 'ok'; }
+      catch (e) { return String(e); }
+    };
+    w.__tcpGetObjects = () => objects;
+    return () => { delete w.__tcpSeed; delete w.__tcpGetObjects; };
+  }, [applySeed, objects]);
 
   const handleTemplateApply = useCallback((templateObjects: CanvasObject[], mode: 'replace' | 'merge') => {
     // Reset any in-progress draw state so partial roads don't persist after apply
@@ -794,6 +851,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           <button onClick={() => fileInputRef.current?.click()} style={panelBtnStyle(false)} title="Open .tcp.json">Open</button>
           <button onClick={savePlan} style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Download plan as .tcp.json">↓ Save</button>
           <button onClick={() => setShowTemplatePicker(true)} data-testid="templates-button" style={panelBtnStyle(false)} title="Start from a template">Templates</button>
+          <button onClick={() => { setSeedInput(""); setShowSeedModal(true); }} data-testid="import-json-button" style={panelBtnStyle(false)} title="Import plan objects from JSON">Import JSON</button>
           {userId && CLOUD_ENABLED && (<>
             <button onClick={handleCloudSave} data-testid="cloud-save-button" style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }} title="Save plan to cloud (S3)">☁ Save{cloudSaveStatus ? ` — ${cloudSaveStatus}` : ''}</button>
             <button onClick={() => setShowDashboard(true)} data-testid="cloud-plans-button" style={panelBtnStyle(false)} title="Open a plan from cloud">☁ Plans</button>
@@ -1425,6 +1483,38 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         )}
       </div>
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {showSeedModal && (
+        <div onClick={() => { setShowSeedModal(false); setSeedError(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 8, padding: 24, width: 520, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.text }}>Import Plan JSON</div>
+            <div style={{ fontSize: 11, color: COLORS.textDim }}>Paste a seed object with <code>mapCenter</code> and/or <code>objects</code> array. Replaces the current canvas.</div>
+            <textarea
+              data-testid="seed-input"
+              value={seedInput}
+              onChange={e => { setSeedInput(e.target.value); setSeedError(null); }}
+              placeholder={'{\n  "mapCenter": { "lat": 37.77, "lon": -122.41, "zoom": 16 },\n  "objects": []\n}'}
+              style={{ width: "100%", height: 220, background: COLORS.bg, color: COLORS.text, border: `1px solid ${seedError ? '#ef4444' : COLORS.panelBorder}`, borderRadius: 4, padding: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, resize: "vertical", boxSizing: "border-box" }}
+            />
+            {seedError && <div style={{ fontSize: 11, color: '#ef4444' }}>{seedError}</div>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => { setShowSeedModal(false); setSeedError(null); }} style={panelBtnStyle(false)}>Cancel</button>
+              <button
+                data-testid="seed-apply-button"
+                onClick={() => {
+                  try {
+                    applySeed(JSON.parse(seedInput));
+                    setShowSeedModal(false);
+                    setSeedError(null);
+                  } catch (e) {
+                    setSeedError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+                  }
+                }}
+                style={{ ...panelBtnStyle(false), background: COLORS.accentDim, color: COLORS.accent, borderColor: "rgba(245,158,11,0.35)" }}
+              >Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showDashboard && userId && CLOUD_ENABLED && (
         <PlanDashboard
           userId={userId}

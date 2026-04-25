@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
@@ -120,6 +120,85 @@ describe('Plan metadata', () => {
     const input = screen.getByLabelText('Client')
     await user.type(input, 'Acme Corp')
     expect(input).toHaveValue('Acme Corp')
+  })
+})
+
+// ─── Address search ───────────────────────────────────────────────────────────
+describe('Address search', () => {
+  const newAddressResult = {
+    lat: '37.8044',
+    lon: '-122.2712',
+    display_name: '500 New St, Oakland, CA',
+    address: {
+      house_number: '500',
+      road: 'New St',
+      city: 'Oakland',
+      state: 'CA',
+    },
+  }
+
+  async function searchForNewAddress(user: ReturnType<typeof userEvent.setup>) {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([newAddressResult]),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const input = screen.getByTestId('address-search-input')
+    await user.clear(input)
+    await user.type(input, '500 New St')
+    await user.click(screen.getByRole('button', { name: /go/i }))
+    return fetchMock
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps existing canvas objects and map center when address change is cancelled', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const { user } = setup()
+
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    await searchForNewAddress(user)
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('1 existing object'))
+    })
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+
+    const saved = JSON.parse(localStorage.getItem('tcp_autosave') ?? 'null')
+    expect(saved?.canvasState?.objects).toHaveLength(1)
+    expect(saved?.mapCenter?.lat).toBe(37.7749)
+    expect(saved?.mapCenter?.lon).toBe(-122.4194)
+  })
+
+  it('clears objects and starts fresh history when address change is confirmed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const { user } = setup()
+
+    fireEvent.keyDown(window, { key: 'S' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+
+    await searchForNewAddress(user)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+    })
+    expect(screen.getByText(/centered on 500 new st, oakland, ca/i)).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('undo-button'))
+    await user.click(screen.getByTestId('redo-button'))
+    expect(screen.getByTestId('object-count')).toHaveTextContent('0 objects')
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') ?? 'null')
+      expect(saved?.canvasState?.objects).toHaveLength(0)
+      expect(saved?.mapCenter).toMatchObject({ lat: 37.8044, lon: -122.2712, zoom: 16 })
+    })
   })
 })
 

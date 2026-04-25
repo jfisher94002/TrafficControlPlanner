@@ -4,6 +4,7 @@ import type React from 'react';
 import type {
   CanvasObject, StraightRoadObject, PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject,
   SignObject, DeviceObject, ZoneObject, ArrowObject, TextObject, MeasureObject, TaperObject, Point,
+  ArrowBoardMode,
 } from '../../../types';
 import { angleBetween, dist, sampleBezier, sampleCubicBezier, buildOffsetSpine } from '../../../utils';
 import { COLORS, GRID_SIZE, TAPER_SCALE } from '../../../features/tcp/constants';
@@ -114,18 +115,28 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
     }
   }
 
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
+
+  // Bike lane: dashed white center symbol stripe
+  const bikeCenterLine = isBikeLane ? (
+    <Line points={[x1, y1, x2, y2]} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} listening={false} />
+  ) : null;
+
   return (
     <Group listening={false}>
       {sidewalkLines}
       {shoulderLines}
       <Circle x={x1} y={y1} radius={hw + 1} fill="#555" listening={false} />
       <Circle x={x2} y={y2} radius={hw + 1} fill="#555" listening={false} />
-      <Circle x={x1} y={y1} radius={hw - 1} fill={COLORS.road} listening={false} />
-      <Circle x={x2} y={y2} radius={hw - 1} fill={COLORS.road} listening={false} />
-      <Line points={roadPoly} closed fill={COLORS.road} stroke="#555" strokeWidth={2} />
-      <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
-      <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
+      <Circle x={x1} y={y1} radius={hw - 1} fill={fillColor} listening={false} />
+      <Circle x={x2} y={y2} radius={hw - 1} fill={fillColor} listening={false} />
+      <Line points={roadPoly} closed fill={fillColor} stroke="#555" strokeWidth={2} />
+      <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={edgeColor} strokeWidth={2} />
+      <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={edgeColor} strokeWidth={2} />
       {laneMarkings}
+      {bikeCenterLine}
       {isSelected && <Line points={[x1, y1, x2, y2]} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />}
     </Group>
   );
@@ -227,13 +238,17 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
   }
 
   const extraLines = buildShoulderSidewalkLines(id, pts, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
 
   return (
     <Group listening={false}>
       {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={edgeColor} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={fillColor} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
+      {isBikeLane && <Line points={flat} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} lineCap="round" lineJoin="round" tension={tension} listening={false} />}
       {laneMarkings}
       {isSelected && (
         <>
@@ -284,13 +299,17 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
   }
 
   const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
 
   return (
     <Group listening={false}>
       {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={edgeColor} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={fillColor} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      {isBikeLane && <Line points={flat} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} lineCap="round" lineJoin="round" tension={0} listening={false} />}
       {laneMarkings}
       {isSelected && (
         <>
@@ -342,13 +361,17 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
   }
 
   const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
 
   return (
     <Group listening={false}>
       {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={edgeColor} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={fillColor} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      {isBikeLane && <Line points={flat} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} lineCap="round" lineJoin="round" tension={0} listening={false} />}
       {laneMarkings}
       {isSelected && (
         <>
@@ -368,7 +391,7 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
 interface SignShapeProps { obj: SignObject; isSelected: boolean; }
 export function SignShape({ obj, isSelected }: SignShapeProps) {
   const { x, y, signData, rotation = 0, scale: sc = 1 } = obj;
-  const s = 18 * sc;
+  const s = 12 * sc;
   return (
     <Shape
       x={x} y={y}
@@ -420,8 +443,8 @@ export function SignShape({ obj, isSelected }: SignShapeProps) {
         }
         ctx.fillStyle = signData.textColor || "#fff";
         const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
-        const baseFontSize = label.length <= 4 ? 13 : label.length <= 8 ? 11 : 8;
-        ctx.font = `bold ${Math.max(6, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
+        const baseFontSize = label.length <= 4 ? 8 : label.length <= 8 ? 6.5 : 5;
+        ctx.font = `bold ${Math.max(4, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(label, 0, shp === "triangle" ? 4 : 0);
@@ -430,9 +453,57 @@ export function SignShape({ obj, isSelected }: SignShapeProps) {
   );
 }
 
+/** Draw the amber LED matrix for a specific arrow board mode. */
+function drawArrowBoard(ctx: KonvaContext, mode: ArrowBoardMode) {
+  const W = 28, H = 18; // board dims in canvas px
+  // Board background
+  ctx.fillStyle = '#1a1a1a';
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(-W / 2, -H / 2, W, H);
+  ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = '#fbbf24'; // amber LED colour
+
+  if (mode === 'right') {
+    // Right-pointing chevron arrow →
+    ctx.beginPath();
+    ctx.moveTo(-10, -6); ctx.lineTo(2, -6); ctx.lineTo(2, -10);
+    ctx.lineTo(10, 0);
+    ctx.lineTo(2, 10); ctx.lineTo(2, 6); ctx.lineTo(-10, 6);
+    ctx.closePath(); ctx.fill();
+  } else if (mode === 'left') {
+    // Left-pointing chevron arrow ←
+    ctx.beginPath();
+    ctx.moveTo(10, -6); ctx.lineTo(-2, -6); ctx.lineTo(-2, -10);
+    ctx.lineTo(-10, 0);
+    ctx.lineTo(-2, 10); ctx.lineTo(-2, 6); ctx.lineTo(10, 6);
+    ctx.closePath(); ctx.fill();
+  } else if (mode === 'caution') {
+    // Diamond ◇ pattern
+    ctx.beginPath();
+    ctx.moveTo(0, -7); ctx.lineTo(9, 0); ctx.lineTo(0, 7); ctx.lineTo(-9, 0);
+    ctx.closePath(); ctx.fill();
+  } else {
+    // Flashing — fill whole board with reduced opacity to suggest flash
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(-W / 2 + 2, -H / 2 + 2, W - 4, H - 4);
+    ctx.globalAlpha = 1;
+  }
+
+  // Mode label below board
+  ctx.fillStyle = COLORS.textMuted;
+  ctx.font = "7px 'JetBrains Mono', monospace";
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(mode.toUpperCase(), 0, H / 2 + 2);
+}
+
 interface DeviceShapeProps { obj: DeviceObject; isSelected: boolean; }
 export function DeviceShape({ obj, isSelected }: DeviceShapeProps) {
-  const { x, y, deviceData, rotation = 0 } = obj;
+  const { x, y, deviceData, rotation = 0, arrowBoardMode = 'right' } = obj;
+  const isArrowBoard = deviceData.id === 'arrow_board';
   return (
     <Shape
       x={x} y={y}
@@ -441,14 +512,18 @@ export function DeviceShape({ obj, isSelected }: DeviceShapeProps) {
       shadowBlur={isSelected ? 12 : 0}
       listening={false}
       sceneFunc={(ctx: KonvaContext) => {
-        ctx.fillStyle = deviceData.color;
-        ctx.font = "22px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(deviceData.icon, 0, 0);
-        ctx.fillStyle = COLORS.textMuted;
-        ctx.font = "9px 'JetBrains Mono', monospace";
-        ctx.fillText(deviceData.label, 0, 18);
+        if (isArrowBoard) {
+          drawArrowBoard(ctx, arrowBoardMode);
+        } else {
+          ctx.fillStyle = deviceData.color;
+          ctx.font = "22px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(deviceData.icon, 0, 0);
+          ctx.fillStyle = COLORS.textMuted;
+          ctx.font = "9px 'JetBrains Mono', monospace";
+          ctx.fillText(deviceData.label, 0, 18);
+        }
       }}
     />
   );

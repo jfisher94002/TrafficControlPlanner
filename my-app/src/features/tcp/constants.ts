@@ -25,6 +25,8 @@ export const COLORS = {
   canvas: "#1e2028",
   grid: "rgba(255,255,255,0.03)",
   road: "#3a3d4a",
+  bikeLane: "#166534",        // dark green fill for bike lane pavement
+  bikeLaneStripe: "#4ade80",  // bright green for bike lane edge stripe
   roadLine: "#f59e0b",
   roadLineWhite: "#ffffff",
   laneMarking: "rgba(255,255,255,0.6)",

@@ -1504,6 +1504,39 @@ describe('Status bar road mode hints', () => {
   })
 })
 
+// ─── Bike lane road type ──────────────────────────────────────────────────────
+describe('Bike lane road type', () => {
+  it('draws a straight road with the selected bike lane preset', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    let calls = 0
+    vi.spyOn(stageStub, 'getPointerPosition').mockImplementation(() =>
+      calls++ === 0 ? { x: 0, y: 0 } : { x: 100, y: 0 }
+    )
+    const { user } = setup()
+
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /bike lane/i }))
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    fireEvent.mouseUp(screen.getByTestId('konva-stage'))
+
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') ?? 'null')
+      expect(saved?.canvasState?.objects[0]).toMatchObject({
+        type: 'road',
+        roadType: 'bike_lane',
+        lanes: 1,
+        width: 22,
+        realWidth: 6,
+      })
+    })
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      road_type: 'bike_lane',
+      draw_mode: 'straight',
+    }))
+  })
+})
+
 // ─── Analytics — canvas events ────────────────────────────────────────────────
 describe('Analytics — canvas events', () => {
   it('placing a sign fires sign_placed with sign_id and sign_source', () => {

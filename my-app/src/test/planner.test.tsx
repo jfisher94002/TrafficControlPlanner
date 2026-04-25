@@ -8,7 +8,9 @@ import * as analytics from '../analytics'
 import { DEFAULT_TILE_URL, resolveTileUrl, buildTileUrl } from '../utils'
 
 vi.mock('../components/tcp/canvas/BufferZoneOverlay', () => ({
-  BufferZoneOverlay: () => <div data-testid="buffer-zone-overlay" />,
+  BufferZoneOverlay: ({ taper }: { taper: { id: string } }) => (
+    <div data-testid="buffer-zone-overlay" data-taper-id={taper.id} />
+  ),
 }))
 
 beforeEach(() => {
@@ -470,16 +472,23 @@ describe('Buffer zone overlay', () => {
   it('does not render the buffer zone overlay by default after placing a taper', () => {
     setup()
     placeTaper()
-    expect(screen.getByRole('button', { name: /show buffer zone/i })).toBeInTheDocument()
+    const rightPanel = screen.getByTestId('right-panel')
+    const toggle = within(rightPanel).getByRole('button', { name: /show buffer zone/i })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
   })
 
   it('renders the buffer zone overlay when toggled on for a selected taper', async () => {
     const { user } = setup()
     placeTaper()
-    await user.click(screen.getByRole('button', { name: /show buffer zone/i }))
-    expect(screen.getByRole('button', { name: /hide buffer zone/i })).toBeInTheDocument()
+    const rightPanel = screen.getByTestId('right-panel')
+    await user.click(within(rightPanel).getByRole('button', { name: /show buffer zone/i }))
+    expect(within(rightPanel).getByRole('button', { name: /hide buffer zone/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+
+    await user.click(within(rightPanel).getByRole('button', { name: /hide buffer zone/i }))
+    expect(within(rightPanel).getByRole('button', { name: /show buffer zone/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
   })
 
   it('hides the overlay when taper selection is cleared', async () => {
@@ -499,6 +508,7 @@ describe('Buffer zone overlay', () => {
     expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'S' })
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+    expect(within(screen.getByTestId('right-panel')).getByText(/sign Properties/i)).toBeInTheDocument()
     expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /hide buffer zone/i })).not.toBeInTheDocument()
   })

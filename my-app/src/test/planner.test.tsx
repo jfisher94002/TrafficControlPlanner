@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrafficControlPlanner from '../traffic-control-planner'
@@ -151,6 +151,10 @@ describe('Address search', () => {
     return fetchMock
   }
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('keeps existing canvas objects and map center when address change is cancelled', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const { user } = setup()
@@ -168,9 +172,7 @@ describe('Address search', () => {
     const saved = JSON.parse(localStorage.getItem('tcp_autosave') ?? 'null')
     expect(saved?.canvasState?.objects).toHaveLength(1)
     expect(saved?.mapCenter?.lat).toBe(37.7749)
-    expect(saved?.mapCenter?.lng).toBe(-122.4194)
-
-    vi.unstubAllGlobals()
+    expect(saved?.mapCenter?.lon).toBe(-122.4194)
   })
 
   it('clears objects and starts fresh history when address change is confirmed', async () => {
@@ -197,8 +199,6 @@ describe('Address search', () => {
       expect(saved?.canvasState?.objects).toHaveLength(0)
       expect(saved?.mapCenter).toMatchObject({ lat: 37.8044, lon: -122.2712, zoom: 16 })
     })
-
-    vi.unstubAllGlobals()
   })
 })
 

@@ -16,16 +16,19 @@ describe('analytics — key absent (dev/CI)', () => {
   it('initAnalytics does not call posthog.init', () => {
     initAnalytics()
     expect(posthog.init).not.toHaveBeenCalled()
+    expect(posthog.register).not.toHaveBeenCalled()
   })
 
   it('identifyUser is a no-op', () => {
     identifyUser('uid', 'user@example.com')
+    expect(posthog.register).not.toHaveBeenCalled()
     expect(posthog.identify).not.toHaveBeenCalled()
   })
 
   it('resetAnalytics is a no-op', () => {
     resetAnalytics()
     expect(posthog.reset).not.toHaveBeenCalled()
+    expect(posthog.register).not.toHaveBeenCalled()
   })
 
   it('track is a no-op', () => {
@@ -37,6 +40,7 @@ describe('analytics — key absent (dev/CI)', () => {
 describe('analytics — key present', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_POSTHOG_KEY', 'phc_testkey')
+    resetAnalytics()
     vi.clearAllMocks()
   })
   afterEach(() => vi.unstubAllEnvs())
@@ -46,10 +50,16 @@ describe('analytics — key present', () => {
     expect(posthog.init).toHaveBeenCalledWith('phc_testkey', expect.objectContaining({
       api_host: 'https://us.i.posthog.com',
     }))
+    expect(posthog.register).toHaveBeenCalledWith(expect.objectContaining({
+      auth_state: 'anonymous',
+    }))
   })
 
   it('identifyUser calls posthog.identify with userId and email', () => {
     identifyUser('uid-123', 'user@example.com')
+    expect(posthog.register).toHaveBeenCalledWith(expect.objectContaining({
+      auth_state: 'identified',
+    }))
     expect(posthog.identify).toHaveBeenCalledWith('uid-123', { email: 'user@example.com' })
   })
 
@@ -59,12 +69,29 @@ describe('analytics — key present', () => {
   })
 
   it('resetAnalytics calls posthog.reset', () => {
+    identifyUser('uid-123', 'user@example.com')
+    vi.clearAllMocks()
     resetAnalytics()
     expect(posthog.reset).toHaveBeenCalledOnce()
+    expect(posthog.register).toHaveBeenCalledWith(expect.objectContaining({
+      auth_state: 'anonymous',
+    }))
   })
 
-  it('track calls posthog.capture with event and properties', () => {
+  it('track calls posthog.capture with caller-supplied properties', () => {
     track('plan_exported_pdf', { object_count: 3 })
     expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', { object_count: 3 })
+  })
+
+  it('track passes undefined properties when none supplied', () => {
+    track('plan_exported_pdf')
+    expect(posthog.capture).toHaveBeenCalledWith('plan_exported_pdf', undefined)
+  })
+
+  it('track does not pass auth_state or environment (handled by posthog.register super-properties)', () => {
+    track('plan_exported_pdf', { object_count: 3 })
+    const [, capturedProps] = vi.mocked(posthog.capture).mock.calls[0]
+    expect(capturedProps).not.toHaveProperty('auth_state')
+    expect(capturedProps).not.toHaveProperty('environment')
   })
 })

@@ -17,13 +17,45 @@ interface SpacingOverlayProps {
   taper: TaperObject;
 }
 
-export function SpacingOverlay({ taper }: SpacingOverlayProps) {
+export interface SpacingGuideMarker {
+  label: string;
+  mutcd: string;
+  x: number;
+  distanceFt: number;
+}
+
+export interface SpacingGuideGeometry {
+  hw: number;
+  lineHalfLen: number;
+  signDotY: number;
+  spacingFt: number;
+  markers: SpacingGuideMarker[];
+}
+
+/** Pure geometry calculation — exported for regression tests. */
+export function getSpacingGuideGeometry(taper: TaperObject): SpacingGuideGeometry {
   const spacingFt = mutcdSignSpacingFt(taper.speed);
   const spacingPx = spacingFt * TAPER_SCALE;
   const hw = (taper.laneWidth * taper.numLanes * TAPER_SCALE) / 2;
   const lineHalfLen = hw + 90;
-  // Lateral (y-axis in taper-local space) offset to the expected sign position
   const signDotY = hw + SIGN_LATERAL_CLEARANCE_PX;
+
+  return {
+    hw,
+    lineHalfLen,
+    signDotY,
+    spacingFt,
+    markers: SIGN_SEQUENCE.map(({ label, mutcd }, i) => ({
+      label,
+      mutcd,
+      x: -(i + 1) * spacingPx,
+      distanceFt: (i + 1) * spacingFt,
+    })),
+  };
+}
+
+export function SpacingOverlay({ taper }: SpacingOverlayProps) {
+  const { hw, lineHalfLen, signDotY, markers } = getSpacingGuideGeometry(taper);
 
   return (
     <Group x={taper.x} y={taper.y} rotation={taper.rotation} listening={false}>
@@ -36,12 +68,9 @@ export function SpacingOverlay({ taper }: SpacingOverlayProps) {
         listening={false}
       />
 
-      {SIGN_SEQUENCE.map(({ label, mutcd }, i) => {
-        const lx = -(i + 1) * spacingPx;
-        const distFt = (i + 1) * spacingFt;
-
+      {markers.map(({ label, mutcd, x, distanceFt }) => {
         return (
-          <Group key={mutcd + label} x={lx} y={0} listening={false}>
+          <Group key={mutcd + label} x={x} y={0} listening={false}>
             {/* Dashed guide line perpendicular to road */}
             <Line
               points={[0, -lineHalfLen, 0, lineHalfLen]}
@@ -55,7 +84,7 @@ export function SpacingOverlay({ taper }: SpacingOverlayProps) {
             <Text
               x={5}
               y={-lineHalfLen}
-              text={`${distFt} ft`}
+              text={`${distanceFt} ft`}
               fontSize={11}
               fontStyle="bold"
               fill={LABEL_COLOR}

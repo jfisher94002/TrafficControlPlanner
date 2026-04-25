@@ -1,8 +1,23 @@
 /**
  * MUTCD Chapter 6P — Typical Application (TA) scenario fixtures.
+ * 2023 MUTCD 11th Edition, all 54 federal diagrams + CA supplement TA-101.
  *
- * All 54 federal scenarios plus CA supplement TA-101.
- * Numbering and content follows MUTCD 11th Edition (2023) Chapter 6P.
+ * ─── Layout convention ────────────────────────────────────────────────────────
+ * All scenarios use a vertical road running north (top) → south (bottom).
+ * Traffic approaches the work zone from the north (top of canvas).
+ *
+ *   CX  = 400   road horizontal centre
+ *   RY1 =  50   road top
+ *   RY2 = 650   road bottom
+ *   SR  = 540   advance sign X, right (east) shoulder — works for all road types
+ *   SL  = 260   advance sign X, left (west) shoulder  — opposing traffic
+ *   WY  = 500   work-zone centre Y
+ *   TY  = 430   taper / end-device Y (upstream of work zone)
+ *
+ * Three-sign advance sequence (top → bottom, farthest first): y = 150, 270, 390
+ * Two-sign sequence:                                           y = 190, 340
+ * One-sign:                                                    y = 280
+ * ──────────────────────────────────────────────────────────────────────────────
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -14,19 +29,12 @@ export interface MapCenter {
 }
 
 export interface TAAssert {
-  /** signData.id values that must be present */
   signs?: string[]
-  /** deviceData.id values that must be present */
   devices?: string[]
-  /** object .type values that must be present (e.g. 'taper', 'zone') */
   objectTypes?: string[]
-  /** canvas must have at least this many taper objects */
   minTapers?: number
-  /** canvas must have at least this many of each device id */
   minDevices?: Record<string, number>
-  /** Taper length formula check: L = laneWidth × speed */
   taperFormula?: { speed: number; laneWidth: number; expectedFt: number }
-  /** Assert zero device objects on canvas */
   noDevices?: boolean
 }
 
@@ -35,16 +43,62 @@ export interface TAScenario {
   title: string
   seed: { mapCenter: MapCenter; objects: unknown[] }
   assert: TAAssert
-  /** If set, the test is skipped with this reason string. */
   skip?: string
 }
+
+// ─── Layout constants ─────────────────────────────────────────────────────────
+
+const CX  = 400   // road horizontal centre
+const RY1 =  50   // road top
+const RY2 = 650   // road bottom
+const SR  = 540   // sign x, right shoulder
+const SL  = 260   // sign x, left shoulder (opposing traffic)
+const WY  = 500   // work-zone centre Y
+const TY  = 430   // taper / end-device Y
+
+// ─── Road builders ────────────────────────────────────────────────────────────
+
+/** Straight two-lane, two-way rural road with shoulders. */
+const road2 = (id = 'road-1') => ({
+  id, type: 'road',
+  x1: CX, y1: RY1, x2: CX, y2: RY2,
+  width: 80, realWidth: 22, lanes: 2, roadType: '2lane', shoulderWidth: 20,
+})
+
+/** Four-lane undivided urban/suburban road with shoulders. */
+const road4 = (id = 'road-1') => ({
+  id, type: 'road',
+  x1: CX, y1: RY1, x2: CX, y2: RY2,
+  width: 150, realWidth: 44, lanes: 4, roadType: '4lane', shoulderWidth: 20,
+})
+
+/** Freeway / limited-access highway with wide shoulders. */
+const roadFwy = (id = 'road-1') => ({
+  id, type: 'road',
+  x1: CX, y1: RY1, x2: CX, y2: RY2,
+  width: 180, realWidth: 58, lanes: 4, roadType: 'highway', shoulderWidth: 30,
+})
+
+/** Divided highway — right (primary) roadway. */
+const roadDivR = () => ({
+  id: 'road-1', type: 'road',
+  x1: CX + 55, y1: RY1, x2: CX + 55, y2: RY2,
+  width: 80, realWidth: 22, lanes: 2, roadType: '2lane', shoulderWidth: 20,
+})
+
+/** Divided highway — left (opposing) roadway. */
+const roadDivL = () => ({
+  id: 'road-2', type: 'road',
+  x1: CX - 55, y1: RY1, x2: CX - 55, y2: RY2,
+  width: 80, realWidth: 22, lanes: 2, roadType: '2lane', shoulderWidth: 20,
+})
 
 // ─── Seed object builders ─────────────────────────────────────────────────────
 
 const MAP_CENTER: MapCenter = { lat: 37.7749, lon: -122.4194, zoom: 16 }
 
 const sign = (id: string, x: number, y: number, mutcd?: string) => ({
-  id: `sign-${id}-${x}`,
+  id: `sign-${id}-${x}-${y}`,
   type: 'sign',
   x, y, rotation: 0, scale: 1,
   signData: {
@@ -74,7 +128,7 @@ const device = (id: string, deviceId: string, x: number, y: number) => ({
   deviceData: { id: deviceId, label: deviceId, icon: '▣', color: '#fbbf24' },
 })
 
-const zone = (id: string, x: number, y: number, w = 300, h = 60) => ({
+const zone = (id: string, x: number, y: number, w = 120, h = 80) => ({
   id, type: 'zone', x, y, w, h,
 })
 
@@ -83,367 +137,393 @@ const zone = (id: string, x: number, y: number, w = 300, h = 60) => ({
 export const TA_SCENARIOS: TAScenario[] = [
 
   // ── TA-1: Work Beyond the Shoulder ────────────────────────────────────────
-  // No taper required; shoulder work sign + road work sign only.
+  // Two-lane road. Work is completely off the right shoulder — no taper.
+  // One advance warning sign only (W20-1). Work zone beyond shoulder.
   {
     id: 'TA-1',
     title: 'Work Beyond the Shoulder',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('shoulderwork', 100, 200, 'W21-5a'),
-        sign('roadwork', 200, 200, 'W20-1'),
+        road2(),
+        sign('roadwork', SR, 280, 'W20-1'),
+        zone('zone-1', CX + 75, WY - 30, 100, 80),
       ],
     },
     assert: {
-      signs: ['shoulderwork', 'roadwork'],
+      signs: ['roadwork'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-2: Work on Shoulder — No Taper ─────────────────────────────────────
-  // Shoulder work with no encroachment; no taper needed. Signs only.
+  // Work on shoulder, no encroachment into travel lane — no taper needed.
   {
     id: 'TA-2',
     title: 'Work on Shoulder — No Taper',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('shoulderwork', 100, 200, 'W21-5a'),
-        sign('roadwork',     250, 200, 'W20-1'),
-        zone('zone-1', 400, 185),
+        road2(),
+        sign('shoulderwork', SR, 200, 'W21-5a'),
+        sign('roadwork',     SR, 340, 'W20-1'),
+        zone('zone-1', CX + 60, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['shoulderwork', 'roadwork'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
       noDevices: true,
     },
   },
 
-  // ── TA-3: Work on the Shoulder ─────────────────────────────────────────────
-  // Shoulder encroaches slightly; taper required.
+  // ── TA-3: Work on the Shoulder (minor encroachment) ───────────────────────
+  // Shoulder work with slight encroachment into the travel lane; taper required.
   {
     id: 'TA-3',
     title: 'Work on the Shoulder',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('shoulderwork', 100, 200, 'W21-5a'),
-        sign('roadwork',     250, 200, 'W20-1'),
-        taper('taper-1', 400, 300),
-        zone('zone-1', 550, 270),
+        road2(),
+        sign('shoulderwork', SR, 190, 'W21-5a'),
+        sign('roadwork',     SR, 340, 'W20-1'),
+        taper('taper-1', CX + 25, TY),
+        zone('zone-1', CX + 55, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['shoulderwork', 'roadwork'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-4: Sidewalk Closure ─────────────────────────────────────────────────
-  // Pedestrian path closed; requires sidewalk closed sign + detour path.
+  // Urban street. Sidewalk closed; pedestrian detour required.
   {
     id: 'TA-4',
     title: 'Sidewalk Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('sidewalkclosed',   100, 200, 'R9-9'),
-        sign('pedestriandetour', 200, 200, 'M4-9b'),
-        zone('zone-1', 350, 185),
+        road4(),
+        sign('sidewalkclosed',   SR, 200, 'R9-9'),
+        sign('pedestriandetour', SR, 340, 'M4-9b'),
+        zone('zone-1', CX + 100, WY - 30, 80, 120),
       ],
     },
     assert: {
       signs: ['sidewalkclosed', 'pedestriandetour'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-5: Moving Work Zone on Two-Lane Road ────────────────────────────────
-  // Slow-moving operation; arrow board in caution/flashing mode replaces taper.
+  // Slow-moving operation; arrow board replaces fixed taper.
   {
     id: 'TA-5',
     title: 'Moving Work Zone on Two-Lane Road',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',       100, 300, 'W20-1'),
-        sign('movingoperation', 250, 300, 'W20-4'),
-        device('ab-1', 'arrow_board', 450, 300),
+        road2(),
+        sign('roadwork',        SR, 190, 'W20-1'),
+        sign('movingoperation', SR, 340, 'W20-4'),
+        device('ab-1', 'arrow_board', CX + 20, TY),
       ],
     },
     assert: {
       signs: ['roadwork', 'movingoperation'],
       devices: ['arrow_board'],
+      objectTypes: ['road'],
     },
   },
 
   // ── TA-6: Shoulder Work with Minor Encroachment ───────────────────────────
+  // Encroaches into travel lane; merge warning + taper required.
   {
     id: 'TA-6',
     title: 'Shoulder Work with Minor Encroachment',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('shoulderwork', 100, 200, 'W21-5a'),
-        sign('roadwork',     200, 200, 'W20-1'),
-        sign('merge',        350, 200, 'W4-2'),
-        taper('taper-1', 500, 300),
-        zone('zone-1', 650, 270),
+        road2(),
+        sign('shoulderwork', SR, 150, 'W21-5a'),
+        sign('roadwork',     SR, 270, 'W20-1'),
+        sign('merge',        SR, 390, 'W4-2'),
+        taper('taper-1', CX + 20, TY),
+        zone('zone-1', CX + 50, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['shoulderwork', 'merge'],
-      objectTypes: ['taper'],
+      objectTypes: ['road', 'taper'],
     },
   },
 
   // ── TA-7: Work Beyond Shoulder — Limited Access Highway ───────────────────
-  // Freeway context; work off paved shoulder, no lane or shoulder taper needed.
+  // Freeway context; work is off the paved shoulder — no lane impact.
+  // Arrow board on shoulder faces approaching traffic.
   {
     id: 'TA-7',
     title: 'Work Beyond Shoulder — Limited Access Highway',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 200, 'W20-1'),
-        sign('shoulderwork', 250, 200, 'W21-5a'),
-        device('ab-1', 'arrow_board', 450, 200),
-        zone('zone-1', 600, 185),
+        roadFwy(),
+        sign('roadwork',     SR, 190, 'W20-1'),
+        sign('shoulderwork', SR, 340, 'W21-5a'),
+        device('ab-1', 'arrow_board', CX + 110, TY),
+        zone('zone-1', CX + 120, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['roadwork', 'shoulderwork'],
       devices: ['arrow_board'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
-  // ── TA-8: Two-Lane Road — One Lane Alternating (Flaggers) ─────────────────
-  // Short section of two-lane road reduced to one lane; flaggers control each end.
+  // ── TA-8: Two-Lane Road — One Lane Alternating with Flaggers ──────────────
+  // Full one-lane alternating section; flaggers at each end.
   {
     id: 'TA-8',
     title: 'Two-Lane Road — One Lane Alternating with Flaggers',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('flaggerahead', 280, 300, 'W20-7a'),
-        sign('onelane',      460, 300, 'W20-4a'),
-        taper('taper-1', 640, 300),
-        zone('zone-1',   800, 270),
-        device('flagger-1', 'flagger', 780, 300),
-        device('flagger-2', 'flagger', 1080, 300),
+        road2(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('flaggerahead', SR, 270, 'W20-7a'),
+        sign('onelane',      SR, 390, 'W20-4a'),
+        taper('taper-1', CX, TY),
+        zone('zone-1', CX, WY - 30, 80, 150),
+        device('flagger-1', 'flagger', CX, TY - 10),
+        device('flagger-2', 'flagger', CX, WY + 90),
       ],
     },
     assert: {
       signs: ['roadwork', 'flaggerahead', 'onelane'],
       devices: ['flagger'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minDevices: { flagger: 2 },
     },
   },
 
   // ── TA-9: Two-Lane Road — Pilot Car Operations ────────────────────────────
-  // Long section; pilot car escorts traffic through one direction at a time.
+  // Long section; pilot car escorts traffic through.
+  // Flaggers at each end signal when pilot car arrives.
   {
     id: 'TA-9',
     title: 'Two-Lane Road — Pilot Car Operations',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('pilotcar',      280, 300, 'W20-8'),
-        sign('preparetostop', 460, 300, 'W3-4'),
-        zone('zone-1', 640, 270),
-        device('flagger-1', 'flagger', 620, 300),
-        device('flagger-2', 'flagger', 920, 300),
+        road2(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('pilotcar',      SR, 270, 'W20-8'),
+        sign('preparetostop', SR, 390, 'W3-4'),
+        zone('zone-1', CX, WY - 30, 80, 200),
+        device('flagger-1', 'flagger', CX, TY),
+        device('flagger-2', 'flagger', CX, WY + 120),
       ],
     },
     assert: {
       signs: ['roadwork', 'pilotcar', 'preparetostop'],
       devices: ['flagger'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
       minDevices: { flagger: 2 },
     },
   },
 
   // ── TA-10: Lane Closure using Flaggers ────────────────────────────────────
+  // Two-lane road; one lane closed; flaggers control alternating traffic.
   {
     id: 'TA-10',
     title: 'Lane Closure using Flaggers',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('flaggerahead', 300, 300, 'W20-7a'),
-        sign('onelane',      500, 300, 'W20-4a'),
-        taper('taper-1', 700, 300),
-        zone('zone-1', 900, 270),
-        device('flagger-1', 'flagger', 880, 300),
-        device('flagger-2', 'flagger', 1200, 300),
+        road2(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('flaggerahead', SR, 270, 'W20-7a'),
+        sign('onelane',      SR, 390, 'W20-4a'),
+        taper('taper-1', CX, TY),
+        zone('zone-1', CX, WY - 30, 80, 150),
+        device('flagger-1', 'flagger', CX, TY - 10),
+        device('flagger-2', 'flagger', CX, WY + 90),
       ],
     },
     assert: {
       signs: ['roadwork', 'flaggerahead', 'onelane'],
       devices: ['flagger'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-11: Lane Closure with Low Traffic Volumes ──────────────────────────
+  // Low-volume road; signs + taper only; no flaggers or devices required.
   {
     id: 'TA-11',
     title: 'Lane Closure with Low Traffic Volumes',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork', 100, 300, 'W20-1'),
-        sign('onelane',  300, 300, 'W20-4a'),
-        taper('taper-1', 500, 300),
-        zone('zone-1',   700, 270),
+        road2(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('onelane',  SR, 340, 'W20-4a'),
+        taper('taper-1', CX, TY),
+        zone('zone-1', CX, WY - 30, 80, 150),
       ],
     },
     assert: {
       signs: ['roadwork', 'onelane'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       noDevices: true,
     },
   },
 
   // ── TA-12: Lane Closure using Traffic Control Signals ─────────────────────
+  // Temp signals at each end alternate traffic through one lane.
   {
     id: 'TA-12',
     title: 'Lane Closure using Traffic Control Signals',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork', 100, 300, 'W20-1'),
-        sign('signal',   300, 300, 'W3-3'),
-        taper('taper-1', 500, 300),
-        zone('zone-1',   700, 270),
-        device('sig-1', 'temp_signal', 690, 300),
-        device('sig-2', 'temp_signal', 1100, 300),
+        road2(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('signal',   SR, 340, 'W3-3'),
+        taper('taper-1', CX, TY),
+        zone('zone-1', CX, WY - 30, 80, 150),
+        device('sig-1', 'temp_signal', CX, TY - 5),
+        device('sig-2', 'temp_signal', CX, WY + 90),
       ],
     },
     assert: {
       signs: ['signal'],
       devices: ['temp_signal'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minDevices: { temp_signal: 2 },
     },
   },
 
   // ── TA-13: Right Lane Closure — Urban Near-Side Intersection ──────────────
-  // Right lane closed before an urban intersection; merge left.
+  // Four-lane urban road. Right lane closed before the intersection.
   {
     id: 'TA-13',
     title: 'Right Lane Closure — Urban Near-Side Intersection',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('rightlaneends', 300, 300, 'W9-1'),
-        sign('merge',         480, 300, 'W4-2'),
-        taper('taper-1', 660, 300),
-        zone('zone-1',   850, 270),
-        device('ab-1', 'arrow_board', 830, 300),
+        road4(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('rightlaneends', SR, 270, 'W9-1'),
+        sign('merge',         SR, 390, 'W4-2'),
+        taper('taper-1', CX + 40, TY, 45),
+        zone('zone-1', CX + 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends', 'merge'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-14: Right Lane Closure — Urban Far-Side Intersection ───────────────
-  // Taper begins after intersection clears; right lane closed on far side.
+  // Taper begins after the intersection; right lane closed on far side.
   {
     id: 'TA-14',
     title: 'Right Lane Closure — Urban Far-Side Intersection',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('rightlaneends', 300, 300, 'W9-1'),
-        taper('taper-1', 600, 300),
-        zone('zone-1',   800, 270),
-        device('ab-1', 'arrow_board', 780, 300),
+        road4(),
+        sign('roadwork',      SR, 190, 'W20-1'),
+        sign('rightlaneends', SR, 340, 'W9-1'),
+        taper('taper-1', CX + 40, TY, 45),
+        zone('zone-1', CX + 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-15: Left Lane Closure — Urban Intersection ─────────────────────────
-  // Left lane closed near/through urban intersection; merge right.
+  // Left lane closed near urban intersection; merge right.
   {
     id: 'TA-15',
     title: 'Left Lane Closure — Urban Intersection',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('leftlaneends', 300, 300, 'W9-2'),
-        sign('merge',        480, 300, 'W4-2'),
-        taper('taper-1', 660, 300),
-        zone('zone-1',   850, 270),
-        device('ab-1', 'arrow_board', 830, 300),
+        road4(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('leftlaneends', SR, 270, 'W9-2'),
+        sign('merge',        SR, 390, 'W4-2'),
+        taper('taper-1', CX - 40, TY, 45),
+        zone('zone-1', CX - 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX - 40, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'leftlaneends', 'merge'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-16: Right Lane Closure — Multilane Undivided Highway ───────────────
-  // Right lane closed on multilane undivided; merge left; 45 mph.
+  // Right lane closed; 45 mph; merge left.
   {
     id: 'TA-16',
     title: 'Right Lane Closure — Multilane Undivided Highway',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('rightlaneends', 300, 300, 'W9-1'),
-        sign('merge',         500, 300, 'W4-2'),
-        taper('taper-1', 700, 300, 45),
-        zone('zone-1',   880, 270),
-        device('ab-1', 'arrow_board', 860, 300),
+        road4(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('rightlaneends', SR, 270, 'W9-1'),
+        sign('merge',         SR, 390, 'W4-2'),
+        taper('taper-1', CX + 40, TY, 45),
+        zone('zone-1', CX + 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends', 'merge'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-17: Left Lane Closure — Multilane Undivided Highway ────────────────
-  // Left lane closed on multilane undivided; merge right; 45 mph.
+  // Left lane closed; 45 mph; merge right.
   {
     id: 'TA-17',
     title: 'Left Lane Closure — Multilane Undivided Highway',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('leftlaneends', 300, 300, 'W9-2'),
-        sign('merge',        500, 300, 'W4-2'),
-        taper('taper-1', 700, 300, 45),
-        zone('zone-1',   880, 270),
-        device('ab-1', 'arrow_board', 860, 300),
+        road4(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('leftlaneends', SR, 270, 'W9-2'),
+        sign('merge',        SR, 390, 'W4-2'),
+        taper('taper-1', CX - 40, TY, 45),
+        zone('zone-1', CX - 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX - 40, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'leftlaneends', 'merge'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
@@ -455,312 +535,329 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',    100, 300, 'W20-1'),
-        sign('twolaneends', 320, 300, 'W9-3'),
-        sign('merge',       520, 300, 'W4-2'),
-        taper('taper-1', 720, 300, 45, 12, 2),
-        taper('taper-2', 900, 300, 45, 12, 1),
-        zone('zone-1',  1080, 270),
-        device('ab-1', 'arrow_board', 700, 300),
-        device('ab-2', 'arrow_board', 880, 300),
+        road4(),
+        sign('roadwork',    SR, 150, 'W20-1'),
+        sign('twolaneends', SR, 270, 'W9-3'),
+        sign('merge',       SR, 390, 'W4-2'),
+        taper('taper-1', CX + 40, TY - 40, 45, 12, 2),
+        taper('taper-2', CX + 20, TY,      45, 12, 1),
+        zone('zone-1', CX + 30, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 55, TY - 50),
+        device('ab-2', 'arrow_board', CX + 30, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'merge'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minTapers: 2,
       minDevices: { arrow_board: 2 },
     },
   },
 
   // ── TA-19: Lane Shift — Multilane Highway ─────────────────────────────────
-  // Traffic shifted laterally (not a lane elimination); tangent taper geometry.
+  // Traffic shifted laterally around work area; in-taper + out-taper.
   {
     id: 'TA-19',
     title: 'Lane Shift — Multilane Highway',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',  100, 300, 'W20-1'),
-        sign('shiftleft', 300, 300, 'W4-9L'),
-        taper('taper-1', 500, 300, 45),
-        zone('zone-1',   680, 270),
-        taper('taper-2', 900, 300, 45),
-        device('ab-1', 'arrow_board', 660, 300),
+        road4(),
+        sign('roadwork',  SR, 190, 'W20-1'),
+        sign('shiftleft', SR, 340, 'W4-9L'),
+        taper('taper-1', CX + 20, TY,      45),
+        zone('zone-1',   CX - 20, WY - 30, 80, 150),
+        taper('taper-2', CX - 20, WY + 80, 45),
+        device('ab-1', 'arrow_board', CX + 20, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'shiftleft'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-20: Ramp Closure on Surface Street ─────────────────────────────────
-  // Entrance ramp closed; detour to next ramp; no main-lane taper.
+  // Entrance ramp closed; no main-lane taper; detour to next ramp.
   {
     id: 'TA-20',
     title: 'Ramp Closure on Surface Street',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',   100, 300, 'W20-1'),
-        sign('rampclosed', 300, 300, 'R4-11a'),
-        sign('detour',     480, 300, 'M4-9b'),
-        zone('zone-1', 650, 270),
+        road4(),
+        sign('roadwork',   SR, 190, 'W20-1'),
+        sign('rampclosed', SR, 280, 'R4-11a'),
+        sign('detour',     SR, 370, 'M4-9b'),
+        zone('zone-1', CX + 100, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['rampclosed', 'detour'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-21: Lane Closure on Near Side of Intersection ─────────────────────
+  // Taper closes lane before intersection; work zone at intersection.
   {
     id: 'TA-21',
     title: 'Lane Closure on Near Side of Intersection',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork', 100, 300, 'W20-1'),
-        sign('merge',    300, 300, 'W4-2'),
-        taper('taper-1', 500, 300),
-        zone('zone-1',   700, 270),
+        road4(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('merge',    SR, 340, 'W4-2'),
+        taper('taper-1', CX + 40, TY, 45),
+        zone('zone-1',   CX + 40, WY - 30, 80, 150),
       ],
     },
     assert: {
       signs: ['roadwork'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-22: Right Lane Closure on Far Side of Intersection ─────────────────
+  // Right lane closed after intersection; taper begins past intersection.
   {
     id: 'TA-22',
     title: 'Right Lane Closure on Far Side of Intersection',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('rightlaneends', 300, 300, 'W9-1'),
-        taper('taper-1', 600, 300),
-        zone('zone-1',   800, 270),
+        road4(),
+        sign('roadwork',      SR, 190, 'W20-1'),
+        sign('rightlaneends', SR, 340, 'W9-1'),
+        taper('taper-1', CX + 40, TY, 45),
+        zone('zone-1',   CX + 40, WY - 30, 80, 150),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-23: Left Lane Closure Near Intersection ─────────────────────────────
-  // Left lane closed approaching an urban intersection; merge right.
+  // Left lane closed near urban intersection; merge right.
   {
     id: 'TA-23',
     title: 'Left Lane Closure Near Intersection',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('leftlaneends', 300, 300, 'W9-2'),
-        sign('merge',        480, 300, 'W4-2'),
-        taper('taper-1', 660, 300),
-        zone('zone-1',   850, 270),
-        device('ab-1', 'arrow_board', 830, 300),
+        road4(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('leftlaneends', SR, 270, 'W9-2'),
+        sign('merge',        SR, 390, 'W4-2'),
+        taper('taper-1', CX - 40, TY, 45),
+        zone('zone-1',   CX - 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX - 40, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'leftlaneends'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-24: Contraflow — Multilane Undivided Highway ───────────────────────
-  // One direction borrows a lane from the other; temp signals at each end.
+  // One direction uses a lane from the other; temp signals at each end.
   {
     id: 'TA-24',
     title: 'Contraflow — Multilane Undivided Highway',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('onelane',       300, 300, 'W20-4a'),
-        sign('preparetostop', 480, 300, 'W3-4'),
-        zone('zone-1',  700, 270),
-        device('sig-1', 'temp_signal', 690, 300),
-        device('sig-2', 'temp_signal', 1000, 300),
+        road4(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('onelane',       SR, 270, 'W20-4a'),
+        sign('preparetostop', SR, 390, 'W3-4'),
+        zone('zone-1', CX, WY - 30, 80, 200),
+        device('sig-1', 'temp_signal', CX, TY),
+        device('sig-2', 'temp_signal', CX, WY + 120),
       ],
     },
     assert: {
       signs: ['roadwork', 'onelane'],
       devices: ['temp_signal'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
       minDevices: { temp_signal: 2 },
     },
   },
 
   // ── TA-25: Short Duration / Moving Operation — Urban ──────────────────────
-  // Urban moving work zone; no fixed taper; arrow board on vehicle.
+  // Urban moving work zone; arrow board on vehicle; no fixed taper.
   {
     id: 'TA-25',
     title: 'Short Duration / Moving Operation — Urban',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',        100, 300, 'W20-1'),
-        sign('movingoperation', 280, 300, 'W20-4'),
-        device('ab-1', 'arrow_board', 480, 300),
+        road4(),
+        sign('roadwork',        SR, 190, 'W20-1'),
+        sign('movingoperation', SR, 340, 'W20-4'),
+        device('ab-1', 'arrow_board', CX + 40, TY),
       ],
     },
     assert: {
       signs: ['roadwork', 'movingoperation'],
       devices: ['arrow_board'],
+      objectTypes: ['road'],
     },
   },
 
   // ── TA-26: Divided Highway — Shoulder Work ────────────────────────────────
-  // Work on shoulder of divided highway; no lane taper; signs + arrow board.
+  // Work on right shoulder; no lane closure; arrow board on shoulder.
   {
     id: 'TA-26',
     title: 'Divided Highway — Shoulder Work',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 200, 'W20-1'),
-        sign('shoulderwork', 250, 200, 'W21-5a'),
-        device('ab-1', 'arrow_board', 450, 200),
-        zone('zone-1', 600, 185),
+        roadDivR(), roadDivL(),
+        sign('roadwork',     SR, 190, 'W20-1'),
+        sign('shoulderwork', SR, 340, 'W21-5a'),
+        device('ab-1', 'arrow_board', CX + 105, TY),
+        zone('zone-1', CX + 110, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['roadwork', 'shoulderwork'],
       devices: ['arrow_board'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-27: Divided Highway — Right Lane Closure ───────────────────────────
-  // Right lane closed on divided highway; 55 mph; taper + arrow board.
+  // Right lane closed on divided highway; 55 mph taper; arrow board.
   {
     id: 'TA-27',
     title: 'Divided Highway — Right Lane Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('rightlaneends', 350, 300, 'W9-1'),
-        sign('merge',         580, 300, 'W4-2'),
-        taper('taper-1', 780, 300, 55, 12),
-        zone('zone-1',   1000, 270),
-        device('ab-1', 'arrow_board', 980, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('rightlaneends', SR, 270, 'W9-1'),
+        sign('merge',         SR, 390, 'W4-2'),
+        taper('taper-1', CX + 75, TY, 55),
+        zone('zone-1',   CX + 75, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 75, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-28: Divided Highway — Left Lane Closure ────────────────────────────
-  // Left lane closed on divided highway; 55 mph; taper + arrow board.
+  // Left (median) lane closed on divided highway; 55 mph; arrow board.
   {
     id: 'TA-28',
     title: 'Divided Highway — Left Lane Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('leftlaneends', 350, 300, 'W9-2'),
-        sign('merge',        580, 300, 'W4-2'),
-        taper('taper-1', 780, 300, 55, 12),
-        zone('zone-1',   1000, 270),
-        device('ab-1', 'arrow_board', 980, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('leftlaneends', SR, 270, 'W9-2'),
+        sign('merge',        SR, 390, 'W4-2'),
+        taper('taper-1', CX + 35, TY, 55),
+        zone('zone-1',   CX + 35, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 35, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'leftlaneends'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-29: Divided Highway — Two Adjacent Lanes Closed ────────────────────
-  // Two lanes closed on divided highway; nested tapers; two arrow boards.
+  // Both lanes of right roadway closed; nested tapers; two arrow boards.
   {
     id: 'TA-29',
     title: 'Divided Highway — Two Adjacent Lanes Closed',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',    100, 300, 'W20-1'),
-        sign('twolaneends', 360, 300, 'W9-3'),
-        sign('merge',       580, 300, 'W4-2'),
-        taper('taper-1', 780, 300, 55, 12, 2),
-        taper('taper-2', 980, 300, 55, 12, 1),
-        zone('zone-1',  1160, 270),
-        device('ab-1', 'arrow_board', 760, 300),
-        device('ab-2', 'arrow_board', 960, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork',    SR, 150, 'W20-1'),
+        sign('twolaneends', SR, 270, 'W9-3'),
+        sign('merge',       SR, 390, 'W4-2'),
+        taper('taper-1', CX + 75, TY - 40, 55, 12, 2),
+        taper('taper-2', CX + 55, TY,      55, 12, 1),
+        zone('zone-1',   CX + 55, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 85, TY - 50),
+        device('ab-2', 'arrow_board', CX + 60, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minTapers: 2,
       minDevices: { arrow_board: 2 },
     },
   },
 
   // ── TA-30: Divided Highway — Ramp Closure ─────────────────────────────────
-  // On-ramp or off-ramp closed; detour signed; no main-lane taper.
+  // Ramp closed; detour signed; no main-lane closure.
   {
     id: 'TA-30',
     title: 'Divided Highway — Ramp Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',   100, 300, 'W20-1'),
-        sign('rampclosed', 300, 300, 'R4-11a'),
-        sign('detour',     480, 300, 'M4-9b'),
-        zone('zone-1', 650, 270),
+        roadDivR(), roadDivL(),
+        sign('roadwork',   SR, 190, 'W20-1'),
+        sign('rampclosed', SR, 280, 'R4-11a'),
+        sign('detour',     SR, 370, 'M4-9b'),
+        zone('zone-1', CX + 120, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['rampclosed', 'detour'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-31: Divided Highway — Crossover ────────────────────────────────────
-  // Traffic redirected to opposite roadway; temp signals + channelization.
+  // Traffic redirected across median; temp signals control flow.
   {
     id: 'TA-31',
     title: 'Divided Highway — Crossover',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('onelane',       320, 300, 'W20-4a'),
-        sign('preparetostop', 520, 300, 'W3-4'),
-        taper('taper-1', 720, 300, 55, 12),
-        zone('zone-1',   920, 270),
-        device('sig-1', 'temp_signal', 900, 300),
-        device('sig-2', 'temp_signal', 1200, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('onelane',       SR, 270, 'W20-4a'),
+        sign('preparetostop', SR, 390, 'W3-4'),
+        taper('taper-1', CX + 55, TY, 55),
+        zone('zone-1', CX, WY - 30, 110, 150),
+        device('sig-1', 'temp_signal', CX + 55, TY - 5),
+        device('sig-2', 'temp_signal', CX - 55, WY + 100),
       ],
     },
     assert: {
       signs: ['roadwork', 'onelane'],
       devices: ['temp_signal'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minDevices: { temp_signal: 2 },
     },
   },
 
-  // ── TA-32: Divided Highway — Contraflow ───────────────────────────────────
+  // ── TA-32: Divided Highway — Contraflow Operation ─────────────────────────
   // One direction uses lanes from opposite roadway; temp signals at each end.
   {
     id: 'TA-32',
@@ -768,18 +865,19 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',    100, 300, 'W20-1'),
-        sign('onelane',     320, 300, 'W20-4a'),
-        sign('contraflow',  520, 300, 'W4-7'),
-        zone('zone-1',  720, 270),
-        device('sig-1', 'temp_signal', 700, 300),
-        device('sig-2', 'temp_signal', 1020, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork',   SR, 150, 'W20-1'),
+        sign('onelane',    SR, 270, 'W20-4a'),
+        sign('contraflow', SR, 390, 'W4-7'),
+        zone('zone-1', CX, WY - 30, 110, 200),
+        device('sig-1', 'temp_signal', CX + 55, TY),
+        device('sig-2', 'temp_signal', CX + 55, WY + 120),
       ],
     },
     assert: {
       signs: ['roadwork', 'onelane'],
       devices: ['temp_signal'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
       minDevices: { temp_signal: 2 },
     },
   },
@@ -792,60 +890,65 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork', 100, 300, 'W20-1'),
-        sign('merge',    400, 300, 'W4-2'),
-        taper('taper-1', 700, 300, 65, 12, 1, 780),
-        zone('zone-1', 1000, 270),
-        device('ab-1', 'arrow_board', 980, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('merge',    SR, 340, 'W4-2'),
+        taper('taper-1', CX + 55, TY, 65, 12, 1, 780),
+        zone('zone-1',   CX + 55, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 55, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       taperFormula: { speed: 65, laneWidth: 12, expectedFt: 780 },
     },
   },
 
   // ── TA-34: Moving Operations on Divided Highway ───────────────────────────
-  // Slow-moving operation; arrow board on shadow vehicle; no fixed taper.
+  // Slow-moving work zone; arrow board on shadow vehicle.
   {
     id: 'TA-34',
     title: 'Moving Operations on Divided Highway',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',        100, 300, 'W20-1'),
-        sign('movingoperation', 300, 300, 'W20-4'),
-        device('ab-1', 'arrow_board', 500, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork',        SR, 190, 'W20-1'),
+        sign('movingoperation', SR, 340, 'W20-4'),
+        device('ab-1', 'arrow_board', CX + 55, TY),
       ],
     },
     assert: {
       signs: ['roadwork', 'movingoperation'],
       devices: ['arrow_board'],
+      objectTypes: ['road'],
     },
   },
 
   // ── TA-35: Divided Highway — Double Lane Closure ──────────────────────────
+  // Both lanes of right roadway closed; two tapers; two arrow boards.
   {
     id: 'TA-35',
     title: 'Divided Highway — Double Lane Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork', 100, 300, 'W20-1'),
-        sign('merge',    400, 300, 'W4-2'),
-        taper('taper-1', 700, 300, 65, 12, 2),
-        taper('taper-2', 900, 300, 65, 12, 1),
-        zone('zone-1',  1100, 270),
-        device('ab-1', 'arrow_board', 680, 300),
-        device('ab-2', 'arrow_board', 880, 300),
+        roadDivR(), roadDivL(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('merge',    SR, 340, 'W4-2'),
+        taper('taper-1', CX + 75, TY - 40, 65, 12, 2),
+        taper('taper-2', CX + 55, TY,      65, 12, 1),
+        zone('zone-1',   CX + 55, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 85, TY - 50),
+        device('ab-2', 'arrow_board', CX + 60, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minTapers: 2,
       minDevices: { arrow_board: 2 },
     },
@@ -859,37 +962,40 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 200, 'W20-1'),
-        sign('shoulderwork', 300, 200, 'W21-5a'),
-        device('ab-1', 'arrow_board', 500, 200),
-        zone('zone-1', 660, 185),
+        roadFwy(),
+        sign('roadwork',     SR, 190, 'W20-1'),
+        sign('shoulderwork', SR, 340, 'W21-5a'),
+        device('ab-1', 'arrow_board', CX + 120, TY),
+        zone('zone-1', CX + 130, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['roadwork', 'shoulderwork'],
       devices: ['arrow_board'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-37: Double Lane Closure on a Freeway ───────────────────────────────
+  // Two lanes closed on freeway; nested tapers; two arrow boards; 65 mph.
   {
     id: 'TA-37',
     title: 'Double Lane Closure on a Freeway',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork', 100, 300, 'W20-1'),
-        sign('merge',    400, 300, 'W4-2'),
-        taper('taper-1', 700, 300, 65, 12, 2),
-        taper('taper-2', 900, 300, 65, 12, 1),
-        zone('zone-1',  1100, 270),
-        device('ab-1', 'arrow_board', 680, 300),
-        device('ab-2', 'arrow_board', 880, 300),
+        roadFwy(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('merge',    SR, 340, 'W4-2'),
+        taper('taper-1', CX + 50, TY - 40, 65, 12, 2),
+        taper('taper-2', CX + 25, TY,      65, 12, 1),
+        zone('zone-1',   CX + 25, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 60, TY - 50),
+        device('ab-2', 'arrow_board', CX + 30, TY - 10),
       ],
     },
     assert: {
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       devices: ['arrow_board'],
       minTapers: 2,
       minDevices: { arrow_board: 2 },
@@ -897,49 +1003,51 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-38: Freeway — Right Lane Closure ───────────────────────────────────
-  // Single right lane closed; 65 mph; L = 780 ft.
+  // Single right lane closed; 65 mph; L = 780 ft; arrow board.
   {
     id: 'TA-38',
     title: 'Freeway — Right Lane Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('rightlaneends', 380, 300, 'W9-1'),
-        sign('merge',         620, 300, 'W4-2'),
-        taper('taper-1', 820, 300, 65, 12, 1, 780),
-        zone('zone-1',   1060, 270),
-        device('ab-1', 'arrow_board', 1040, 300),
+        roadFwy(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('rightlaneends', SR, 270, 'W9-1'),
+        sign('merge',         SR, 390, 'W4-2'),
+        taper('taper-1', CX + 50, TY, 65, 12, 1, 780),
+        zone('zone-1',   CX + 50, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 50, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       taperFormula: { speed: 65, laneWidth: 12, expectedFt: 780 },
     },
   },
 
   // ── TA-39: Freeway — Left Lane Closure ────────────────────────────────────
-  // Single left lane closed on freeway; 65 mph; arrow board.
+  // Single left (median) lane closed; 65 mph; arrow board.
   {
     id: 'TA-39',
     title: 'Freeway — Left Lane Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('leftlaneends', 380, 300, 'W9-2'),
-        sign('merge',        620, 300, 'W4-2'),
-        taper('taper-1', 820, 300, 65, 12, 1, 780),
-        zone('zone-1',   1060, 270),
-        device('ab-1', 'arrow_board', 1040, 300),
+        roadFwy(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('leftlaneends', SR, 270, 'W9-2'),
+        sign('merge',        SR, 390, 'W4-2'),
+        taper('taper-1', CX - 50, TY, 65, 12, 1, 780),
+        zone('zone-1',   CX - 50, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX - 50, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'leftlaneends'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       taperFormula: { speed: 65, laneWidth: 12, expectedFt: 780 },
     },
   },
@@ -952,14 +1060,15 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('rampclosed', 100, 300, 'R4-11a'),
-        sign('detour',     280, 300, 'M4-9b'),
-        zone('zone-1', 460, 270),
+        roadFwy(),
+        sign('rampclosed', SR, 230, 'R4-11a'),
+        sign('detour',     SR, 360, 'M4-9b'),
+        zone('zone-1', CX + 130, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['rampclosed', 'detour'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
@@ -971,127 +1080,133 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('exitclosed', 100, 300, 'R4-11a'),
-        sign('detour',     280, 300, 'M4-9b'),
-        zone('zone-1', 460, 270),
+        roadFwy(),
+        sign('exitclosed', SR, 230, 'R4-11a'),
+        sign('detour',     SR, 360, 'M4-9b'),
+        zone('zone-1', CX + 130, WY - 30, 100, 80),
       ],
     },
     assert: {
       signs: ['exitclosed', 'detour'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-42: Freeway — Median Work (No Lane Closure) ────────────────────────
-  // Work confined to median; no lane impact; signs + arrow board.
+  // Work confined to median; travel lanes unaffected; arrow board in median.
   {
     id: 'TA-42',
     title: 'Freeway — Median Work (No Lane Closure)',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('shoulderwork', 300, 300, 'W21-5a'),
-        device('ab-1', 'arrow_board', 500, 300),
-        zone('zone-1', 660, 270),
+        roadFwy(),
+        sign('roadwork',     SR, 190, 'W20-1'),
+        sign('shoulderwork', SR, 340, 'W21-5a'),
+        device('ab-1', 'arrow_board', CX, TY),
+        zone('zone-1', CX, WY - 30, 80, 120),
       ],
     },
     assert: {
       signs: ['roadwork'],
       devices: ['arrow_board'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-43: Freeway — Lane Closure with Median Crossover ───────────────────
-  // Traffic routed to opposite roadway via crossover; temp signals required.
+  // Traffic routed to opposite roadway via median crossover; temp signals.
   {
     id: 'TA-43',
     title: 'Freeway — Lane Closure with Median Crossover',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('onelane',       340, 300, 'W20-4a'),
-        sign('preparetostop', 560, 300, 'W3-4'),
-        taper('taper-1', 760, 300, 65, 12),
-        zone('zone-1',   960, 270),
-        device('sig-1', 'temp_signal', 940, 300),
-        device('sig-2', 'temp_signal', 1260, 300),
+        roadFwy(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('onelane',       SR, 270, 'W20-4a'),
+        sign('preparetostop', SR, 390, 'W3-4'),
+        taper('taper-1', CX + 25, TY, 65),
+        zone('zone-1', CX, WY - 30, 150, 200),
+        device('sig-1', 'temp_signal', CX + 25, TY - 5),
+        device('sig-2', 'temp_signal', CX - 25, WY + 130),
       ],
     },
     assert: {
       signs: ['roadwork', 'onelane'],
       devices: ['temp_signal'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minDevices: { temp_signal: 2 },
     },
   },
 
   // ── TA-44: Freeway — Contraflow Operation ─────────────────────────────────
-  // Both directions share one side; temp signals + barrier at each end.
+  // Both directions share one side; temp signals at each end of contraflow.
   {
     id: 'TA-44',
     title: 'Freeway — Contraflow Operation',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',    100, 300, 'W20-1'),
-        sign('onelane',     340, 300, 'W20-4a'),
-        sign('contraflow',  560, 300, 'W4-7'),
-        zone('zone-1',  760, 270),
-        device('sig-1', 'temp_signal', 740, 300),
-        device('sig-2', 'temp_signal', 1060, 300),
+        roadFwy(),
+        sign('roadwork',   SR, 150, 'W20-1'),
+        sign('onelane',    SR, 270, 'W20-4a'),
+        sign('contraflow', SR, 390, 'W4-7'),
+        zone('zone-1', CX, WY - 30, 150, 200),
+        device('sig-1', 'temp_signal', CX, TY),
+        device('sig-2', 'temp_signal', CX, WY + 130),
       ],
     },
     assert: {
       signs: ['roadwork', 'onelane'],
       devices: ['temp_signal'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
       minDevices: { temp_signal: 2 },
     },
   },
 
-  // ── TA-45: Freeway — Moving Operations (Short Duration) ───────────────────
-  // Moving work zone; arrow board on shadow vehicle; no fixed taper.
+  // ── TA-45: Freeway — Moving Operations ────────────────────────────────────
+  // Moving work zone at freeway speeds; two shadow vehicles with arrow boards.
   {
     id: 'TA-45',
     title: 'Freeway — Moving Operations (Short Duration)',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',        100, 300, 'W20-1'),
-        sign('movingoperation', 300, 300, 'W20-4'),
-        device('ab-1', 'arrow_board', 500, 300),
-        device('ab-2', 'arrow_board', 680, 300),
+        roadFwy(),
+        sign('roadwork',        SR, 190, 'W20-1'),
+        sign('movingoperation', SR, 340, 'W20-4'),
+        device('ab-1', 'arrow_board', CX + 25, TY),
+        device('ab-2', 'arrow_board', CX + 25, TY + 60),
       ],
     },
     assert: {
       signs: ['roadwork', 'movingoperation'],
       devices: ['arrow_board'],
+      objectTypes: ['road'],
       minDevices: { arrow_board: 2 },
     },
   },
 
-  // ── TA-46: Urban Intersection — Right Turn Lane / Approach Closure ─────────
-  // One approach lane closed at urban intersection; pedestrian impacts signed.
+  // ── TA-46: Urban Intersection — Approach Lane Closure ─────────────────────
+  // Right approach lane and adjacent sidewalk closed; pedestrian detour.
   {
     id: 'TA-46',
     title: 'Urban Intersection — Approach Lane Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',         100, 300, 'W20-1'),
-        sign('rightlaneends',    300, 300, 'W9-1'),
-        sign('sidewalkclosed',   480, 300, 'R9-9'),
-        sign('pedestriandetour', 660, 300, 'M4-9b'),
-        taper('taper-1', 860, 300),
-        zone('zone-1',  1040, 270),
+        road4(),
+        sign('roadwork',         SR, 150, 'W20-1'),
+        sign('rightlaneends',    SR, 270, 'W9-1'),
+        sign('sidewalkclosed',   SR, 390, 'R9-9'),
+        taper('taper-1', CX + 40, TY, 35),
+        zone('zone-1', CX + 40, WY - 30, 80, 150),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends', 'sidewalkclosed'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
@@ -1103,36 +1218,38 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',  100, 300, 'W20-1'),
-        sign('detour',    280, 300, 'M4-9b'),
-        zone('zone-1', 460, 270),
-        device('ab-1', 'arrow_board', 440, 300),
+        road4(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('detour',   SR, 340, 'M4-9b'),
+        zone('zone-1', CX, WY - 30, 100, 100),
+        device('ab-1', 'arrow_board', CX, TY),
       ],
     },
     assert: {
       signs: ['roadwork', 'detour'],
       devices: ['arrow_board'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
-  // ── TA-48: Sidewalk Closure and Pedestrian Detour (Standard) ─────────────
-  // Sidewalk closed with marked alternate pedestrian route.
+  // ── TA-48: Sidewalk Closure and Pedestrian Detour ─────────────────────────
+  // Sidewalk and crosswalk closed; marked alternate pedestrian route.
   {
     id: 'TA-48',
     title: 'Sidewalk Closure and Pedestrian Detour',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('sidewalkclosed',   100, 200, 'R9-9'),
-        sign('pedestriandetour', 250, 200, 'M4-9b'),
-        sign('crosswalkclosed',  400, 200, 'R9-8'),
-        zone('zone-1', 560, 185),
+        road4(),
+        sign('sidewalkclosed',   SR, 150, 'R9-9'),
+        sign('pedestriandetour', SR, 270, 'M4-9b'),
+        sign('crosswalkclosed',  SR, 390, 'R9-8'),
+        zone('zone-1', CX + 100, WY - 30, 80, 120),
       ],
     },
     assert: {
       signs: ['sidewalkclosed', 'pedestriandetour', 'crosswalkclosed'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
@@ -1144,108 +1261,113 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('crosswalkclosed',  100, 200, 'R9-8'),
-        sign('pedestriandetour', 260, 200, 'M4-9b'),
-        zone('zone-1', 430, 185),
+        road4(),
+        sign('crosswalkclosed',  SR, 190, 'R9-8'),
+        sign('pedestriandetour', SR, 340, 'M4-9b'),
+        zone('zone-1', CX + 100, WY - 30, 80, 80),
       ],
     },
     assert: {
       signs: ['crosswalkclosed', 'pedestriandetour'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-50: High-Speed Two-Lane Road — Flagger-Controlled Closure ──────────
-  // High-speed rural two-lane; extended advance warning; flaggers required.
+  // Rural road at 65 mph; extended advance warning distances; flaggers required.
   {
     id: 'TA-50',
     title: 'High-Speed Two-Lane Road — Flagger-Controlled Closure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',     100, 300, 'W20-1'),
-        sign('flaggerahead', 350, 300, 'W20-7a'),
-        sign('onelane',      600, 300, 'W20-4a'),
-        taper('taper-1', 860, 300, 65, 12),
-        zone('zone-1',  1060, 270),
-        device('flagger-1', 'flagger', 1040, 300),
-        device('flagger-2', 'flagger', 1360, 300),
+        road2(),
+        sign('roadwork',     SR, 150, 'W20-1'),
+        sign('flaggerahead', SR, 270, 'W20-7a'),
+        sign('onelane',      SR, 390, 'W20-4a'),
+        taper('taper-1', CX, TY, 65),
+        zone('zone-1', CX, WY - 30, 80, 150),
+        device('flagger-1', 'flagger', CX, TY - 10),
+        device('flagger-2', 'flagger', CX, WY + 90),
       ],
     },
     assert: {
       signs: ['roadwork', 'flaggerahead', 'onelane'],
       devices: ['flagger'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
       minDevices: { flagger: 2 },
     },
   },
 
   // ── TA-51: Work at Complex Multi-Leg Intersection ─────────────────────────
-  // Work zone affects multiple approaches; signing on every approach.
+  // Work zone affects multiple approaches; signing and arrow boards on each.
   {
     id: 'TA-51',
     title: 'Work at Complex Multi-Leg Intersection',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',  100, 300, 'W20-1'),
-        sign('roadwork2', 100, 150, 'W20-1'),
-        sign('detour',    280, 300, 'M4-9b'),
-        sign('detour2',   280, 150, 'M4-9b'),
-        zone('zone-1', 460, 225),
-        device('ab-1', 'arrow_board', 440, 300),
-        device('ab-2', 'arrow_board', 440, 150),
+        road4(),
+        sign('roadwork',  SR,  190, 'W20-1'),
+        sign('roadwork2', SL,  190, 'W20-1'),
+        sign('detour',    SR,  340, 'M4-9b'),
+        sign('detour2',   SL,  340, 'M4-9b'),
+        zone('zone-1', CX, WY - 30, 100, 100),
+        device('ab-1', 'arrow_board', CX + 40, TY),
+        device('ab-2', 'arrow_board', CX - 40, TY),
       ],
     },
     assert: {
       signs: ['roadwork', 'detour'],
       devices: ['arrow_board'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
       minDevices: { arrow_board: 2 },
     },
   },
 
   // ── TA-52: Work in Roundabout ─────────────────────────────────────────────
-  // Lane or splitter island work in roundabout; signs at each entry.
+  // Lane or splitter-island work in roundabout; signs at entries.
   {
     id: 'TA-52',
     title: 'Work in Roundabout',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork', 100, 300, 'W20-1'),
-        sign('detour',   280, 300, 'M4-9b'),
-        zone('zone-1', 460, 270),
-        device('ab-1', 'arrow_board', 440, 300),
+        road4(),
+        sign('roadwork', SR, 190, 'W20-1'),
+        sign('detour',   SR, 340, 'M4-9b'),
+        zone('zone-1', CX, WY - 30, 80, 80),
+        device('ab-1', 'arrow_board', CX, TY),
       ],
     },
     assert: {
       signs: ['roadwork', 'detour'],
       devices: ['arrow_board'],
-      objectTypes: ['zone'],
+      objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-53: Work on Bridge or Structure ────────────────────────────────────
-  // Lane closure on bridge deck; same geometry as standard lane closure.
+  // Lane closure on bridge deck; same signing geometry as standard lane closure.
   {
     id: 'TA-53',
     title: 'Work on Bridge or Structure',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',      100, 300, 'W20-1'),
-        sign('rightlaneends', 350, 300, 'W9-1'),
-        sign('merge',         570, 300, 'W4-2'),
-        taper('taper-1', 770, 300, 45, 12),
-        zone('zone-1',   950, 270),
-        device('ab-1', 'arrow_board', 930, 300),
+        road4(),
+        sign('roadwork',      SR, 150, 'W20-1'),
+        sign('rightlaneends', SR, 270, 'W9-1'),
+        sign('merge',         SR, 390, 'W4-2'),
+        taper('taper-1', CX + 40, TY, 45),
+        zone('zone-1',   CX + 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
       signs: ['roadwork', 'rightlaneends'],
       devices: ['arrow_board'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
@@ -1257,36 +1379,40 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',        100, 300, 'W20-1'),
-        sign('movingoperation', 340, 300, 'W20-4'),
-        device('ab-1', 'arrow_board', 560, 300),
-        device('ab-2', 'arrow_board', 760, 300),
+        roadFwy(),
+        sign('roadwork',        SR, 190, 'W20-1'),
+        sign('movingoperation', SR, 340, 'W20-4'),
+        device('ab-1', 'arrow_board', CX + 25, TY),
+        device('ab-2', 'arrow_board', CX + 25, TY + 60),
       ],
     },
     assert: {
       signs: ['roadwork', 'movingoperation'],
       devices: ['arrow_board'],
+      objectTypes: ['road'],
       minDevices: { arrow_board: 2 },
     },
   },
 
   // ── TA-101(CA): Right Lane + Bike Lane Closure (California supplement) ─────
+  // CA-specific: right lane and adjacent bike lane both closed.
   {
     id: 'TA-101',
     title: 'Right Lane + Bike Lane Closure (CA)',
     seed: {
       mapCenter: MAP_CENTER,
       objects: [
-        sign('roadwork',       100, 300, 'W20-1'),
-        sign('bikelaneclosed', 300, 300, 'R9-10a'),
-        sign('rightlaneends',  500, 300, 'W9-1'),
-        taper('taper-1', 700, 300),
-        zone('zone-1',   900, 270),
+        road4(),
+        sign('roadwork',       SR, 150, 'W20-1'),
+        sign('bikelaneclosed', SR, 270, 'R9-10a'),
+        sign('rightlaneends',  SR, 390, 'W9-1'),
+        taper('taper-1', CX + 40, TY, 35),
+        zone('zone-1',   CX + 40, WY - 30, 80, 150),
       ],
     },
     assert: {
       signs: ['bikelaneclosed', 'rightlaneends'],
-      objectTypes: ['taper', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 

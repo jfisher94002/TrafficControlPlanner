@@ -4,8 +4,7 @@ Tests for cognito_post_confirmation Lambda handler.
 All SES/boto3 calls are mocked — no real AWS credentials needed.
 """
 import os
-import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import cognito_post_confirmation as mod
 
@@ -60,6 +59,43 @@ def test_confirm_signup_trigger_sends_email():
         result = mod.handler(_event(), {})
     mock_ses.send_email.assert_called_once()
     assert result["triggerSource"] == "PostConfirmation_ConfirmSignUp"
+
+
+def test_confirm_signup_trigger_sends_expected_ses_message():
+    """SES payload must preserve the configured recipient and key signup fields."""
+    mock_ses = MagicMock()
+    with patch("cognito_post_confirmation.boto3.client", return_value=mock_ses) as mock_client, \
+         patch.dict(os.environ, {**_SES_ENVS, "APP_ENV": "prod"}, clear=True):
+        result = mod.handler(_event(), {})
+
+    mock_client.assert_called_once_with("ses")
+    mock_ses.send_email.assert_called_once()
+    kwargs = mock_ses.send_email.call_args.kwargs
+    assert result["triggerSource"] == "PostConfirmation_ConfirmSignUp"
+    assert kwargs["Source"] == "sender@example.com"
+    assert kwargs["Destination"] == {"ToAddresses": ["admin@example.com"]}
+    assert kwargs["ReplyToAddresses"] == ["sender@example.com"]
+    assert kwargs["Message"]["Subject"] == {
+        "Data": "New TCP Plan Pro signup: user@example.com",
+        "Charset": "UTF-8",
+    }
+    assert kwargs["Message"]["Body"]["Text"]["Charset"] == "UTF-8"
+    body = kwargs["Message"]["Body"]["Text"]["Data"]
+    assert "Name: Alice" in body
+    assert "Email: user@example.com" in body
+    assert "Username: alice" in body
+    assert "User Sub: abc-123" in body
+    assert "Environment: prod" in body
+
+
+def test_aws_ses_region_is_passed_to_boto3_when_configured():
+    mock_ses = MagicMock()
+    with patch("cognito_post_confirmation.boto3.client", return_value=mock_ses) as mock_client, \
+         patch.dict(os.environ, {**_SES_ENVS, "AWS_SES_REGION": "us-west-2"}, clear=True):
+        mod.handler(_event(), {})
+
+    mock_client.assert_called_once_with("ses", region_name="us-west-2")
+    mock_ses.send_email.assert_called_once()
 
 
 # ── env-var guard ─────────────────────────────────────────────────────────────

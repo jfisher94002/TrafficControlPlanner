@@ -116,7 +116,7 @@ describe('WorkZone rendering contract', () => {
   const getWorkZoneChildren = (isSelected = false) => {
     const element = WorkZone({ obj: zone, isSelected })
     if (!React.isValidElement(element)) throw new Error('WorkZone did not return a React element')
-    const children = React.Children.toArray(element.props.children) as React.ReactElement<Record<string, unknown>>[]
+    const children = React.Children.toArray((element.props as { children?: React.ReactNode }).children) as React.ReactElement<Record<string, unknown>>[]
     const [rect, ...rest] = children
     const label = rest[rest.length - 1]
     const hatches = rest.slice(0, -1)

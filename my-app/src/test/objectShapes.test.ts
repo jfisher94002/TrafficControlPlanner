@@ -150,12 +150,10 @@ describe('drawArrowBoard', () => {
     drawArrowBoard(right, 'right')
     drawArrowBoard(left, 'left')
 
-    const rightLedPoints = right.lineTo.mock.calls.slice(3)
-    const leftLedPoints = left.lineTo.mock.calls.slice(3)
-    expect(rightLedPoints).toContainEqual([10, 0])
-    expect(rightLedPoints).not.toContainEqual([-10, 0])
-    expect(leftLedPoints).toContainEqual([-10, 0])
-    expect(leftLedPoints).not.toContainEqual([10, 0])
+    expect(right.lineTo).toHaveBeenCalledWith(10, 0)
+    expect(right.lineTo).not.toHaveBeenCalledWith(-10, 0)
+    expect(left.lineTo).toHaveBeenCalledWith(-10, 0)
+    expect(left.lineTo).not.toHaveBeenCalledWith(10, 0)
   })
 
   it('draws caution mode as a centered diamond', () => {

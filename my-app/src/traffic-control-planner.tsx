@@ -706,7 +706,6 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
   };
 
   const selectAddressResult = (result: GeocodeResult) => {
-    setSearchQuery(formatSearchPrimary(result));
     const lat = Number(result?.lat), lon = Number(result?.lon);
     if (Number.isFinite(lat) && Number.isFinite(lon)) {
       // If the map is already set and objects exist, confirm before moving —
@@ -717,9 +716,11 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           `Moving to a new address will leave your ${objects.length} existing object${objects.length === 1 ? '' : 's'} at the wrong location.\n\nClear the canvas and start fresh at the new address?`
         );
         if (!confirmed) { setSearchOpen(false); return; }
+        // Use resetHistory so undo cannot restore objects at the now-wrong location
         resetHistory([]);
         setSelectedIds([]);
       }
+      setSearchQuery(formatSearchPrimary(result));
       setMapCenter({ lat, lon, zoom: 16 }); setOffset({ x: 0, y: 0 }); setZoom(1); setV1NoMapBanner(false);
       setSearchStatus(`Centered on ${formatSearchPrimary(result)}`);
     } else { setSearchStatus("Selected result has no coordinates."); }
@@ -786,7 +787,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
             data-testid="plan-title"
             value={planTitle}
             onChange={(e) => setPlanTitle(e.target.value)}
-            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, width: 220, padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
+            style={{ background: "transparent", border: "none", color: COLORS.text, fontSize: 13, fontWeight: 500, minWidth: 60, flex: "0 1 180px", padding: "4px 8px", borderRadius: 4, fontFamily: "inherit" }}
           />
           <div style={{ width: 1, height: 24, background: COLORS.panelBorder }} />
           <button onClick={newPlan} style={panelBtnStyle(false)} title="New plan">New</button>

@@ -42,7 +42,7 @@ test.beforeEach(async ({ page }) => {
 
 /** Seed the canvas and navigate to /app, waiting for stage to be ready. */
 async function seedAndLoad(page: Page, seed: Record<string, unknown>) {
-  const encoded = Buffer.from(JSON.stringify(seed)).toString('base64')
+  const encoded = encodeURIComponent(Buffer.from(JSON.stringify(seed)).toString('base64'))
   await page.goto(`/app?seed=${encoded}`)
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
 }

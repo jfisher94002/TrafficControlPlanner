@@ -368,7 +368,7 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
 interface SignShapeProps { obj: SignObject; isSelected: boolean; }
 export function SignShape({ obj, isSelected }: SignShapeProps) {
   const { x, y, signData, rotation = 0, scale: sc = 1 } = obj;
-  const s = 18 * sc;
+  const s = 12 * sc;
   return (
     <Shape
       x={x} y={y}
@@ -420,8 +420,8 @@ export function SignShape({ obj, isSelected }: SignShapeProps) {
         }
         ctx.fillStyle = signData.textColor || "#fff";
         const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
-        const baseFontSize = label.length <= 4 ? 13 : label.length <= 8 ? 11 : 8;
-        ctx.font = `bold ${Math.max(6, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
+        const baseFontSize = label.length <= 4 ? 8 : label.length <= 8 ? 6.5 : 5;
+        ctx.font = `bold ${Math.max(4, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(label, 0, shp === "triangle" ? 4 : 0);

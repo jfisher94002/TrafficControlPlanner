@@ -105,8 +105,113 @@ describe('buildOffsetSpine', () => {
 
 import { render } from '@testing-library/react'
 import React from 'react'
-import { PolylineRoad, CurveRoad, CubicBezierRoad } from '../components/tcp/canvas/ObjectShapes'
-import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject } from '../types'
+import { vi } from 'vitest'
+import { PolylineRoad, CurveRoad, CubicBezierRoad, SignShape } from '../components/tcp/canvas/ObjectShapes'
+import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, SignObject } from '../types'
+
+type MockCanvasContext = {
+  fillStyle: string
+  strokeStyle: string
+  lineWidth: number
+  font: string
+  textAlign: string
+  textBaseline: string
+  beginPath: ReturnType<typeof vi.fn>
+  moveTo: ReturnType<typeof vi.fn>
+  lineTo: ReturnType<typeof vi.fn>
+  closePath: ReturnType<typeof vi.fn>
+  fill: ReturnType<typeof vi.fn>
+  stroke: ReturnType<typeof vi.fn>
+  arc: ReturnType<typeof vi.fn>
+  fillRect: ReturnType<typeof vi.fn>
+  strokeRect: ReturnType<typeof vi.fn>
+  fillText: ReturnType<typeof vi.fn>
+}
+
+function createMockCanvasContext(): MockCanvasContext {
+  return {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 0,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    arc: vi.fn(),
+    fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    fillText: vi.fn(),
+  }
+}
+
+function renderSignToMockContext(obj: SignObject) {
+  const element = SignShape({ obj, isSelected: false }) as React.ReactElement<{
+    sceneFunc: (ctx: MockCanvasContext) => void
+    x: number
+    y: number
+    rotation: number
+  }>
+  const ctx = createMockCanvasContext()
+  element.props.sceneFunc(ctx)
+  return { ctx, props: element.props }
+}
+
+// ─── SignShape scale contract ─────────────────────────────────────────────────
+
+describe('SignShape — schematic scale rendering', () => {
+  const baseSign: SignObject = {
+    id: 'sign-1',
+    type: 'sign',
+    x: 25,
+    y: 40,
+    rotation: 15,
+    scale: 1,
+    signData: {
+      id: 'w20-1',
+      label: 'ROAD',
+      shape: 'circle',
+      color: '#facc15',
+      textColor: '#111827',
+    },
+  }
+
+  it('draws default-scale signs at the reduced schematic size', () => {
+    const { ctx, props } = renderSignToMockContext(baseSign)
+
+    expect(props.x).toBe(25)
+    expect(props.y).toBe(40)
+    expect(props.rotation).toBe(15)
+    expect(ctx.arc).toHaveBeenCalledWith(0, 0, 12, 0, Math.PI * 2)
+    expect(ctx.font).toBe("bold 8px 'JetBrains Mono', monospace")
+    expect(ctx.fillText).toHaveBeenCalledWith('ROAD', 0, 0)
+  })
+
+  it('scales sign geometry and label text from the same 12px base size', () => {
+    const obj: SignObject = {
+      ...baseSign,
+      scale: 2,
+      signData: {
+        ...baseSign.signData,
+        label: 'STOP',
+        shape: 'diamond',
+        color: '#dc2626',
+      },
+    }
+
+    const { ctx } = renderSignToMockContext(obj)
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(0, -24)
+    expect(ctx.lineTo).toHaveBeenNthCalledWith(1, 24, 0)
+    expect(ctx.lineTo).toHaveBeenNthCalledWith(2, 0, 24)
+    expect(ctx.lineTo).toHaveBeenNthCalledWith(3, -24, 0)
+    expect(ctx.font).toBe("bold 16px 'JetBrains Mono', monospace")
+  })
+})
 
 // ─── PolylineRoad ─────────────────────────────────────────────────────────────
 

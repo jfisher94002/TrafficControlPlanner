@@ -482,7 +482,7 @@ describe('Buffer zone overlay', () => {
     expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
   })
 
-  it('hides the overlay when taper selection is cleared while toggle stays on', async () => {
+  it('hides the overlay when taper selection is cleared', async () => {
     const { user } = setup()
     placeTaper()
     await user.click(screen.getByRole('button', { name: /show buffer zone/i }))
@@ -501,6 +501,25 @@ describe('Buffer zone overlay', () => {
     fireEvent.mouseDown(screen.getByTestId('konva-stage'))
     expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /hide buffer zone/i })).not.toBeInTheDocument()
+  })
+
+  it('restores the overlay automatically when a taper is re-selected after deselection', async () => {
+    const { user } = setup()
+    placeTaper()
+    await user.click(screen.getByRole('button', { name: /show buffer zone/i }))
+    expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+
+    // Deselect — overlay hides but toggle state is preserved in component
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByTestId('buffer-zone-overlay')).not.toBeInTheDocument()
+
+    // Re-select the taper (V = select tool, then click where taper was placed)
+    fireEvent.keyDown(window, { key: 'V' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    // Overlay reappears without clicking toggle again — toggle state persisted
+    expect(screen.getByTestId('buffer-zone-overlay')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide buffer zone/i })).toBeInTheDocument()
   })
 })
 

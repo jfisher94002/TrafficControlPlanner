@@ -30,7 +30,6 @@ describe('SIGN_CATEGORIES — ID uniqueness', () => {
 
   it('has exactly 206 signs total', () => {
     expect(allSigns).toHaveLength(206)
-<<<<<<< HEAD
   })
 })
 

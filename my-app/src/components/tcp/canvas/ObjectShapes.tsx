@@ -115,18 +115,28 @@ export function RoadSegment({ obj, isSelected }: RoadSegmentProps) {
     }
   }
 
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
+
+  // Bike lane: dashed white center symbol stripe
+  const bikeCenterLine = isBikeLane ? (
+    <Line points={[x1, y1, x2, y2]} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} listening={false} />
+  ) : null;
+
   return (
     <Group listening={false}>
       {sidewalkLines}
       {shoulderLines}
       <Circle x={x1} y={y1} radius={hw + 1} fill="#555" listening={false} />
       <Circle x={x2} y={y2} radius={hw + 1} fill="#555" listening={false} />
-      <Circle x={x1} y={y1} radius={hw - 1} fill={COLORS.road} listening={false} />
-      <Circle x={x2} y={y2} radius={hw - 1} fill={COLORS.road} listening={false} />
-      <Line points={roadPoly} closed fill={COLORS.road} stroke="#555" strokeWidth={2} />
-      <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
-      <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={COLORS.roadLineWhite} strokeWidth={2} />
+      <Circle x={x1} y={y1} radius={hw - 1} fill={fillColor} listening={false} />
+      <Circle x={x2} y={y2} radius={hw - 1} fill={fillColor} listening={false} />
+      <Line points={roadPoly} closed fill={fillColor} stroke="#555" strokeWidth={2} />
+      <Line points={[x1 + cos * hw, y1 + sin * hw, x2 + cos * hw, y2 + sin * hw]} stroke={edgeColor} strokeWidth={2} />
+      <Line points={[x1 - cos * hw, y1 - sin * hw, x2 - cos * hw, y2 - sin * hw]} stroke={edgeColor} strokeWidth={2} />
       {laneMarkings}
+      {bikeCenterLine}
       {isSelected && <Line points={[x1, y1, x2, y2]} stroke={COLORS.selected} strokeWidth={2} dash={[6, 4]} />}
     </Group>
   );
@@ -228,13 +238,17 @@ export function PolylineRoad({ obj, isSelected }: PolylineRoadProps) {
   }
 
   const extraLines = buildShoulderSidewalkLines(id, pts, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
 
   return (
     <Group listening={false}>
       {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={edgeColor} strokeWidth={width} lineCap="round" lineJoin="round" tension={tension} />
+      <Line points={flat} stroke={fillColor} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={tension} />
+      {isBikeLane && <Line points={flat} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} lineCap="round" lineJoin="round" tension={tension} listening={false} />}
       {laneMarkings}
       {isSelected && (
         <>
@@ -285,13 +299,17 @@ export function CurveRoad({ obj, isSelected }: CurveRoadProps) {
   }
 
   const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
 
   return (
     <Group listening={false}>
       {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={edgeColor} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={fillColor} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      {isBikeLane && <Line points={flat} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} lineCap="round" lineJoin="round" tension={0} listening={false} />}
       {laneMarkings}
       {isSelected && (
         <>
@@ -343,13 +361,17 @@ export function CubicBezierRoad({ obj, isSelected }: CubicBezierRoadProps) {
   }
 
   const extraLines = buildShoulderSidewalkLines(id, spine, hw, shoulderWidth, sidewalkWidth, sidewalkSide);
+  const isBikeLane = roadType === 'bike_lane';
+  const fillColor  = isBikeLane ? COLORS.bikeLane : COLORS.road;
+  const edgeColor  = isBikeLane ? COLORS.bikeLaneStripe : COLORS.roadLineWhite;
 
   return (
     <Group listening={false}>
       {extraLines}
       <Line points={flat} stroke="#444" strokeWidth={width + 4} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.roadLineWhite} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
-      <Line points={flat} stroke={COLORS.road} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={edgeColor} strokeWidth={width} lineCap="round" lineJoin="round" tension={0} />
+      <Line points={flat} stroke={fillColor} strokeWidth={width - 4} lineCap="round" lineJoin="round" tension={0} />
+      {isBikeLane && <Line points={flat} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} dash={[8, 12]} lineCap="round" lineJoin="round" tension={0} listening={false} />}
       {laneMarkings}
       {isSelected && (
         <>

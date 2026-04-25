@@ -541,6 +541,48 @@ describe('Taper tool', () => {
   })
 })
 
+// ─── Arrow board device modes ─────────────────────────────────────────────────
+describe('Arrow board device modes', () => {
+  it('shows arrow board mode controls only for arrow board devices', async () => {
+    const { user } = setup()
+
+    await user.click(screen.getByRole('button', { name: /devices/i }))
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    expect(within(screen.getByTestId('right-panel')).queryByText('Arrow Board Mode')).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Arrow Board'))
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    const panel = screen.getByTestId('right-panel')
+    expect(within(panel).getByText('Arrow Board Mode')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /right/i })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /left/i })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /caution/i })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /flash/i })).toBeInTheDocument()
+  })
+
+  it('persists selected arrow board mode to autosave', async () => {
+    const { user } = setup()
+
+    await user.click(screen.getByRole('button', { name: /devices/i }))
+    await user.click(screen.getByText('Arrow Board'))
+    fireEvent.keyDown(window, { key: 'D' })
+    fireEvent.mouseDown(screen.getByTestId('konva-stage'))
+
+    await user.click(within(screen.getByTestId('right-panel')).getByRole('button', { name: /left/i }))
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('tcp_autosave') ?? 'null')
+      const arrowBoard = saved?.canvasState?.objects.find((o: { type: string; deviceData?: { id?: string } }) =>
+        o.type === 'device' && o.deviceData?.id === 'arrow_board'
+      )
+      expect(arrowBoard?.arrowBoardMode).toBe('left')
+    })
+  })
+})
+
 // ─── Buffer zone overlay ──────────────────────────────────────────────────────
 describe('Buffer zone overlay', () => {
   function placeTaper() {

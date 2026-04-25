@@ -432,7 +432,7 @@ export function SignShape({ obj, isSelected }: SignShapeProps) {
 }
 
 /** Draw the amber LED matrix for a specific arrow board mode. */
-function drawArrowBoard(ctx: KonvaContext, mode: ArrowBoardMode) {
+export function drawArrowBoard(ctx: KonvaContext, mode: ArrowBoardMode) {
   const W = 28, H = 18; // board dims in canvas px
   // Board background
   ctx.fillStyle = '#1a1a1a';

@@ -4,7 +4,7 @@
  * We test the pure utility (buildOffsetSpine) directly, and verify the rendered
  * element counts for each road component via React Testing Library.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import { buildOffsetSpine } from '../utils'
 import type { Point } from '../types'
 
@@ -105,8 +105,92 @@ describe('buildOffsetSpine', () => {
 
 import { render } from '@testing-library/react'
 import React from 'react'
-import { PolylineRoad, CurveRoad, CubicBezierRoad } from '../components/tcp/canvas/ObjectShapes'
+import { PolylineRoad, CurveRoad, CubicBezierRoad, drawArrowBoard } from '../components/tcp/canvas/ObjectShapes'
 import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject } from '../types'
+
+// ─── Arrow board rendering ────────────────────────────────────────────────────
+
+function createArrowBoardContext() {
+  return {
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    closePath: vi.fn(),
+    fillRect: vi.fn(),
+    fillText: vi.fn(),
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 0,
+    globalAlpha: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+  } as unknown as Parameters<typeof drawArrowBoard>[0] & {
+    beginPath: Mock
+    rect: Mock
+    fill: Mock
+    stroke: Mock
+    moveTo: Mock
+    lineTo: Mock
+    closePath: Mock
+    fillRect: Mock
+    fillText: Mock
+    globalAlpha: number
+  }
+}
+
+describe('drawArrowBoard', () => {
+  it('draws left and right modes with opposite chevron tips', () => {
+    const right = createArrowBoardContext()
+    const left = createArrowBoardContext()
+
+    drawArrowBoard(right, 'right')
+    drawArrowBoard(left, 'left')
+
+    const rightLedPoints = right.lineTo.mock.calls.slice(3)
+    const leftLedPoints = left.lineTo.mock.calls.slice(3)
+    expect(rightLedPoints).toContainEqual([10, 0])
+    expect(rightLedPoints).not.toContainEqual([-10, 0])
+    expect(leftLedPoints).toContainEqual([-10, 0])
+    expect(leftLedPoints).not.toContainEqual([10, 0])
+  })
+
+  it('draws caution mode as a centered diamond', () => {
+    const ctx = createArrowBoardContext()
+
+    drawArrowBoard(ctx, 'caution')
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(0, -7)
+    expect(ctx.lineTo).toHaveBeenCalledWith(9, 0)
+    expect(ctx.lineTo).toHaveBeenCalledWith(0, 7)
+    expect(ctx.lineTo).toHaveBeenCalledWith(-9, 0)
+  })
+
+  it('draws flashing mode with the lit board fill and restores opacity', () => {
+    const ctx = createArrowBoardContext()
+
+    drawArrowBoard(ctx, 'flashing')
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(-12, -7, 24, 14)
+    expect(ctx.globalAlpha).toBe(1)
+  })
+
+  it.each([
+    ['right', 'RIGHT'],
+    ['left', 'LEFT'],
+    ['caution', 'CAUTION'],
+    ['flashing', 'FLASHING'],
+  ] as const)('labels %s mode on the board', (mode, label) => {
+    const ctx = createArrowBoardContext()
+
+    drawArrowBoard(ctx, mode)
+
+    expect(ctx.fillText).toHaveBeenCalledWith(label, 0, 11)
+  })
+})
 
 // ─── PolylineRoad ─────────────────────────────────────────────────────────────
 

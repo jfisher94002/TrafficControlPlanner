@@ -4,7 +4,7 @@
  * We test the pure utility (buildOffsetSpine) directly, and verify the rendered
  * element counts for each road component via React Testing Library.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { buildOffsetSpine } from '../utils'
 import type { Point } from '../types'
 
@@ -105,8 +105,8 @@ describe('buildOffsetSpine', () => {
 
 import React from 'react'
 import { render } from '@testing-library/react'
-import { PolylineRoad, CurveRoad, CubicBezierRoad, WorkZone } from '../components/tcp/canvas/ObjectShapes'
-import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ZoneObject } from '../types'
+import { PolylineRoad, CurveRoad, CubicBezierRoad, WorkZone, DeviceShape } from '../components/tcp/canvas/ObjectShapes'
+import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ZoneObject, DeviceObject, ArrowBoardMode } from '../types'
 
 // ─── WorkZone ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +167,84 @@ describe('WorkZone rendering contract', () => {
       align: 'center',
       verticalAlign: 'middle',
     })
+  })
+})
+
+// ─── Arrow board device display modes ─────────────────────────────────────────
+
+describe('DeviceShape arrow board display modes', () => {
+  const arrowBoard = (arrowBoardMode?: ArrowBoardMode): DeviceObject => ({
+    id: `arrow-board-${arrowBoardMode ?? 'default'}`,
+    type: 'device',
+    x: 10,
+    y: 20,
+    deviceData: { id: 'arrow_board', label: 'Arrow Board', icon: '⟹', color: '#fbbf24' },
+    rotation: 0,
+    ...(arrowBoardMode ? { arrowBoardMode } : {}),
+  })
+
+  const renderToCanvasCalls = (obj: DeviceObject) => {
+    const element = DeviceShape({ obj, isSelected: false })
+    if (!React.isValidElement(element)) throw new Error('DeviceShape did not return a React element')
+
+    const ctx = {
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+      globalAlpha: 1,
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fillRect: vi.fn(),
+      fillText: vi.fn(),
+    }
+
+    ;(element.props as { sceneFunc: (ctx: unknown) => void }).sceneFunc(ctx)
+    return ctx
+  }
+
+  it('defaults legacy arrow boards with no mode to the right-arrow display', () => {
+    const ctx = renderToCanvasCalls(arrowBoard())
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(-10, -6)
+    expect(ctx.lineTo).toHaveBeenCalledWith(10, 0)
+    expect(ctx.fillText).toHaveBeenCalledWith('RIGHT', 0, 11)
+  })
+
+  it.each([
+    ['right', -10, 10, 'RIGHT'],
+    ['left', 10, -10, 'LEFT'],
+  ] as const)('draws the %s arrow chevron geometry and label', (mode, startX, tipX, label) => {
+    const ctx = renderToCanvasCalls(arrowBoard(mode))
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(startX, -6)
+    expect(ctx.lineTo).toHaveBeenCalledWith(tipX, 0)
+    expect(ctx.fillText).toHaveBeenCalledWith(label, 0, 11)
+  })
+
+  it('draws caution mode as a diamond pattern with the caution label', () => {
+    const ctx = renderToCanvasCalls(arrowBoard('caution'))
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(0, -7)
+    expect(ctx.lineTo).toHaveBeenCalledWith(9, 0)
+    expect(ctx.lineTo).toHaveBeenCalledWith(0, 7)
+    expect(ctx.lineTo).toHaveBeenCalledWith(-9, 0)
+    expect(ctx.fillText).toHaveBeenCalledWith('CAUTION', 0, 11)
+  })
+
+  it('draws flashing mode as a full-board amber fill with restored opacity', () => {
+    const ctx = renderToCanvasCalls(arrowBoard('flashing'))
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(-12, -7, 24, 14)
+    expect(ctx.fillText).toHaveBeenCalledWith('FLASHING', 0, 11)
+    expect(ctx.globalAlpha).toBe(1)
   })
 })
 

@@ -1333,7 +1333,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           )}
 
           {/* Status bar */}
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>
+          <div data-testid="status-bar" style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>
             <div style={{ display: "flex", gap: 16 }}>
               <span>X: {cursorPos.x.toFixed(0)}</span>
               <span>Y: {cursorPos.y.toFixed(0)}</span>

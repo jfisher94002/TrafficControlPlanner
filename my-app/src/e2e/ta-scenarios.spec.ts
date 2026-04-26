@@ -10,10 +10,20 @@
  *
  * To add a scenario: find the entry in ta-scenarios.ts, replace the
  * STUB_SEED/STUB_ASSERT with real data, and remove the `skip` field.
+ *
+ * ─── Assertions ───────────────────────────────────────────────────────────────
+ * 1. Sign IDs present on canvas
+ * 2. Sign labels match SIGN_DATA (catches MUTCD label mismatches automatically)
+ *    Override per-scenario with assert.signLabels if needed.
+ * 3. Device IDs present
+ * 4. Object types present
+ * 5. Taper counts / lengths
+ * 6. Visual snapshot — compared against stored baseline (update with
+ *    STAGING_URL=http://localhost:5173 npx playwright test --update-snapshots --project=local)
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import { TA_SCENARIOS } from './fixtures/ta-scenarios'
+import { TA_SCENARIOS, SIGN_DATA } from './fixtures/ta-scenarios'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,7 +62,7 @@ async function seedAndLoad(page: Page, seed: Record<string, unknown>) {
 
 type CanvasObj = {
   type: string
-  signData?: { id: string }
+  signData?: { id: string; label?: string }
   deviceData?: { id: string }
   taperLength?: number
 }
@@ -83,6 +93,18 @@ for (const scenario of TA_SCENARIOS) {
     for (const signId of assert.signs ?? []) {
       const found = objs.some(o => o.type === 'sign' && o.signData?.id === signId)
       expect(found, `Expected sign "${signId}" on canvas`).toBe(true)
+    }
+
+    // Assert sign labels match SIGN_DATA (auto-catches MUTCD label mismatches).
+    // Per-scenario overrides via assert.signLabels take precedence.
+    for (const signId of assert.signs ?? []) {
+      const expectedLabel = assert.signLabels?.[signId] ?? SIGN_DATA[signId]?.label
+      if (!expectedLabel) continue
+      const obj = objs.find(o => o.type === 'sign' && o.signData?.id === signId)
+      expect(
+        obj?.signData?.label,
+        `Sign "${signId}" label mismatch — expected "${expectedLabel}"`,
+      ).toBe(expectedLabel)
     }
 
     // Assert required device ids are present
@@ -121,5 +143,16 @@ for (const scenario of TA_SCENARIOS) {
       const deviceCount = objs.filter(o => o.type === 'device').length
       expect(deviceCount, 'Expected zero device objects on canvas').toBe(0)
     }
+
+    // ── Visual snapshot ────────────────────────────────────────────────────────
+    // Masks the status bar (cursor coords are dynamic) and the mini-map.
+    // To regenerate baselines:
+    //   STAGING_URL=http://localhost:5173 npx playwright test ta-scenarios \
+    //     --project=local --update-snapshots
+    await expect(page).toHaveScreenshot(`${scenario.id}.png`, {
+      maxDiffPixelRatio: 0.02,
+      // Mask the status bar (cursor coords change on hover); canvas is stable.
+      mask: [page.getByTestId('status-bar')],
+    })
   })
 }

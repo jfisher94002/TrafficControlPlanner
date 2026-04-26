@@ -30,6 +30,7 @@ export interface MapCenter {
 
 export interface TAAssert {
   signs?: string[]
+  signLabels?: Record<string, string>   // sign id → expected label text
   devices?: string[]
   objectTypes?: string[]
   minTapers?: number
@@ -101,7 +102,8 @@ const roadDivL = () => ({
 
 // ─── Sign catalog — keys MUST match sign IDs used in scenarios below.
 // Labels mirror tcpCatalog.ts exactly so the rendered sign matches production.
-const SIGN_DATA: Record<string, { label: string; shape: string; color: string; textColor: string; mutcd?: string }> = {
+// Exported so the spec can auto-assert labels for every asserted sign ID.
+export const SIGN_DATA: Record<string, { label: string; shape: string; color: string; textColor: string; mutcd?: string }> = {
   // ── Road-work warning signs (diamonds) ───────────────────────────────────────
   roadwork:         { label: 'ROAD WORK AHEAD', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },
   roadwork2:        { label: 'ROAD WORK AHEAD', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },

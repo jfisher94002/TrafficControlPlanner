@@ -100,34 +100,34 @@ const roadDivL = () => ({
 
 const MAP_CENTER: MapCenter = { lat: 37.7749, lon: -122.4194, zoom: 16 }
 
-// ─── Sign catalog (mirrors src/tcpCatalog.ts labels) ─────────────────────────
+// ─── Sign catalog — keys MUST match sign IDs used in scenarios below.
+// Labels mirror tcpCatalog.ts exactly so the rendered sign matches production.
 const SIGN_DATA: Record<string, { label: string; shape: string; color: string; textColor: string; mutcd?: string }> = {
-  roadwork:       { label: 'ROAD WORK',          shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W20-1'  },
-  shoulderwork:   { label: 'SHOULDER WORK',       shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W21-5a' },
-  flagging:       { label: 'FLAGGER',             shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W20-7a' },
-  lane_closed:    { label: 'LANE CLOSED',         shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W20-5'  },
-  road_narrows:   { label: 'ROAD NARROWS',        shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W5-1'   },
-  left_lane_closed: { label: 'LEFT LANE CLOSED',  shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W20-5L' },
-  right_lane_closed: { label: 'RIGHT LANE CLOSED',shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W20-5R' },
-  merge_right:    { label: 'MERGE RIGHT',         shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W4-2R'  },
-  merge_left:     { label: 'MERGE LEFT',          shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W4-2L'  },
-  one_lane_road:  { label: 'ONE LANE ROAD',       shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W20-4'  },
-  be_prepared_stop: { label: 'BE PREPARED\nTO STOP', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W3-4' },
-  road_closed:    { label: 'ROAD CLOSED',         shape: 'rect',     color: '#dc2626', textColor: '#fff', mutcd: 'R11-2'  },
-  detour:         { label: 'DETOUR',              shape: 'rect',     color: '#f97316', textColor: '#111', mutcd: 'M4-9'   },
-  speed_limit_45: { label: 'SPEED\nLIMIT\n45',   shape: 'rect',     color: '#fff',    textColor: '#111', mutcd: 'R2-1'   },
-  speed_limit_55: { label: 'SPEED\nLIMIT\n55',   shape: 'rect',     color: '#fff',    textColor: '#111', mutcd: 'R2-1'   },
-  end_road_work:  { label: 'END\nROAD WORK',     shape: 'rect',     color: '#fff',    textColor: '#111', mutcd: 'G20-2'  },
-  stop_flag:      { label: 'STOP',                shape: 'octagon',  color: '#dc2626', textColor: '#fff', mutcd: 'R1-1'   },
-  slow_flag:      { label: 'SLOW',                shape: 'diamond',  color: '#f97316', textColor: '#111'                 },
-  arrow_down_right: { label: 'ARROW →',          shape: 'rect',     color: '#f97316', textColor: '#111', mutcd: 'W1-6R'  },
-  arrow_down_left:  { label: 'ARROW ←',          shape: 'rect',     color: '#f97316', textColor: '#111', mutcd: 'W1-6L'  },
-  divided_hwy:    { label: 'DIVIDED\nHIGHWAY',   shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W6-1'   },
-  divided_hwy_ends: { label: 'DIVIDED HWY\nENDS', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W6-2'  },
-  two_way_traffic: { label: 'TWO WAY\nTRAFFIC',  shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W6-3'   },
-  flagger_ahead:  { label: 'FLAGGER\nAHEAD',     shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W20-7a' },
-  signal_ahead:   { label: 'SIGNAL\nAHEAD',      shape: 'diamond',  color: '#f97316', textColor: '#111', mutcd: 'W3-3'   },
-  yield:          { label: 'YIELD',               shape: 'triangle', color: '#fff',    textColor: '#111', mutcd: 'R1-2'   },
+  // ── Road-work warning signs (diamonds) ───────────────────────────────────────
+  roadwork:         { label: 'ROAD WORK',    shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },
+  roadwork2:        { label: 'ROAD WORK',    shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },
+  shoulderwork:     { label: 'SHLDER WORK',  shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W21-5a'  },
+  merge:            { label: 'MERGE',         shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W4-2'    },
+  rightlaneends:    { label: 'RT LANE ENDS', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W9-1'    },
+  leftlaneends:     { label: 'LT LANE ENDS', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W9-2'    },
+  twolaneends:      { label: '2 LANES END',  shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W9-3'    },
+  flaggerahead:     { label: 'FLAGGER AHD',  shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-7a'  },
+  preparetostop:    { label: 'PREP TO STOP', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W3-4'    },
+  signal:           { label: 'SIGNAL AHEAD', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W3-3'    },
+  movingoperation:  { label: 'SLOW / STOP',  shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-6'   },
+  contraflow:       { label: 'CONTRAFLOW',   shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W4-10'   },
+  shiftleft:        { label: 'SHIFT LEFT',   shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W4-2L'   },
+  // ── Rectangular signs ────────────────────────────────────────────────────────
+  onelane:          { label: 'ONE LANE RD',  shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'W20-4a'  },
+  pilotcar:         { label: 'PILOT CAR',    shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'W20-8'   },
+  sidewalkclosed:   { label: 'SDWLK CLOSED', shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R9-10'   },
+  crosswalkclosed:  { label: 'XWLK CLOSED',  shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R9-10'   },
+  pedestriandetour: { label: 'PED DETOUR',   shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'M4-8a'   },
+  bikelaneclosed:   { label: 'BIKE LN CLSD', shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R9-10a'  },
+  detour:           { label: 'DETOUR',        shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'M4-8'    },
+  detour2:          { label: 'DETOUR',        shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'M4-8'    },
+  rampclosed:       { label: 'RAMP CLOSED',  shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R11-2'   },
+  exitclosed:       { label: 'EXIT CLOSED',  shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R11-2'   },
 }
 
 const sign = (id: string, x: number, y: number) => {
@@ -147,15 +147,19 @@ const sign = (id: string, x: number, y: number) => {
   }
 }
 
+// rotation: 90 = taper points south (down) — correct for our vertical north→south road layout.
+// The wide (upstream) end is at (x, y); the narrow end extends downward to y + taperLength*TAPER_SCALE.
+// Full MUTCD lengths (e.g. 540 ft at 45 mph) extend beyond the 600 px canvas — that is expected;
+// the visible top portion still shows the taper correctly positioned on the road.
 const taper = (
   id: string, x: number, y: number,
   speed = 45, laneWidth = 12, numLanes = 1,
   overrideLength?: number,
 ) => ({
-  id, type: 'taper', x, y, rotation: 0,
+  id, type: 'taper', x, y, rotation: 90,
   speed, laneWidth,
   taperLength: overrideLength ?? laneWidth * speed,
-  manualLength: false,
+  manualLength: overrideLength !== undefined,
   numLanes,
 })
 

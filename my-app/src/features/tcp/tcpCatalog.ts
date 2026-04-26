@@ -132,7 +132,10 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "surveycrew",     label: "SURVEY CREW",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-6" },
       { id: "utilcrew",       label: "UTIL CREW",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-7" },
       { id: "nightwork",      label: "NIGHT WORK",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-14" },
-      { id: "roadworknextmi", label: "RD WORK X MI", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1a" },
+      { id: "roadworknextmi",    label: "RD WORK X MI",              shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1a" },
+      { id: "blastingzoneahead", label: "BLASTING ZONE AHEAD",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W22-1"  },
+      { id: "turnoffradio",      label: "TURN OFF 2-WAY RADIO/CELL PHONE", shape: "rect", color: "#f97316", textColor: "#111", mutcd: "R22-2" },
+      { id: "endblastingzone",   label: "END BLASTING ZONE",          shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W22-3"  },
     ],
   },
   temporary: {

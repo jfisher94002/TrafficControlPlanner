@@ -127,6 +127,10 @@ const SIGN_DATA: Record<string, { label: string; shape: string; color: string; t
   detour2:          { label: 'DETOUR',        shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'M4-8'    },
   rampclosed:       { label: 'RAMP CLOSED',  shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R11-2'   },
   exitclosed:       { label: 'EXIT CLOSED',  shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R11-2'   },
+  // ── Blasting zone signs ──────────────────────────────────────────────────────
+  blastingzoneahead: { label: 'BLASTING ZONE AHEAD',            shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W22-1'  },
+  turnoffradio:      { label: 'TURN OFF 2-WAY RADIO/CELL PHONE', shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'R22-2'  },
+  endblastingzone:   { label: 'END BLASTING ZONE',               shape: 'rect',    color: '#f97316', textColor: '#111', mutcd: 'W22-3'  },
 }
 
 const sign = (id: string, x: number, y: number) => {
@@ -194,21 +198,28 @@ export const TA_SCENARIOS: TAScenario[] = [
     },
   },
 
-  // ── TA-2: Work on Shoulder — No Taper ─────────────────────────────────────
-  // Work on shoulder, no encroachment into travel lane — no taper needed.
+  // ── TA-2: Blasting Zone ───────────────────────────────────────────────────
+  // Two-lane two-way road passing through a blasting zone.
+  // Both directions: W22-1 (BLASTING ZONE AHEAD) farthest advance,
+  // then R22-2 (TURN OFF 2-WAY RADIO/CELL PHONE), then W22-3 (END BLASTING ZONE)
+  // downstream of the blasting area.
   {
     id: 'TA-2',
-    title: 'Work on Shoulder — No Taper',
+    title: 'Blasting Zone',
     seed: {
       objects: [
         road2(),
-        sign('shoulderwork', SR, 200),
-        sign('roadwork',     SR, 340),
-        zone('zone-1', CX + 60, WY - 30, 100, 80),
+        // Northbound approach signs (right/east shoulder, farthest first)
+        sign('blastingzoneahead', SR, 150),
+        sign('turnoffradio',      SR, 270),
+        // Blasting zone area off right shoulder
+        zone('zone-1', WX, 330, 100, 120),
+        // End blasting zone sign (downstream, northbound side)
+        sign('endblastingzone', SR, 490),
       ],
     },
     assert: {
-      signs: ['shoulderwork', 'roadwork'],
+      signs: ['blastingzoneahead', 'turnoffradio', 'endblastingzone'],
       objectTypes: ['road', 'zone'],
       noDevices: true,
     },

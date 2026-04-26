@@ -20,8 +20,19 @@ import { TA_SCENARIOS } from './fixtures/ta-scenarios'
 /**
  * Skip all TA scenario tests if the staging deployment doesn't have the
  * seed API yet. Tests auto-enable once the feature deploys to staging.
+ *
+ * Also registers an init script that clears tcp_autosave before any seed
+ * page load — this runs synchronously before React's readAutosave() call,
+ * preventing a stale mapCenter from a real user session bleeding in.
  */
 test.beforeEach(async ({ page }) => {
+  // addInitScript is cumulative per page; the conditional prevents it from
+  // clearing autosave on non-seed navigations (e.g., the /app check below).
+  await page.addInitScript(() => {
+    if (new URLSearchParams(window.location.search).has('seed')) {
+      localStorage.removeItem('tcp_autosave')
+    }
+  })
   await page.goto('/app')
   const hasApi = await page.evaluate(
     () => typeof (window as unknown as Record<string, unknown>).__tcpGetObjects === 'function',
@@ -34,6 +45,9 @@ async function seedAndLoad(page: Page, seed: Record<string, unknown>) {
   const encoded = encodeURIComponent(Buffer.from(JSON.stringify(seed)).toString('base64'))
   await page.goto(`/app?seed=${encoded}`)
   await expect(page.getByTestId('canvas-container')).toBeVisible({ timeout: 20_000 })
+  // Hide the "enter address" overlay — it appears when mapCenter is null and
+  // would obscure canvas objects in screenshots, but is irrelevant to assertions.
+  await page.addStyleTag({ content: '[data-testid="blank-canvas-overlay"] { display: none !important; }' })
 }
 
 type CanvasObj = {

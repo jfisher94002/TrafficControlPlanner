@@ -41,7 +41,7 @@ export interface TAAssert {
 export interface TAScenario {
   id: string
   title: string
-  seed: { mapCenter: MapCenter; objects: unknown[] }
+  seed: { objects: unknown[] }
   assert: TAAssert
   skip?: string
 }
@@ -98,7 +98,6 @@ const roadDivL = () => ({
 
 // ─── Seed object builders ─────────────────────────────────────────────────────
 
-const MAP_CENTER: MapCenter = { lat: 37.7749, lon: -122.4194, zoom: 16 }
 
 // ─── Sign catalog — keys MUST match sign IDs used in scenarios below.
 // Labels mirror tcpCatalog.ts exactly so the rendered sign matches production.
@@ -183,7 +182,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-1',
     title: 'Work Beyond the Shoulder',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork', SR, 280),
@@ -202,7 +200,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-2',
     title: 'Work on Shoulder — No Taper',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('shoulderwork', SR, 200),
@@ -223,7 +220,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-3',
     title: 'Work on the Shoulder',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('shoulderwork', SR, 190),
@@ -244,7 +240,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-4',
     title: 'Sidewalk Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('sidewalkclosed',   SR, 200),
@@ -264,7 +259,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-5',
     title: 'Moving Work Zone on Two-Lane Road',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork',        SR, 190),
@@ -285,7 +279,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-6',
     title: 'Shoulder Work with Minor Encroachment',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('shoulderwork', SR, 150),
@@ -308,7 +301,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-7',
     title: 'Work Beyond Shoulder — Limited Access Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',     SR, 190),
@@ -330,7 +322,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-8',
     title: 'Two-Lane Road — One Lane Alternating with Flaggers',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork',     SR, 150),
@@ -357,7 +348,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-9',
     title: 'Two-Lane Road — Pilot Car Operations',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork',      SR, 150),
@@ -382,7 +372,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-10',
     title: 'Lane Closure using Flaggers',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork',     SR, 150),
@@ -407,7 +396,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-11',
     title: 'Lane Closure with Low Traffic Volumes',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork', SR, 190),
@@ -429,7 +417,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-12',
     title: 'Lane Closure using Traffic Control Signals',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork', SR, 190),
@@ -454,7 +441,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-13',
     title: 'Right Lane Closure — Urban Near-Side Intersection',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',      SR, 150),
@@ -478,7 +464,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-14',
     title: 'Right Lane Closure — Urban Far-Side Intersection',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',      SR, 190),
@@ -501,7 +486,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-15',
     title: 'Left Lane Closure — Urban Intersection',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',     SR, 150),
@@ -525,7 +509,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-16',
     title: 'Right Lane Closure — Multilane Undivided Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',      SR, 150),
@@ -549,7 +532,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-17',
     title: 'Left Lane Closure — Multilane Undivided Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',     SR, 150),
@@ -573,7 +555,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-18',
     title: 'Two Adjacent Lanes Closed — Multilane Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',    SR, 150),
@@ -601,7 +582,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-19',
     title: 'Lane Shift — Multilane Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',  SR, 190),
@@ -625,7 +605,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-20',
     title: 'Ramp Closure on Surface Street',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',   SR, 190),
@@ -646,7 +625,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-21',
     title: 'Lane Closure on Near Side of Intersection',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork', SR, 190),
@@ -667,7 +645,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-22',
     title: 'Right Lane Closure on Far Side of Intersection',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',      SR, 190),
@@ -688,7 +665,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-23',
     title: 'Left Lane Closure Near Intersection',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',     SR, 150),
@@ -712,7 +688,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-24',
     title: 'Contraflow — Multilane Undivided Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',      SR, 150),
@@ -737,7 +712,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-25',
     title: 'Short Duration / Moving Operation — Urban',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',        SR, 190),
@@ -758,7 +732,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-26',
     title: 'Divided Highway — Shoulder Work',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',     SR, 190),
@@ -780,7 +753,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-27',
     title: 'Divided Highway — Right Lane Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',      SR, 150),
@@ -804,7 +776,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-28',
     title: 'Divided Highway — Left Lane Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',     SR, 150),
@@ -828,7 +799,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-29',
     title: 'Divided Highway — Two Adjacent Lanes Closed',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',    SR, 150),
@@ -856,7 +826,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-30',
     title: 'Divided Highway — Ramp Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',   SR, 190),
@@ -877,7 +846,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-31',
     title: 'Divided Highway — Crossover',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',      SR, 150),
@@ -903,7 +871,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-32',
     title: 'Divided Highway — Contraflow Operation',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',   SR, 150),
@@ -928,7 +895,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-33',
     title: 'Stationary Lane Closure on a Divided Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork', SR, 190),
@@ -952,7 +918,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-34',
     title: 'Moving Operations on Divided Highway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork',        SR, 190),
@@ -973,7 +938,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-35',
     title: 'Divided Highway — Double Lane Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadDivR(), roadDivL(),
         sign('roadwork', SR, 190),
@@ -1000,7 +964,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-36',
     title: 'Freeway — Shoulder Work',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',     SR, 190),
@@ -1022,7 +985,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-37',
     title: 'Double Lane Closure on a Freeway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork', SR, 190),
@@ -1048,7 +1010,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-38',
     title: 'Freeway — Right Lane Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',      SR, 150),
@@ -1073,7 +1034,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-39',
     title: 'Freeway — Left Lane Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',     SR, 150),
@@ -1098,7 +1058,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-40',
     title: 'Freeway — On-Ramp Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('rampclosed', SR, 230),
@@ -1118,7 +1077,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-41',
     title: 'Freeway — Off-Ramp Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('exitclosed', SR, 230),
@@ -1138,7 +1096,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-42',
     title: 'Freeway — Median Work (No Lane Closure)',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',     SR, 190),
@@ -1160,7 +1117,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-43',
     title: 'Freeway — Lane Closure with Median Crossover',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',      SR, 150),
@@ -1186,7 +1142,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-44',
     title: 'Freeway — Contraflow Operation',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',   SR, 150),
@@ -1211,7 +1166,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-45',
     title: 'Freeway — Moving Operations (Short Duration)',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',        SR, 190),
@@ -1234,7 +1188,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-46',
     title: 'Urban Intersection — Approach Lane Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',         SR, 150),
@@ -1256,7 +1209,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-47',
     title: 'Urban Intersection — Partial Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork', SR, 190),
@@ -1278,7 +1230,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-48',
     title: 'Sidewalk Closure and Pedestrian Detour',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('sidewalkclosed',   SR, 150),
@@ -1299,7 +1250,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-49',
     title: 'Urban Pedestrian Detour — Mid-Block',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('crosswalkclosed',  SR, 190),
@@ -1319,7 +1269,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-50',
     title: 'High-Speed Two-Lane Road — Flagger-Controlled Closure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road2(),
         sign('roadwork',     SR, 150),
@@ -1345,7 +1294,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-51',
     title: 'Work at Complex Multi-Leg Intersection',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',  SR,  190),
@@ -1371,7 +1319,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-52',
     title: 'Work in Roundabout',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork', SR, 190),
@@ -1393,7 +1340,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-53',
     title: 'Work on Bridge or Structure',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',      SR, 150),
@@ -1417,7 +1363,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-54',
     title: 'High-Speed Moving Operation on Freeway',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         roadFwy(),
         sign('roadwork',        SR, 190),
@@ -1440,7 +1385,6 @@ export const TA_SCENARIOS: TAScenario[] = [
     id: 'TA-101',
     title: 'Right Lane + Bike Lane Closure (CA)',
     seed: {
-      mapCenter: MAP_CENTER,
       objects: [
         road4(),
         sign('roadwork',       SR, 150),

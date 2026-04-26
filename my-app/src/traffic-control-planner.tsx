@@ -413,6 +413,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         setMapCenter({ lat: mc.lat, lon, zoom: typeof mc.zoom === 'number' ? mc.zoom : 16 });
         setOffset({ x: 0, y: 0 }); setZoom(1);
       }
+    } else {
+      // Seed without mapCenter — clear any existing map so the canvas always starts clean.
+      setMapCenter(null);
+      setOffset({ x: 0, y: 0 }); setZoom(1);
     }
     if (Array.isArray(seed.objects)) {
       const MAX_ZONE_DIM = 5000; // cap zone dimensions to prevent render DoS via crafted seeds

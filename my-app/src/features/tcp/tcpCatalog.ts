@@ -69,7 +69,7 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
     label: "Warning",
     color: "#f59e0b",
     signs: [
-      { id: "roadwork",       label: "ROAD WORK",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "roadwork",       label: "ROAD WORK AHEAD", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
       { id: "flagahead",      label: "FLAGGER",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
       { id: "merge",          label: "MERGE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-2" },
       { id: "curve",          label: "CURVE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2" },

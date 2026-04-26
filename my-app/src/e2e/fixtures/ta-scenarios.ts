@@ -103,8 +103,8 @@ const roadDivL = () => ({
 // Labels mirror tcpCatalog.ts exactly so the rendered sign matches production.
 const SIGN_DATA: Record<string, { label: string; shape: string; color: string; textColor: string; mutcd?: string }> = {
   // ── Road-work warning signs (diamonds) ───────────────────────────────────────
-  roadwork:         { label: 'ROAD WORK',    shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },
-  roadwork2:        { label: 'ROAD WORK',    shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },
+  roadwork:         { label: 'ROAD WORK AHEAD', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },
+  roadwork2:        { label: 'ROAD WORK AHEAD', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1'   },
   shoulderwork:     { label: 'SHLDER WORK',  shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W21-5a'  },
   merge:            { label: 'MERGE',         shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W4-2'    },
   rightlaneends:    { label: 'RT LANE ENDS', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W9-1'    },

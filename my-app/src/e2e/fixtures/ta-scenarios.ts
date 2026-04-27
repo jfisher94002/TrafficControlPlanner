@@ -268,24 +268,28 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-5: Shoulder Closure on a Freeway (MUTCD Figure 6P-5) ─────────────
-  // Freeway; shoulder closed — no lane impact. W20-1 → W21-5a.
-  // Arrow board on closed shoulder faces traffic.
+  // Divided freeway — right roadway has right shoulder closed (no lane impact).
+  // Sign sequence (farthest→nearest): W20-1 (roadwork) → W21-5aR (shoulderwork)
+  // × 2 sign groups. Taper head has crash cushion (barrier). No arrow board shown.
   {
     id: 'TA-5',
     title: mutcdTitle(5),
     seed: {
       objects: [
-        roadFwy(),
-        sign('roadwork',     SR, 190),
-        sign('shoulderwork', SR, 340),
-        device('ab-1', 'arrow_board', CX + 30, TY),
-        zone('zone-1', CX + 60, WY - 30, 120, 60),
+        roadDivR(), roadDivL(),
+        sign('roadwork',     SR, 490),   // W20-1 — farthest advance
+        sign('shoulderwork', SR, 340),   // W21-5aR — second sign group
+        sign('shoulderwork', SR, 190),   // W21-5aR — first sign group (nearest)
+        taper('taper-1', CX + 55, TY, 65),
+        device('barrier-1', 'barrier', CX + 55, TY + 25),  // crash cushion
+        zone('zone-1', CX + 75, WY - 30, 80, 120),
       ],
     },
     assert: {
       signs: ['roadwork', 'shoulderwork'],
-      devices: ['arrow_board'],
-      objectTypes: ['road', 'zone'],
+      devices: ['barrier'],
+      objectTypes: ['road', 'taper', 'zone'],
+      minTapers: 1,
     },
   },
 

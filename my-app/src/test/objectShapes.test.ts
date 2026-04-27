@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { buildOffsetSpine } from '../utils'
+import { COLORS } from '../features/tcp/constants'
 import type { Point } from '../types'
 
 // ─── buildOffsetSpine ─────────────────────────────────────────────────────────
@@ -105,8 +106,8 @@ describe('buildOffsetSpine', () => {
 
 import React from 'react'
 import { render } from '@testing-library/react'
-import { PolylineRoad, CurveRoad, CubicBezierRoad, WorkZone } from '../components/tcp/canvas/ObjectShapes'
-import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ZoneObject } from '../types'
+import { RoadSegment, PolylineRoad, CurveRoad, CubicBezierRoad, WorkZone } from '../components/tcp/canvas/ObjectShapes'
+import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, StraightRoadObject, ZoneObject } from '../types'
 
 // ─── WorkZone ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,59 @@ describe('WorkZone rendering contract', () => {
       align: 'center',
       verticalAlign: 'middle',
     })
+  })
+})
+
+// ─── RoadSegment ───────────────────────────────────────────────────────────────
+
+describe('RoadSegment rendering contract', () => {
+  const base: StraightRoadObject = {
+    id: 'road1',
+    type: 'road',
+    x1: 0,
+    y1: 0,
+    x2: 120,
+    y2: 0,
+    width: 22,
+    realWidth: 6,
+    lanes: 1,
+    roadType: 'bike_lane',
+  }
+
+  const getRoadChildren = (obj: StraightRoadObject = base) => {
+    const element = RoadSegment({ obj, isSelected: false })
+    if (!React.isValidElement(element)) throw new Error('RoadSegment did not return a React element')
+    return React.Children.toArray((element.props as { children?: React.ReactNode }).children) as React.ReactElement<Record<string, unknown>>[]
+  }
+
+  it('renders Bike Lane roads with bike-lane fill, stripe, and dashed center line', () => {
+    const children = getRoadChildren()
+
+    expect(children.some((child) => child.props.fill === COLORS.bikeLane)).toBe(true)
+    expect(children.some((child) => child.props.stroke === COLORS.bikeLaneStripe)).toBe(true)
+    expect(children).toContainEqual(expect.objectContaining({
+      props: expect.objectContaining({
+        points: [0, 0, 120, 0],
+        stroke: 'rgba(255,255,255,0.5)',
+        dash: [8, 12],
+        listening: false,
+      }),
+    }))
+  })
+
+  it('keeps standard road rendering on non-bike road types', () => {
+    const children = getRoadChildren({
+      ...base,
+      roadType: '2lane',
+      lanes: 2,
+      width: 80,
+      realWidth: 22,
+    })
+
+    expect(children.some((child) => child.props.fill === COLORS.bikeLane)).toBe(false)
+    expect(children.some((child) => child.props.stroke === COLORS.bikeLaneStripe)).toBe(false)
+    expect(children.some((child) => child.props.fill === COLORS.road)).toBe(true)
+    expect(children.some((child) => child.props.stroke === COLORS.roadLineWhite)).toBe(true)
   })
 })
 

@@ -117,9 +117,9 @@ describe('WorkZone rendering contract', () => {
     const element = WorkZone({ obj: zone, isSelected })
     if (!React.isValidElement(element)) throw new Error('WorkZone did not return a React element')
     const children = React.Children.toArray((element.props as { children?: React.ReactNode }).children) as React.ReactElement<Record<string, unknown>>[]
-    const [rect, ...rest] = children
-    const label = rest[rest.length - 1]
-    const hatches = rest.slice(0, -1)
+    const [rect, clipGroup, label] = children
+    // Hatches live inside the clipping Group (added to clip them to the zone bounds)
+    const hatches = React.Children.toArray((clipGroup.props as { children?: React.ReactNode }).children) as React.ReactElement<Record<string, unknown>>[]
     return {
       rect,
       hatches,

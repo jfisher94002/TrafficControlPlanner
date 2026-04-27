@@ -12,7 +12,7 @@
  * STUB_SEED/STUB_ASSERT with real data, and remove the `skip` field.
  *
  * ─── Assertions ───────────────────────────────────────────────────────────────
- * 1. Sign IDs present on canvas
+ * 1. Sign IDs present on canvas (from the **seed** via getSignIdsFromSeed; not assert.signs alone)
  * 2. Sign labels match SIGN_DATA (catches MUTCD label mismatches automatically)
  *    Override per-scenario with assert.signLabels if needed.
  * 3. Device IDs present
@@ -23,7 +23,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test'
-import { TA_SCENARIOS, SIGN_DATA } from './fixtures/ta-scenarios'
+import { TA_SCENARIOS, SIGN_DATA, getSignIdsFromSeed } from './fixtures/ta-scenarios'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -88,16 +88,19 @@ for (const scenario of TA_SCENARIOS) {
 
     const objs = await getObjects(page)
     const { assert } = scenario
+    // Authoritative: whatever `sign('…')` objects are in the seed. `assert.signs` must
+    // match in Vitest; e2e uses the seed so we never pass on a stale/short `assert` alone.
+    const signIdsFromSeed = getSignIdsFromSeed(scenario.seed as { objects: unknown[] })
 
     // Assert required sign ids are present
-    for (const signId of assert.signs ?? []) {
+    for (const signId of signIdsFromSeed) {
       const found = objs.some(o => o.type === 'sign' && o.signData?.id === signId)
       expect(found, `Expected sign "${signId}" on canvas`).toBe(true)
     }
 
     // Assert sign labels match SIGN_DATA (auto-catches MUTCD label mismatches).
     // Per-scenario overrides via assert.signLabels take precedence.
-    for (const signId of assert.signs ?? []) {
+    for (const signId of signIdsFromSeed) {
       const expectedLabel = assert.signLabels?.[signId] ?? SIGN_DATA[signId]?.label
       if (!expectedLabel) continue
       const obj = objs.find(o => o.type === 'sign' && o.signData?.id === signId)

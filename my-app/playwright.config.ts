@@ -4,6 +4,7 @@ const STAGING_URL = process.env.STAGING_URL ?? 'https://staging.d1i0disr0t50m8.a
 
 export default defineConfig({
   testDir: './src/e2e',
+  testMatch: '**/*.spec.ts',   // only .spec.ts — vitest uses .test.ts (e.g. contract tests)
   fullyParallel: false,   // auth tests share state; keep sequential for now
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

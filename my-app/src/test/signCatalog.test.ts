@@ -2,7 +2,7 @@
  * Sign catalog integrity tests.
  *
  * 1. ID uniqueness — no sign id appears more than once across all categories.
- * 2. Label length — no label exceeds 12 characters (drawSign.ts truncates at 13+).
+ * 2. Label length — keep legends readable on canvas; drawSign word-wraps (no hard 12-char cap).
  * 3. SVG parity — every catalog id has a corresponding .svg in backend/signs/.
  */
 import { describe, it, expect } from 'vitest'
@@ -28,8 +28,8 @@ describe('SIGN_CATEGORIES — ID uniqueness', () => {
     expect(dupes).toEqual([])
   })
 
-  it('has exactly 206 signs total', () => {
-    expect(allSigns).toHaveLength(206)
+  it('has exactly 370 signs total', () => {
+    expect(allSigns).toHaveLength(370)
   })
 })
 
@@ -56,12 +56,12 @@ describe('SIGN_CATEGORIES — work-zone warning coverage', () => {
         }]
       }),
     )).toEqual({
-      endsroadwork: { label: 'ENDS RD WORK', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-2' },
+      endsroadwork: { label: 'ENDS RD WORK', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'G20-2' },
       prepstop: { label: 'PREP TO STOP', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W3-4' },
       surveycrew: { label: 'SURVEY CREW', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W21-6' },
       utilcrew: { label: 'UTIL CREW', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W21-7' },
       nightwork: { label: 'NIGHT WORK', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-14' },
-      roadworknextmi: { label: 'RD WORK X MI', shape: 'diamond', color: '#f97316', textColor: '#111', mutcd: 'W20-1a' },
+      roadworknextmi: { label: 'ROAD WORK NEXT XX MILES', shape: 'rect', color: '#f97316', textColor: '#111', mutcd: 'G20-1' },
     })
   })
 })
@@ -69,9 +69,9 @@ describe('SIGN_CATEGORIES — work-zone warning coverage', () => {
 // ─── Label length ─────────────────────────────────────────────────────────────
 
 describe('SIGN_CATEGORIES — label length', () => {
-  it('has no label longer than 12 characters', () => {
+  it('has no label longer than 32 characters (longer MUTCD / multi-word temp signs use word-wrap)', () => {
     const violations = allSigns
-      .filter((s) => s.label.length > 12)
+      .filter((s) => s.label.length > 32)
       .map((s) => `${s.id}: "${s.label}" (${s.label.length})`)
     expect(violations).toEqual([])
   })

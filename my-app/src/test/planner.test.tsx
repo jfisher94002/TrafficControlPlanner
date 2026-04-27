@@ -1564,6 +1564,28 @@ describe('Analytics — canvas events', () => {
     }))
   })
 
+  it('selecting Bike Lane draws a bike_lane road and tracks that road type', async () => {
+    const trackSpy = vi.spyOn(analytics, 'track')
+    let calls = 0
+    vi.spyOn(stageStub, 'getPointerPosition').mockImplementation(() =>
+      calls++ === 0 ? { x: 10, y: 20 } : { x: 120, y: 20 }
+    )
+    const { user } = setup()
+
+    await user.click(screen.getByRole('button', { name: 'roads' }))
+    await user.click(screen.getByRole('button', { name: /Bike Lane/i }))
+    const canvas = screen.getByTestId('konva-stage')
+    fireEvent.mouseDown(canvas)
+    fireEvent.mouseUp(canvas)
+
+    expect(screen.getByTestId('object-count')).toHaveTextContent('1 objects')
+    expect(screen.getByText('bike_lane road')).toBeInTheDocument()
+    expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
+      draw_mode: 'straight',
+      road_type: 'bike_lane',
+    }))
+  })
+
   it('stamping an intersection fires road_drawn with intersection draw_mode', async () => {
     const trackSpy = vi.spyOn(analytics, 'track')
     const { user } = setup()

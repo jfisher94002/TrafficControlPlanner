@@ -13,7 +13,7 @@ const MUTCD_MIN_SIGN_IDS: Partial<Record<string, string[]>> = {
   'TA-2':  ['blastingzoneahead', 'turnoffradio', 'endblastingzone'],
   'TA-3':  ['roadworknextmi', 'shoulderwork', 'roadwork', 'endwork'],
   'TA-4':  ['roadworknextmi', 'shoulderwork', 'roadwork'],
-  'TA-5':  ['roadwork', 'shoulderwork'],
+  'TA-5':  ['roadwork', 'xxft', 'rightshoulderClosed', 'nextmiles'],
   'TA-6':  ['shoulderwork', 'roadwork', 'merge'],
   'TA-7':  ['roadclosed', 'diversionrte'],
   'TA-8':  ['roadclosed', 'detour'],
@@ -103,7 +103,7 @@ describe('TA_SCENARIOS contract (55 × 6P/CA)', () => {
         expect(SIGN_DATA[id]!.label.length, id).toBeGreaterThan(0)
       }
     }
-    expect(union.size).toBe(32)
+    expect(union.size).toBe(35)
   })
 
   for (const scenario of TA_SCENARIOS) {

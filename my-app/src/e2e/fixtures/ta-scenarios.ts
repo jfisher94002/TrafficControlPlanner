@@ -269,24 +269,28 @@ export const TA_SCENARIOS: TAScenario[] = [
 
   // ── TA-5: Shoulder Closure on a Freeway (MUTCD Figure 6P-5) ─────────────
   // Divided freeway — right roadway has right shoulder closed (no lane impact).
-  // Sign sequence (farthest→nearest): W20-1 (roadwork) → W21-5aR (shoulderwork)
-  // × 2 sign groups. Taper head has crash cushion (barrier). No arrow board shown.
+  // Sign sequence farthest→nearest (per Figure 6P-5):
+  //   W20-1 (roadwork) → W16-2aP (xxft) → W21-5aR (rightshoulderClosed)
+  //   → W7-3aP (nextmiles) → W21-5aR (rightshoulderClosed) [second group, closest]
+  // Taper head has crash cushion (barrier). No arrow board shown.
   {
     id: 'TA-5',
     title: mutcdTitle(5),
     seed: {
       objects: [
         roadDivR(), roadDivL(),
-        sign('roadwork',     SR, 490),   // W20-1 — farthest advance
-        sign('shoulderwork', SR, 340),   // W21-5aR — second sign group
-        sign('shoulderwork', SR, 190),   // W21-5aR — first sign group (nearest)
+        sign('roadwork',            SR, 530),  // W20-1 — farthest advance
+        sign('xxft',                SR, 430),  // W16-2aP — distance plaque
+        sign('rightshoulderClosed', SR, 340),  // W21-5aR — second sign group
+        sign('nextmiles',           SR, 250),  // W7-3aP — next-XX-miles plaque
+        sign('rightshoulderClosed', SR, 160),  // W21-5aR — first sign group (nearest)
         taper('taper-1', CX + 55, TY, 65),
         device('barrier-1', 'barrier', CX + 55, TY + 25),  // crash cushion
         zone('zone-1', CX + 75, WY - 30, 80, 120),
       ],
     },
     assert: {
-      signs: ['roadwork', 'shoulderwork'],
+      signs: ['roadwork', 'xxft', 'rightshoulderClosed', 'nextmiles'],
       devices: ['barrier'],
       objectTypes: ['road', 'taper', 'zone'],
       minTapers: 1,

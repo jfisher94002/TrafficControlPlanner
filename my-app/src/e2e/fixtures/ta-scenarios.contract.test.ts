@@ -8,9 +8,69 @@ import { MUTCD_6P1_TA_TITLES, MUTCD_6P1_TA_TITLES_LEN } from './mutcd-6p-1-title
  * Extend as each TA is vetted against the manual.
  */
 const MUTCD_MIN_SIGN_IDS: Partial<Record<string, string[]>> = {
-  'TA-3': ['roadworknextmi', 'shoulderwork', 'roadwork', 'endwork'],
-  'TA-4': ['roadworknextmi', 'shoulderwork', 'roadwork'],
+  // ── Two-lane rural / shoulder ──────────────────────────────────────────────
+  'TA-1':  ['roadwork'],
+  'TA-2':  ['blastingzoneahead', 'turnoffradio', 'endblastingzone'],
+  'TA-3':  ['roadworknextmi', 'shoulderwork', 'roadwork', 'endwork'],
+  'TA-4':  ['roadworknextmi', 'shoulderwork', 'roadwork'],
+  'TA-5':  ['roadwork', 'shoulderwork'],
+  'TA-6':  ['shoulderwork', 'roadwork', 'merge'],
+  'TA-7':  ['roadclosed', 'diversionrte'],
+  'TA-8':  ['roadclosed', 'detour'],
+  'TA-9':  ['roadclosed', 'detour'],
+  // ── Two-lane alternating / flagging ───────────────────────────────────────
+  'TA-10': ['roadwork', 'flaggerahead', 'onelane'],
+  'TA-11': ['roadwork', 'onelane'],
+  'TA-12': ['roadwork', 'signal'],
+  'TA-13': ['roadclosed', 'detour'],
+  'TA-14': ['roadwork', 'trucksentering'],
+  'TA-15': ['roadwork', 'onelane'],
+  'TA-16': ['surveyors'],
+  'TA-17': ['roadwork', 'workers'],
+  // ── Multi-lane streets / intersections ────────────────────────────────────
+  'TA-18': ['roadwork', 'rightlaneends'],
+  'TA-19': ['roadclosed', 'detour'],
+  'TA-20': ['roadclosed', 'detour'],
+  'TA-21': ['roadwork', 'merge'],
+  'TA-22': ['roadwork', 'rightlaneends'],
+  'TA-23': ['roadwork', 'leftlaneends', 'merge'],
+  'TA-24': ['roadwork', 'onelane', 'prepstop'],
+  'TA-25': ['roadwork', 'twolaneends', 'merge'],
+  'TA-26': ['roadwork'],
+  'TA-27': ['roadwork', 'rightlaneends'],
+  // ── Pedestrian / bicycle ──────────────────────────────────────────────────
   'TA-28': ['roadwork', 'sidewalkclosed', 'peddetour'],
+  'TA-29': ['xwalkclosed', 'peddetour'],
+  // ── Multi-lane high-speed ─────────────────────────────────────────────────
+  'TA-30': ['roadwork', 'centerlane', 'merge'],
+  'TA-31': ['roadwork', 'flaggerahead', 'onelane'],
+  'TA-32': ['roadwork', 'onelane', 'prepstop'],
+  'TA-33': ['roadwork', 'merge'],
+  'TA-34': ['roadwork', 'merge'],
+  'TA-35': ['roadwork', 'workers'],
+  // ── Freeway ───────────────────────────────────────────────────────────────
+  'TA-36': ['roadwork', 'shiftleft'],
+  'TA-37': ['roadwork', 'merge'],
+  'TA-38': ['roadwork', 'centerlane', 'merge'],
+  'TA-39': ['roadwork', 'onelane', 'prepstop'],
+  'TA-40': ['rampclosed', 'detour'],
+  'TA-41': ['exitclosed', 'detour'],
+  'TA-42': ['roadwork', 'shoulderwork'],
+  'TA-43': ['exitclosed', 'detour'],
+  'TA-44': ['roadwork', 'shoulderwork'],
+  'TA-45': ['roadwork', 'centerlane', 'onelane'],
+  // ── Special situations ────────────────────────────────────────────────────
+  'TA-46': ['roadwork', 'gradecrossing'],
+  'TA-47': ['bikelaneclosed'],
+  'TA-48': ['bikelaneclosed', 'detour'],
+  'TA-49': ['sharedusepath', 'diversionrte'],
+  'TA-50': ['sharedusepath', 'detour'],
+  'TA-51': ['shoulderwork', 'bikelaneclosed'],
+  'TA-52': ['roadwork', 'detour'],
+  'TA-53': ['roadwork', 'circularint', 'flaggerahead'],
+  'TA-54': ['roadwork', 'centerlane'],
+  // ── CA supplement ─────────────────────────────────────────────────────────
+  'TA-101': ['roadwork', 'bikelaneclosed', 'rightlaneends'],
 }
 
 describe('TA_SCENARIOS contract (55 × 6P/CA)', () => {

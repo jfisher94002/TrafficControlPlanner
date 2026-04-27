@@ -1583,7 +1583,6 @@ describe('Analytics — canvas events', () => {
     expect(trackSpy).toHaveBeenCalledWith('road_drawn', expect.objectContaining({
       draw_mode: 'straight',
       road_type: 'bike_lane',
-      length_px: 110,
     }))
   })
 

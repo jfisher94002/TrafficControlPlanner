@@ -36,4 +36,13 @@ describe("tcpCatalog", () => {
     expect(ROAD_TYPES.map((r) => r.id)).toContain("2lane");
     expect(TOOLS.map((t) => t.id)).toContain("erase");
   });
+
+  it("defines Bike Lane as a narrow one-lane road preset", () => {
+    expect(ROAD_TYPES.find((r) => r.id === "bike_lane")).toMatchObject({
+      label: "Bike Lane",
+      lanes: 1,
+      width: 22,
+      realWidth: 6,
+    });
+  });
 });

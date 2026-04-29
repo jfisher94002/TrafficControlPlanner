@@ -193,7 +193,7 @@ describe('RoadSegment bike lane styling contract', () => {
 
   it('uses bike lane fill and green edge stripes for bike lane roads', () => {
     const children = getChildren()
-    const filledCircles = children.filter((child) => child.props.fill === COLORS.bikeLane)
+    const filledCircles = children.filter((child) => child.props.radius && child.props.fill === COLORS.bikeLane)
     const bikeEdges = children.filter((child) => child.props.stroke === COLORS.bikeLaneStripe)
 
     expect(filledCircles).toHaveLength(2)

@@ -4,12 +4,13 @@ const STAGING_URL = process.env.STAGING_URL ?? 'https://staging.d1i0disr0t50m8.a
 
 export default defineConfig({
   testDir: './src/e2e',
+  testMatch: '**/*.spec.ts',   // only .spec.ts — vitest uses .test.ts (e.g. contract tests)
   fullyParallel: false,   // auth tests share state; keep sequential for now
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   timeout: 60_000,
-  reporter: [['html', { open: 'never' }], ['list']],
+  reporter: [['html', { open: process.env.CI ? 'never' : 'always' }], ['list']],
 
   use: {
     baseURL: STAGING_URL,
@@ -24,7 +25,7 @@ export default defineConfig({
       name: 'setup',
       testMatch: '**/auth.setup.ts',
     },
-    // All other tests reuse the signed-in state
+    // All other tests reuse the signed-in state (used in CI / against staging)
     {
       name: 'chromium',
       use: {
@@ -39,6 +40,16 @@ export default defineConfig({
       name: 'auth',
       use: { ...devices['Desktop Chrome'] },
       testMatch: '**/auth.spec.ts',
+    },
+    // Local dev — no auth setup required; canvas works anonymously
+    // Usage: STAGING_URL=http://localhost:5173 npx playwright test --project=local
+    {
+      name: 'local',
+      use: {
+        ...devices['Desktop Chrome'],
+        screenshot: 'on',
+      },
+      testIgnore: ['**/auth.setup.ts', '**/auth.spec.ts'],
     },
   ],
 })

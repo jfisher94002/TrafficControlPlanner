@@ -442,12 +442,36 @@ export function SignShape({ obj, isSelected }: SignShapeProps) {
           ctx.strokeRect(-s, -s * 0.65, s * 2, s * 1.3);
         }
         ctx.fillStyle = signData.textColor || "#fff";
-        const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
-        const baseFontSize = label.length <= 4 ? 8 : label.length <= 8 ? 6.5 : 5;
-        ctx.font = `bold ${Math.max(4, baseFontSize * sc)}px 'JetBrains Mono', monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(label, 0, shp === "triangle" ? s * 0.3 : 0);
+
+        // Font proportional to sign size; 3.5 × scale gives ~7px at the default scale=2.
+        const baseFontSize = Math.max(2.5, 3.5 * sc);
+        // Cap text width to the sign face (diamond = 2s wide); s×1.9 leaves a small margin.
+        const maxTextWidth = s * 1.9;
+        ctx.font = `bold ${baseFontSize}px 'JetBrains Mono', monospace`;
+
+        // Word-wrap label into lines that fit within maxTextWidth
+        const words = signData.label.split(' ');
+        const lines: string[] = [];
+        let current = '';
+        for (const word of words) {
+          const test = current ? `${current} ${word}` : word;
+          if (ctx.measureText(test).width <= maxTextWidth) {
+            current = test;
+          } else {
+            if (current) lines.push(current);
+            current = word;
+          }
+        }
+        if (current) lines.push(current);
+
+        const lineHeight = baseFontSize * 1.25;
+        const totalHeight = lines.length * lineHeight;
+        const yBase = (shp === "triangle" ? s * 0.3 : 0) - totalHeight / 2 + lineHeight / 2;
+        for (let i = 0; i < lines.length; i++) {
+          ctx.fillText(lines[i], 0, yBase + i * lineHeight);
+        }
       }}
     />
   );
@@ -543,7 +567,10 @@ export function WorkZone({ obj, isSelected }: WorkZoneProps) {
     <Group listening={false}>
       <Rect x={x} y={y} width={w} height={h} fill="rgba(245,158,11,0.22)"
         stroke={isSelected ? COLORS.selected : "rgba(245,158,11,0.85)"} strokeWidth={2} dash={[8, 6]} />
-      {hatches}
+      {/* Clip hatching to the zone rectangle so it doesn't spill outside the border */}
+      <Group clipX={x} clipY={y} clipWidth={w} clipHeight={h}>
+        {hatches}
+      </Group>
       <KonvaText x={x} y={y} width={w} height={h} text="WORK ZONE"
         fontSize={11} fontStyle="bold" fontFamily="'JetBrains Mono', monospace"
         fill={COLORS.accent} align="center" verticalAlign="middle" />

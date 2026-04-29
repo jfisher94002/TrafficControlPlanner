@@ -57,11 +57,39 @@ export function drawSign(
   }
 
   ctx.fillStyle = signData.textColor || "#fff";
-  const label = signData.label.length > 12 ? signData.label.slice(0, 11) + "…" : signData.label;
-  const baseFontSize = label.length <= 4 ? 8 : label.length <= 8 ? 6.5 : 5;
-  ctx.font = `bold ${Math.max(4, baseFontSize * scale)}px 'JetBrains Mono', monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(label, 0, shape === "triangle" ? s * 0.3 : 0);
+
+  // Allow text to span the full sign face (diamond tip-to-tip = 2s).
+  // Using 3× gives a bit of overflow tolerance so multi-word phrases
+  // like "ROAD WORK" land on one line rather than splitting every word.
+  const maxTextWidth = s * 3;
+
+  // Minimum 11px so text is readable at typical canvas zoom; scales up with sign.
+  const baseFontSize = Math.max(11, 3.5 * scale);
+  ctx.font = `bold ${baseFontSize}px 'JetBrains Mono', monospace`;
+
+  // Word-wrap: greedily fill lines up to maxTextWidth
+  const words = signData.label.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (ctx.measureText(test).width <= maxTextWidth) {
+      current = test;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+
+  const lineHeight = baseFontSize * 1.25;
+  const totalHeight = lines.length * lineHeight;
+  const yBase = (shape === "triangle" ? s * 0.3 : 0) - totalHeight / 2 + lineHeight / 2;
+
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], 0, yBase + i * lineHeight);
+  }
   ctx.restore();
 }

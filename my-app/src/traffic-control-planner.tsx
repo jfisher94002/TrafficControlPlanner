@@ -413,6 +413,10 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
         setMapCenter({ lat: mc.lat, lon, zoom: typeof mc.zoom === 'number' ? mc.zoom : 16 });
         setOffset({ x: 0, y: 0 }); setZoom(1);
       }
+    } else {
+      // Seed without mapCenter — clear any existing map so the canvas always starts clean.
+      setMapCenter(null);
+      setOffset({ x: 0, y: 0 }); setZoom(1);
     }
     if (Array.isArray(seed.objects)) {
       const MAX_ZONE_DIM = 5000; // cap zone dimensions to prevent render DoS via crafted seeds
@@ -1329,7 +1333,7 @@ export default function TrafficControlPlanner({ userId = null, userEmail = null,
           )}
 
           {/* Status bar */}
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>
+          <div data-testid="status-bar" style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 28, background: COLORS.panel, borderTop: `1px solid ${COLORS.panelBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", fontSize: 10, color: COLORS.textDim }}>
             <div style={{ display: "flex", gap: 16 }}>
               <span>X: {cursorPos.x.toFixed(0)}</span>
               <span>Y: {cursorPos.y.toFixed(0)}</span>

@@ -1,5 +1,7 @@
 /** MUTCD sign library, devices, road presets, and tool definitions (extracted from the main planner component). */
 import type { DeviceData, RoadType, SignData, SignShape, ToolDef } from "../../types";
+import { MUTCD_6F1_SUPPLEMENT } from "./mutcd6f1Signs";
+import { MUTCD_6H_SUPPLEMENT } from "./mutcd6hSigns";
 
 export const SIGN_SHAPES: Array<{ id: SignShape; label: string; preview: string }> = [
   { id: "diamond",  label: "Diamond",   preview: "◆" },
@@ -69,9 +71,11 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
     label: "Warning",
     color: "#f59e0b",
     signs: [
-      { id: "roadwork",       label: "ROAD WORK",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "roadwork",       label: "ROAD WORK AHEAD", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
+      { id: "w20d2",          label: "DETOUR (DIST.)",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-2" },
       { id: "flagahead",      label: "FLAGGER",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-7a" },
       { id: "merge",          label: "MERGE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-2" },
+      { id: "shiftleft",      label: "SHIFT LEFT",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-2L"  },
       { id: "curve",          label: "CURVE",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W1-2" },
       { id: "narrow",         label: "NARROW",       shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-1" },
       { id: "bump",           label: "BUMP",         shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-1" },
@@ -110,6 +114,8 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "mergeleft",      label: "MERGE LEFT",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-1" },
       { id: "rightlaneends",  label: "RT LANE ENDS", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W9-1" },
       { id: "leftlaneends",   label: "LT LANE ENDS", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W9-2" },
+      /** Stacked/merged lane end (multi-lane drop); TTC drawings often combine lane-end messages. */
+      { id: "twolaneends",   label: "2 LNS END",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W9-1"  },
       { id: "addedlane",      label: "ADDED LANE",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W4-3" },
       { id: "lowshoulder",    label: "LOW SHOULDER", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-9" },
       { id: "softshoulder",   label: "SOFT SHLDER",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-4" },
@@ -127,12 +133,15 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "bridgefreezes",  label: "BRDG MAY ICE", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-13" },
       { id: "fogahead",       label: "FOG AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W8-5b" },
       { id: "gradecrossing",  label: "GRADE CROSS",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W10-1" },
-      { id: "endsroadwork",   label: "ENDS RD WORK", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-2" },
+      { id: "endsroadwork",   label: "ENDS RD WORK", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "G20-2" },
       { id: "prepstop",       label: "PREP TO STOP", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W3-4" },
       { id: "surveycrew",     label: "SURVEY CREW",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-6" },
       { id: "utilcrew",       label: "UTIL CREW",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-7" },
       { id: "nightwork",      label: "NIGHT WORK",   shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-14" },
-      { id: "roadworknextmi", label: "RD WORK X MI", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1a" },
+      { id: "roadworknextmi",    label: "ROAD WORK NEXT XX MILES",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-1"  },
+      { id: "blastingzoneahead", label: "BLASTING ZONE AHEAD",        shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W22-1"  },
+      { id: "turnoffradio",      label: "TURN OFF 2-WAY RADIO/CELL PHONE", shape: "rect", color: "#f97316", textColor: "#111", mutcd: "W22-2" },
+      { id: "endblastingzone",   label: "END BLASTING ZONE",          shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W22-3"  },
     ],
   },
   temporary: {
@@ -140,9 +149,11 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
     color: "#f97316",
     signs: [
       { id: "roadclosed",   label: "ROAD CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2" },
+      { id: "rampclosed",   label: "RAMP CLOSED",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2"  },
+      { id: "exitclosed",   label: "EXIT CLOSED",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2"  },
       { id: "detour",       label: "DETOUR",        shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "M4-8" },
       { id: "laneclosed",   label: "LANE CLOSED",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2a" },
-      { id: "endwork",      label: "END RD WORK",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
+      { id: "endwork",      label: "END ROAD WORK", shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "G20-2" },
       { id: "slowtraffic",  label: "SLOW TRAFFIC",  shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-4" },
       { id: "workzone",     label: "WORK ZONE",     shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W20-1" },
       { id: "workahead",    label: "WORK AHEAD",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1" },
@@ -184,7 +195,11 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "roadnarrowed",   label: "RD NARROWED",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W5-1a" },
       { id: "workhours",      label: "WORK HOURS",   shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R2-7" },
       { id: "twowaytraf",     label: "TWO-WAY TRAF", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W6-3" },
-      { id: "shoulderwork",   label: "SHLDER WORK",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-5a" },
+      { id: "shoulderwork",         label: "SHOULDER WORK",       shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-5a"  },
+      { id: "rightshoulderClosed",  label: "RIGHT SHOULDER CLOSED", shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-5aR" },
+      { id: "leftshoulderClosed",   label: "LEFT SHOULDER CLOSED",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W21-5aL" },
+      { id: "nextmiles",            label: "NEXT XX MILES",         shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W7-3aP"  },
+      { id: "xxft",                 label: "XX FT",                 shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W16-2aP" },
       { id: "emergdetour",    label: "EMERG DETOUR", shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "M4-8b" },
     ],
   },
@@ -258,6 +273,18 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "hikingtrail",   label: "HIKING TRAIL",shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-2" },
       { id: "horsetrail",    label: "HORSE TRAIL", shape: "rect",    color: "#22c55e", textColor: "#fff", mutcd: "D11-3" },
     ],
+  },
+  /** Every remaining atomic designation from MUTCD 2009 Table 6F-1 (FHWA TTC size table). */
+  mutcd6f1: {
+    label: "MUTCD 6F-1 (TTC supplement)",
+    color: "#f97316",
+    signs: MUTCD_6F1_SUPPLEMENT,
+  },
+  /** Table 2E-1 / 2D guide signs referenced in MUTCD Chapter 6H Typical Applications (FHWA). */
+  mutcd6h: {
+    label: "MUTCD 6H (guide & route supplement)",
+    color: "#22c55e",
+    signs: MUTCD_6H_SUPPLEMENT,
   },
 };
 

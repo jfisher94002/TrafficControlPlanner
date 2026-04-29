@@ -4,7 +4,7 @@
  * We test the pure utility (buildOffsetSpine) directly, and verify the rendered
  * element counts for each road component via React Testing Library.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { buildOffsetSpine } from '../utils'
 import type { Point } from '../types'
 
@@ -105,8 +105,9 @@ describe('buildOffsetSpine', () => {
 
 import React from 'react'
 import { render } from '@testing-library/react'
-import { PolylineRoad, CurveRoad, CubicBezierRoad, WorkZone } from '../components/tcp/canvas/ObjectShapes'
-import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, ZoneObject } from '../types'
+import { PolylineRoad, CurveRoad, CubicBezierRoad, WorkZone, RoadSegment, DeviceShape } from '../components/tcp/canvas/ObjectShapes'
+import { COLORS } from '../features/tcp/constants'
+import type { PolylineRoadObject, CurveRoadObject, CubicBezierRoadObject, DeviceObject, StraightRoadObject, ZoneObject } from '../types'
 
 // ─── WorkZone ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,114 @@ describe('WorkZone rendering contract', () => {
       align: 'center',
       verticalAlign: 'middle',
     })
+  })
+})
+
+describe('RoadSegment bike lane styling contract', () => {
+  const base: StraightRoadObject = {
+    id: 'road1',
+    type: 'road',
+    x1: 0,
+    y1: 0,
+    x2: 100,
+    y2: 0,
+    width: 22,
+    realWidth: 6,
+    lanes: 1,
+    roadType: 'bike_lane',
+  }
+
+  const getChildren = (obj: StraightRoadObject = base) => {
+    const element = RoadSegment({ obj, isSelected: false })
+    if (!React.isValidElement(element)) throw new Error('RoadSegment did not return a React element')
+    return React.Children.toArray((element.props as { children?: React.ReactNode }).children) as React.ReactElement<Record<string, unknown>>[]
+  }
+
+  it('uses bike lane fill and green edge stripes for bike lane roads', () => {
+    const children = getChildren()
+    const filledCircles = children.filter((child) => child.props.fill === COLORS.bikeLane)
+    const bikeEdges = children.filter((child) => child.props.stroke === COLORS.bikeLaneStripe)
+
+    expect(filledCircles).toHaveLength(2)
+    expect(children.some((child) => child.props.closed && child.props.fill === COLORS.bikeLane)).toBe(true)
+    expect(bikeEdges).toHaveLength(2)
+  })
+
+  it('adds a dashed center stripe only for bike lane roads', () => {
+    const bikeChildren = getChildren()
+    expect(bikeChildren.some((child) => child.props.dash?.join(',') === '8,12')).toBe(true)
+
+    const standardChildren = getChildren({ ...base, roadType: '2lane', lanes: 2, width: 80, realWidth: 22 })
+    expect(standardChildren.some((child) => child.props.dash?.join(',') === '8,12')).toBe(false)
+    expect(standardChildren.filter((child) => child.props.stroke === COLORS.roadLineWhite)).toHaveLength(2)
+  })
+})
+
+describe('DeviceShape arrow board mode drawing', () => {
+  const arrowBoard: DeviceObject = {
+    id: 'arrow1',
+    type: 'device',
+    x: 10,
+    y: 20,
+    rotation: 0,
+    deviceData: { id: 'arrow_board', label: 'Arrow Board', icon: '->', color: '#fbbf24' },
+  }
+
+  const createCtx = () => {
+    const ctx = {
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fillRect: vi.fn(),
+      fillText: vi.fn(),
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+      globalAlpha: 1,
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+    }
+
+    return ctx
+  }
+
+  const runScene = (obj: DeviceObject) => {
+    const element = DeviceShape({ obj, isSelected: false })
+    if (!React.isValidElement(element)) throw new Error('DeviceShape did not return a React element')
+    const ctx = createCtx()
+    ;(element.props as { sceneFunc: (ctx: ReturnType<typeof createCtx>) => void }).sceneFunc(ctx)
+    return ctx
+  }
+
+  it.each([
+    ['right', 10],
+    ['left', -10],
+    ['caution', 9],
+  ] as const)('draws the %s arrow board mode geometry and label', (mode, expectedPoint) => {
+    const ctx = runScene({ ...arrowBoard, arrowBoardMode: mode })
+
+    expect(ctx.lineTo).toHaveBeenCalledWith(expectedPoint, 0)
+    expect(ctx.fillText).toHaveBeenCalledWith(mode.toUpperCase(), 0, 11)
+  })
+
+  it('defaults legacy arrow boards to the right arrow mode', () => {
+    const ctx = runScene(arrowBoard)
+
+    expect(ctx.lineTo).toHaveBeenCalledWith(10, 0)
+    expect(ctx.fillText).toHaveBeenCalledWith('RIGHT', 0, 11)
+  })
+
+  it('draws flashing mode as a filled board panel with restored opacity', () => {
+    const ctx = runScene({ ...arrowBoard, arrowBoardMode: 'flashing' })
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(-12, -7, 24, 14)
+    expect(ctx.globalAlpha).toBe(1)
+    expect(ctx.fillText).toHaveBeenCalledWith('FLASHING', 0, 11)
   })
 })
 

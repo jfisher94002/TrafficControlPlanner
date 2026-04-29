@@ -28,8 +28,8 @@ describe('SIGN_CATEGORIES — ID uniqueness', () => {
     expect(dupes).toEqual([])
   })
 
-  it('has exactly 370 signs total', () => {
-    expect(allSigns).toHaveLength(370)
+  it('has exactly 374 signs total', () => {
+    expect(allSigns).toHaveLength(374)
   })
 })
 

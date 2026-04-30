@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50" aria-label="EXIT">
+  <rect x="3" y="3" width="94" height="44" rx="4" fill="#22c55e" stroke="#111" stroke-width="2"/>
+  <text x="50" y="33" text-anchor="middle" font-size="20" font-weight="bold" fill="#fff">EXIT</text>
+</svg>

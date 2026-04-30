@@ -13,6 +13,22 @@ const MUTCD_MIN_SIGN_IDS: Partial<Record<string, string[]>> = {
   'TA-1':  ['roadwork'],                                           // W20-1
   'TA-2':  ['blastingzoneahead', 'turnoffradio', 'endblastingzone'], // W22-1, R22-2, W22-3
   'TA-5':  ['roadwork', 'xxft', 'rightshoulderClosed', 'nextmiles'], // W20-1, W16-2aP, W21-5aR, W7-3aP
+  'TA-21': ['roadwork', 'laneends', 'leftlaneclosed'],             // W20-1, W12-1, W20-5aL
+  'TA-22': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],    // W20-1, W20-5aR, W4-2R, G20-2
+  'TA-23': ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],     // W20-1, W20-5aL, W4-2L, G20-2
+  'TA-32': ['roadwork', 'leftlaneclosed', 'rightlaneclosed', 'merge', 'endwork'], // W20-1, W20-5aL, W20-5aR, W4-2R, G20-2
+  'TA-37': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],    // W20-1, W20-5aR, W4-2R, G20-2
+  'TA-38': ['roadwork', 'laneends', 'leftlaneclosed', 'merge', 'endwork'], // W20-1, W12-1, W9-3L, W4-2L, G20-2
+  'TA-40': ['roadwork', 'twowaytraf', 'donotenter', 'yield'],      // W20-1, W6-3, R5-1, R1-2
+  'TA-42': ['roadwork', 'rightlaneclosed', 'merge', 'exitramp', 'exitramp2'], // W20-1, W20-5R, W4-2R, E5-1, E5-2
+  'TA-44': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],    // W20-1, W20-5R, W4-2R, G20-2
+  'TA-45': ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],     // W20-1, W20-5aL, W4-2L, G20-2
+  'TA-46': ['roadwork', 'onelane', 'trafficcontrols', 'railroadxing', 'railcrossing'], // W20-1, W20-4, W20-7, R8-8, R15-1
+  'TA-47': ['roadwork', 'bicyclelaneclosed', 'bikelaneclosedahead'], // W20-1, R9-12, W20-5b
+  'TA-48': ['roadwork', 'bicyclelaneclosed', 'bikelaneclosedahead'], // W20-1, R9-12, W20-5b
+  'TA-49': ['pathworkahead', 'pathclosed'],                         // W20-1b, R11-2c
+  'TA-50': ['roadwork', 'roadworkpath', 'pathclosed'],              // W20-1, W20-3a, R11-2c
+  'TA-54': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],     // W20-1, W20-5R, W4-2R, G20-2
 }
 
 describe('TA_SCENARIOS contract (55 × 6P/CA)', () => {
@@ -45,7 +61,7 @@ describe('TA_SCENARIOS contract (55 × 6P/CA)', () => {
         expect(SIGN_DATA[id]!.label.length, id).toBeGreaterThan(0)
       }
     }
-    expect(union.size).toBe(35)
+    expect(union.size).toBe(47)
   })
 
   for (const scenario of TA_SCENARIOS) {

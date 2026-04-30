@@ -65,6 +65,11 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "ltlanemust",     label: "LT LANE MUST", shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R3-7L" },
       { id: "yieldtopeds",    label: "YIELD TO PED", shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R1-6" },
       { id: "sharedlane",     label: "SHARED LANE",  shape: "rect",     color: "#fff",    textColor: "#111", border: "#111", mutcd: "R4-11" },
+      // ── Regulatory — Rail / Bike (new for issue #349) ────────────────────
+      { id: "railroadxing",      label: "RR CROSSING",       shape: "rect",    color: "#fff",    textColor: "#111", border: "#111", mutcd: "R8-8"   },
+      { id: "railcrossing",      label: "RAIL XING",         shape: "rect",    color: "#fff",    textColor: "#111", border: "#111", mutcd: "R15-1"  },
+      { id: "yieldtobikes",      label: "YIELD TO BIKES",    shape: "triangle",color: "#ef4444", textColor: "#fff", mutcd: "R9-20"  },
+      { id: "bicyclelaneclosed", label: "BICYCLE LN CLOSED", shape: "rect",    color: "#ef4444", textColor: "#fff", mutcd: "R9-12"  },
     ],
   },
   warning: {
@@ -201,6 +206,14 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "nextmiles",            label: "NEXT XX MILES",         shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W7-3aP"  },
       { id: "xxft",                 label: "XX FT",                 shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "W16-2aP" },
       { id: "emergdetour",    label: "EMERG DETOUR", shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "M4-8b" },
+      // ── TTC — Lane Closed / Path / Bike (new for issue #349) ─────────────
+      { id: "rightlaneclosed",    label: "RIGHT LANE CLOSED",    shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-5R"  },
+      { id: "leftlaneclosed",     label: "LEFT LANE CLOSED",     shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-5L"  },
+      { id: "laneends",           label: "LANE ENDS MERGE",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W12-1"   },
+      { id: "pathworkahead",      label: "PATH WORK AHEAD",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-1b"  },
+      { id: "pathclosed",         label: "PATH CLOSED",          shape: "rect",    color: "#f97316", textColor: "#111", mutcd: "R11-2c"  },
+      { id: "bikelaneclosedahead",label: "BIKE LN CLOSED AHD",  shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-5b"  },
+      { id: "roadworkpath",       label: "ROAD WORK AHEAD",      shape: "diamond", color: "#f97316", textColor: "#111", mutcd: "W20-3a"  },
     ],
   },
   guide: {
@@ -229,6 +242,7 @@ export const SIGN_CATEGORIES: Record<string, { label: string; color: string; sig
       { id: "speedadvtab",   label: "SPD ADV TAB", shape: "rect",   color: "#f59e0b", textColor: "#111", mutcd: "R2-3a" },
       { id: "milesahead",    label: "2 MILES",     shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "W16-2a" },
       { id: "restareadist",  label: "REST AREA MI",shape: "rect",   color: "#3b82f6", textColor: "#fff", mutcd: "D5-1a" },
+      { id: "exitramp2",     label: "EXIT",        shape: "rect",   color: "#22c55e", textColor: "#fff", mutcd: "E5-2"   },
     ],
   },
   school: {

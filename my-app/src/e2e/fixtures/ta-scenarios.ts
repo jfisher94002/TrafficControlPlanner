@@ -227,7 +227,8 @@ export const TA_SCENARIOS: TAScenario[] = [
 
   // ── TA-3: Work on the Shoulder (MUTCD Figure 6P-3) ───────────────────────
   // Pure shoulder work — no lane encroachment, no taper.
-  // G20-1 (advance distance) → W21-5a (shoulder work) → W20-1 → G20-2 (end).
+  // PDF Figure 6P-3: G20-1 (roadworknextmi) → W21-5 (shoulderwork) → G20-2 (endwork).
+  // W20-1 (roadwork) does NOT appear in this figure.
   {
     id: 'TA-3',
     title: mutcdTitle(3),
@@ -235,34 +236,34 @@ export const TA_SCENARIOS: TAScenario[] = [
       objects: [
         road2(),
         sign('roadworknextmi', SR, 150),
-        sign('shoulderwork',   SR, 250),
-        sign('roadwork',       SR, 360),
-        sign('endwork',        SR, 500),
+        sign('shoulderwork',   SR, 300),
+        sign('endwork',        SR, 470),
         zone('zone-1', CX + 55, WY - 30, 100, 80),
       ],
     },
     assert: {
-      signs: ['roadworknextmi', 'shoulderwork', 'roadwork', 'endwork'],
+      signs: ['roadworknextmi', 'shoulderwork', 'endwork'],
       objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-4: Short Duration or Mobile Operation on a Shoulder (Figure 6P-4) ─
-  // G20-1 → W21-5a → W20-1; no END sign (mobile/short-duration).
+  // PDF Figure 6P-4: W21-5 (shoulderwork) → W20-1 (roadwork) → W7-3aP (nextmiles).
+  // No G20-1 (roadworknextmi) in this figure.
   {
     id: 'TA-4',
     title: mutcdTitle(4),
     seed: {
       objects: [
         road2(),
-        sign('roadworknextmi', SR, 150),
-        sign('shoulderwork',   SR, 250),
-        sign('roadwork',       SR, 360),
+        sign('shoulderwork', SR, 190),
+        sign('roadwork',     SR, 310),
+        sign('nextmiles',    SR, 430),
         zone('zone-1', CX + 40, WY - 30, 90, 80),
       ],
     },
     assert: {
-      signs: ['roadworknextmi', 'shoulderwork', 'roadwork'],
+      signs: ['shoulderwork', 'roadwork', 'nextmiles'],
       objectTypes: ['road', 'zone'],
     },
   },
@@ -298,42 +299,44 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-6: Shoulder Work with Minor Encroachment (MUTCD Figure 6P-6) ──────
-  // Encroaches into travel lane; W4-2 (MERGE) + taper required.
+  // PDF Figure 6P-6: W20-1 (roadwork) + G20-2 (endwork) on both approaches.
+  // W21-5 (shoulderwork) and W4-2 (merge) do NOT appear in this figure.
   {
     id: 'TA-6',
     title: mutcdTitle(6),
     seed: {
       objects: [
         road2(),
-        sign('shoulderwork', SR, 150),
-        sign('roadwork',     SR, 270),
-        sign('merge',        SR, 390),
+        sign('roadwork', SR, 190),
+        sign('endwork',  SR, 430),
         taper('taper-1', CX + 20, TY),
         zone('zone-1', CX + 50, WY - 30, 100, 80),
       ],
     },
     assert: {
-      signs: ['shoulderwork', 'roadwork', 'merge'],
+      signs: ['roadwork', 'endwork'],
       objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-7: Road Closed with a Diversion (MUTCD Figure 6P-7) ──────────────
-  // Entire two-lane road closed; traffic diverted via alternate route.
-  // R11-2 (ROAD CLOSED) + M4-11 (DIVERSION ROUTE).
+  // PDF Figure 6P-7: W20-1 (roadwork), G20-2 (endwork), W1-6R/L (reversecurve),
+  // W24-1L (diversion arrow — not in catalog), W13-1P (distance plaque).
+  // R11-2 (roadclosed) and M4-11 (diversionrte) do NOT appear in this figure.
   {
     id: 'TA-7',
     title: mutcdTitle(7),
     seed: {
       objects: [
         road2(),
-        sign('roadclosed',   SR, 190),
-        sign('diversionrte', SR, 340),
+        sign('roadwork',    SR, 150),
+        sign('reversecurve',SR, 270),
+        sign('endwork',     SR, 430),
         zone('zone-1', CX, WY - 30, 80, 150),
       ],
     },
     assert: {
-      signs: ['roadclosed', 'diversionrte'],
+      signs: ['roadwork', 'reversecurve', 'endwork'],
       objectTypes: ['road', 'zone'],
     },
   },
@@ -458,20 +461,27 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       objects: [
         road2(),
-        sign('roadclosed', SR, 190),
-        sign('detour',     SR, 340),
+        // PDF Figure 6P-13: W20-1 (roadwork), W3-4 (prepstop), W20-7 (trafficcontrols/flagger)
+        // R11-2 (roadclosed) and M4-8 (detour) do NOT appear in this figure.
+        sign('roadwork',     SR, 150),
+        sign('prepstop',     SR, 270),
+        sign('flaggerahead', SR, 390),
         zone('zone-1', CX, WY - 30, 80, 200),
+        device('flagger-1', 'flagger', CX, TY),
+        device('flagger-2', 'flagger', CX, WY + 100),
       ],
     },
     assert: {
-      signs: ['roadclosed', 'detour'],
+      signs: ['roadwork', 'prepstop', 'flaggerahead'],
+      devices: ['flagger'],
       objectTypes: ['road', 'zone'],
+      minDevices: { flagger: 2 },
     },
   },
 
   // ── TA-14: Haul Road Crossing (MUTCD Figure 6P-14) ───────────────────────
-  // Construction vehicles cross the public road. W21-7 (TRUCKS ENTERING)
-  // warns drivers; flagger controls the crossing.
+  // PDF Figure 6P-14: W20-1 (roadwork), W20-7 (trafficcontrols), W3-3 (signal),
+  // R10-6, W14-3 (not in catalog). W21-7 (trucksentering) does NOT appear.
   {
     id: 'TA-14',
     title: mutcdTitle(14),
@@ -479,13 +489,13 @@ export const TA_SCENARIOS: TAScenario[] = [
       objects: [
         road2(),
         sign('roadwork',       SR, 190),
-        sign('trucksentering', SR, 340),
+        sign('trafficcontrols',SR, 340),
         zone('zone-1', WX, WY - 30, 100, 80),
         device('flagger-1', 'flagger', CX, TY),
       ],
     },
     assert: {
-      signs: ['roadwork', 'trucksentering'],
+      signs: ['roadwork', 'trafficcontrols'],
       devices: ['flagger'],
       objectTypes: ['road', 'zone'],
     },
@@ -516,20 +526,23 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-16: Surveying Along the Center Line — Low Traffic Volumes ──────────
-  // Survey crew along center line; W21-5 (SURVEYORS) on both approaches.
+  // PDF Figure 6P-16: W21-6 (surveycrew), W20-7 (trafficcontrols/flagger).
+  // W21-5 (surveyors/shoulderwork) does NOT appear — figure uses W21-6 specifically.
   {
     id: 'TA-16',
     title: mutcdTitle(16),
     seed: {
       objects: [
         road2(),
-        sign('surveyors', SR, 190),
-        sign('surveyors', SL, 190),
+        sign('surveycrew',     SR, 190),
+        sign('trafficcontrols',SR, 340),
+        sign('surveycrew',     SL, 190),
+        sign('trafficcontrols',SL, 340),
         zone('zone-1', CX, WY - 30, 80, 120),
       ],
     },
     assert: {
-      signs: ['surveyors'],
+      signs: ['surveycrew', 'trafficcontrols'],
       objectTypes: ['road', 'zone'],
     },
   },
@@ -555,22 +568,23 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-18: Lane Closure on a Minor Street (MUTCD Figure 6P-18) ───────────
-  // Single lane closed on a minor/low-speed street; arrow board.
+  // PDF Figure 6P-18: W21-1 (workers symbol) only.
+  // W20-1 (roadwork) and W9-1 (rightlaneends) do NOT appear in this figure.
   {
     id: 'TA-18',
     title: mutcdTitle(18),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',      SR, 190),
-        sign('rightlaneends', SR, 340),
+        sign('workers', SR, 280),
+        sign('workers', SL, 280),
         taper('taper-1', CX + 40, TY, 35),
         zone('zone-1',   CX + 40, WY - 30, 80, 150),
         device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'rightlaneends'],
+      signs: ['workers'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
     },
@@ -615,104 +629,121 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-21: Lane Closure on the Near Side of an Intersection ──────────────
-  // Taper closes right lane before intersection; work zone at intersection.
+  // PDF Figure 6P-21: W20-1 (roadwork), W12-1 (laneends), W9-3L (leftlaneclosed).
+  // W4-2 (merge) does NOT appear in this figure.
   {
     id: 'TA-21',
     title: mutcdTitle(21),
     seed: {
       objects: [
         road4(),
-        sign('roadwork', SR, 190),
-        sign('merge',    SR, 340),
+        sign('roadwork',      SR, 150),
+        sign('laneends',      SR, 270),
+        sign('leftlaneclosed',SR, 390),
         taper('taper-1', CX + 40, TY, 45),
         zone('zone-1',   CX + 40, WY - 30, 80, 150),
       ],
     },
     assert: {
-      signs: ['roadwork', 'merge'],
+      signs: ['roadwork', 'laneends', 'leftlaneclosed'],
       objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-22: Right-Hand Lane Closure on the Far Side of an Intersection ─────
-  // Right lane closed after intersection; taper begins past intersection.
+  // PDF Figure 6P-22: W20-1 (roadwork), G20-2 (endwork), W20-5R (rightlaneclosed),
+  // W4-2R (merge). W9-1 (rightlaneends) does NOT appear in this figure.
   {
     id: 'TA-22',
     title: mutcdTitle(22),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',      SR, 190),
-        sign('rightlaneends', SR, 340),
+        sign('roadwork',        SR, 150),
+        sign('rightlaneclosed', SR, 270),
+        sign('merge',           SR, 390),
+        sign('endwork',         SR, 520),
         taper('taper-1', CX + 40, TY, 45),
         zone('zone-1',   CX + 40, WY - 30, 80, 150),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'rightlaneends'],
+      signs: ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
+      devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-23: Left-Hand Lane Closure on the Far Side of an Intersection ──────
-  // Left lane closed; merge right; arrow board.
+  // PDF Figure 6P-23: W20-1 (roadwork), G20-2 (endwork), W20-5L (leftlaneclosed),
+  // W4-2L (merge). W9-2 (leftlaneends) does NOT appear in this figure.
   {
     id: 'TA-23',
     title: mutcdTitle(23),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',     SR, 150),
-        sign('leftlaneends', SR, 270),
-        sign('merge',        SR, 390),
+        sign('roadwork',       SR, 150),
+        sign('leftlaneclosed', SR, 270),
+        sign('merge',          SR, 390),
+        sign('endwork',        SR, 520),
         taper('taper-1', CX - 40, TY, 45),
         zone('zone-1',   CX - 40, WY - 30, 80, 150),
         device('ab-1', 'arrow_board', CX - 40, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'leftlaneends', 'merge'],
+      signs: ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-24: Half Road Closure on the Far Side of an Intersection ───────────
-  // Half the road (one lane in each direction) closed beyond intersection;
-  // temp signals control alternating traffic.
+  // PDF Figure 6P-24: W20-1 (roadwork), W20-5L (leftlaneclosed), W4-2L (merge),
+  // G20-2 (endwork), W20-5R (rightlaneclosed), W4-2R (merge again), R3-2, R3-1.
+  // W20-4a (onelane) and W3-4 (prepstop) do NOT appear in this figure.
   {
     id: 'TA-24',
     title: mutcdTitle(24),
     seed: {
       objects: [
         road4(),
-        sign('roadwork', SR, 150),
-        sign('onelane',  SR, 270),
-        sign('prepstop', SR, 390),
+        sign('roadwork',        SR, 150),
+        sign('leftlaneclosed',  SR, 270),
+        sign('merge',           SR, 390),
+        sign('endwork',         SL, 150),
+        sign('rightlaneclosed', SL, 270),
         zone('zone-1', CX, WY - 30, 80, 200),
-        device('sig-1', 'temp_signal', CX, TY),
-        device('sig-2', 'temp_signal', CX, WY + 120),
+        taper('taper-1', CX + 40, TY, 45),
+        taper('taper-2', CX - 40, TY, 45),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
+        device('ab-2', 'arrow_board', CX - 40, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'onelane', 'prepstop'],
-      devices: ['temp_signal'],
-      objectTypes: ['road', 'zone'],
-      minDevices: { temp_signal: 2 },
+      signs: ['roadwork', 'leftlaneclosed', 'merge', 'endwork', 'rightlaneclosed'],
+      devices: ['arrow_board'],
+      objectTypes: ['road', 'taper', 'zone'],
+      minTapers: 2,
+      minDevices: { arrow_board: 2 },
     },
   },
 
   // ── TA-25: Multiple Lane Closures at an Intersection (Figure 6P-25) ───────
-  // Two lanes closed at/near an intersection; nested tapers, multiple boards.
+  // PDF Figure 6P-25: W20-1 (roadwork), G20-2 (endwork), W20-5L (leftlaneclosed),
+  // W4-2L (merge), R4-7 (keepright). W9-1 (twolaneends) does NOT appear.
   {
     id: 'TA-25',
     title: mutcdTitle(25),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',    SR, 150),
-        sign('twolaneends', SR, 270),
-        sign('merge',       SR, 390),
+        sign('roadwork',       SR, 150),
+        sign('leftlaneclosed', SR, 270),
+        sign('merge',          SR, 390),
+        sign('endwork',        SR, 520),
         taper('taper-1', CX + 50, TY - 40, 35, 12, 2),
         taper('taper-2', CX + 25, TY,      35, 12, 1),
         zone('zone-1',   CX + 25, WY - 30, 80, 150),
@@ -721,7 +752,7 @@ export const TA_SCENARIOS: TAScenario[] = [
       ],
     },
     assert: {
-      signs: ['roadwork', 'twolaneends', 'merge'],
+      signs: ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
       minTapers: 2,
@@ -753,22 +784,25 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-27: Closure at the Side of an Intersection (Figure 6P-27) ──────────
-  // Work at the side of an intersection; right lane closed; arrow board.
+  // PDF Figure 6P-27: W20-1 (roadwork), G20-2 (endwork), W20-4 (onelane/slowtraffic),
+  // W20-7 (trafficcontrols). W9-1 (rightlaneends) does NOT appear in this figure.
   {
     id: 'TA-27',
     title: mutcdTitle(27),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',      SR, 190),
-        sign('rightlaneends', SR, 340),
+        sign('roadwork',       SR, 150),
+        sign('onelane',        SR, 270),
+        sign('trafficcontrols',SR, 390),
+        sign('endwork',        SR, 520),
         taper('taper-1', CX + 40, TY, 35),
         zone('zone-1',   CX + 40, WY - 30, 80, 80),
         device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'rightlaneends'],
+      signs: ['roadwork', 'onelane', 'trafficcontrols', 'endwork'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
     },
@@ -814,75 +848,79 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-30: Interior Lane Closure on a Multi-Lane Street (Figure 6P-30) ────
-  // Center/interior lane closed on a multi-lane street. W9-3 (CENTER LANE).
+  // PDF Figure 6P-30: W20-1 (roadwork), W20-5L (leftlaneclosed), W4-2L (merge).
+  // W9-3 (centerlane) does NOT appear in this figure.
   {
     id: 'TA-30',
     title: mutcdTitle(30),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',   SR, 150),
-        sign('centerlane', SR, 270),
-        sign('merge',      SR, 390),
+        sign('roadwork',      SR, 150),
+        sign('leftlaneclosed',SR, 270),
+        sign('merge',         SR, 390),
         taper('taper-1', CX, TY, 45),
         zone('zone-1',   CX, WY - 30, 80, 150),
         device('ab-1', 'arrow_board', CX, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'centerlane', 'merge'],
+      signs: ['roadwork', 'leftlaneclosed', 'merge'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-31: Lane Closure on a Street with Uneven Directional Volumes ────────
-  // One lane closed; volumes differ by direction; flagger alternates flow.
+  // PDF Figure 6P-31: W20-1 (roadwork), W4-2L (merge), W1-4bR/L (not in catalog),
+  // W13-1P (distance plaque). W20-7a (flaggerahead) and W20-4a (onelane) NOT in fig.
   {
     id: 'TA-31',
     title: mutcdTitle(31),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',     SR, 150),
-        sign('flaggerahead', SR, 270),
-        sign('onelane',      SR, 390),
+        sign('roadwork', SR, 190),
+        sign('merge',    SR, 340),
         taper('taper-1', CX + 40, TY, 35),
         zone('zone-1',   CX + 40, WY - 30, 80, 150),
-        device('flagger-1', 'flagger', CX + 40, TY - 10),
-        device('flagger-2', 'flagger', CX + 40, WY + 90),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'flaggerahead', 'onelane'],
-      devices: ['flagger'],
+      signs: ['roadwork', 'merge'],
+      devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
-      minDevices: { flagger: 2 },
     },
   },
 
   // ── TA-32: Half Road Closure on a Multi-Lane, High-Speed Highway ───────────
-  // Half the lanes closed on a high-speed multilane road; temp signals.
+  // PDF Figure 6P-32: W20-1 (roadwork), W20-5L (leftlaneclosed), W20-5R (rightlaneclosed),
+  // W4-2L/R (merge), G20-2 (endwork). W20-4a (onelane) and W3-4 (prepstop) NOT in fig.
   {
     id: 'TA-32',
     title: mutcdTitle(32),
     seed: {
       objects: [
         road4(),
-        sign('roadwork', SR, 150),
-        sign('onelane',  SR, 270),
-        sign('prepstop', SR, 390),
+        sign('roadwork',        SR, 150),
+        sign('leftlaneclosed',  SR, 270),
+        sign('rightlaneclosed', SR, 390),
+        sign('merge',           SR, 510),
+        sign('endwork',         SL, 150),
         taper('taper-1', CX + 40, TY, 55),
+        taper('taper-2', CX - 40, TY, 55),
         zone('zone-1', CX + 40, WY - 30, 80, 150),
-        device('sig-1', 'temp_signal', CX + 40, TY - 5),
-        device('sig-2', 'temp_signal', CX + 40, WY + 100),
+        device('ab-1', 'arrow_board', CX + 40, TY - 10),
+        device('ab-2', 'arrow_board', CX - 40, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'onelane', 'prepstop'],
-      devices: ['temp_signal'],
+      signs: ['roadwork', 'leftlaneclosed', 'rightlaneclosed', 'merge', 'endwork'],
+      devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
-      minDevices: { temp_signal: 2 },
+      minTapers: 2,
+      minDevices: { arrow_board: 2 },
     },
   },
 
@@ -941,28 +979,30 @@ export const TA_SCENARIOS: TAScenario[] = [
     seed: {
       objects: [
         road4(),
-        sign('roadwork', SR, 190),
-        sign('workers',  SR, 340),
+        // PDF Figure 6P-35: W20-5L (leftlaneclosed) only — mobile op, no advance signs.
+        // W20-1 (roadwork) and W21-1 (workers) do NOT appear.
+        sign('leftlaneclosed', SR, 280),
         device('ab-1', 'arrow_board', CX + 40, TY),
       ],
     },
     assert: {
-      signs: ['roadwork', 'workers'],
+      signs: ['leftlaneclosed'],
       devices: ['arrow_board'],
       objectTypes: ['road'],
     },
   },
 
   // ── TA-36: Lane Shift on a Freeway (MUTCD Figure 6P-36) ─────────────────
-  // All freeway lanes shifted laterally; in-taper and out-taper; arrow board.
+  // PDF Figure 6P-36: W20-1 (roadwork), G20-2 (endwork), W1-4cL/R (lane shift
+  // turn signs — not in catalog), W13-1P (distance plaques). W4-2L (shiftleft) NOT in fig.
   {
     id: 'TA-36',
     title: mutcdTitle(36),
     seed: {
       objects: [
         roadFwy(),
-        sign('roadwork',  SR, 190),
-        sign('shiftleft', SR, 340),
+        sign('roadwork', SR, 190),
+        sign('endwork',  SR, 430),
         taper('taper-1', CX + 50, TY,       65),
         zone('zone-1',   CX - 25, WY - 30, 80, 150),
         taper('taper-2', CX - 25, WY + 80,  65),
@@ -970,7 +1010,7 @@ export const TA_SCENARIOS: TAScenario[] = [
       ],
     },
     assert: {
-      signs: ['roadwork', 'shiftleft'],
+      signs: ['roadwork', 'endwork'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
       minTapers: 2,
@@ -978,15 +1018,18 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-37: Double Lane Closure on a Freeway (MUTCD Figure 6P-37) ─────────
-  // Two lanes closed on freeway; nested tapers; two arrow boards; 65 mph.
+  // PDF Figure 6P-37: G20-2 (endwork), W20-5aR (rightlaneclosed), W4-2R (merge),
+  // W20-1 (roadwork). Verified correct — signs all present.
   {
     id: 'TA-37',
     title: mutcdTitle(37),
     seed: {
       objects: [
         roadFwy(),
-        sign('roadwork', SR, 190),
-        sign('merge',    SR, 340),
+        sign('roadwork',        SR, 150),
+        sign('rightlaneclosed', SR, 270),
+        sign('merge',           SR, 390),
+        sign('endwork',         SR, 530),
         taper('taper-1', CX + 50, TY - 40, 65, 12, 2),
         taper('taper-2', CX + 25, TY,      65, 12, 1),
         zone('zone-1',   CX + 25, WY - 30, 80, 150),
@@ -995,7 +1038,7 @@ export const TA_SCENARIOS: TAScenario[] = [
       ],
     },
     assert: {
-      signs: ['roadwork', 'merge'],
+      signs: ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
       minTapers: 2,
@@ -1004,23 +1047,27 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-38: Interior Lane Closure on a Freeway (MUTCD Figure 6P-38) ────────
-  // Interior (center/median) lane closed; W9-3 (CENTER LANE); 65 mph taper.
+  // PDF Figure 6P-38: G20-2 optional (endwork), W12-1 (laneends), W9-3L (leftlaneclosed),
+  // W4-2L (merge), W20-5L (leftlaneclosed again), W20-1 (roadwork).
+  // W9-3 (centerlane) does NOT appear — W9-3L is the left-specific variant.
   {
     id: 'TA-38',
     title: mutcdTitle(38),
     seed: {
       objects: [
         roadFwy(),
-        sign('roadwork',   SR, 150),
-        sign('centerlane', SR, 270),
-        sign('merge',      SR, 390),
+        sign('roadwork',       SR, 150),
+        sign('laneends',       SR, 270),
+        sign('leftlaneclosed', SR, 390),
+        sign('merge',          SR, 510),
+        sign('endwork',        SR, 600),
         taper('taper-1', CX, TY, 65, 12, 1, 780),
         zone('zone-1',   CX, WY - 30, 80, 150),
         device('ab-1', 'arrow_board', CX, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'centerlane', 'merge'],
+      signs: ['roadwork', 'laneends', 'leftlaneclosed', 'merge', 'endwork'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
       taperFormula: { speed: 65, laneWidth: 12, expectedFt: 780 },
@@ -1028,287 +1075,345 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-39: Median Crossover on a Freeway (MUTCD Figure 6P-39) ────────────
-  // Traffic from one side crosses median to use opposite roadway;
-  // temp signals control both ends; prepare-to-stop signing.
+  // PDF Figure 6P-39: G20-2 (endwork), W1-6R (reversecurve), W1-4R (reverseturn),
+  // R5-1 (donotenter), R4-7 (keepright), W13-1P (plaque), W6-3 (twowaytraf), W20-1 (roadwork).
+  // W20-4a (onelane) and W3-4 (prepstop) do NOT appear in this figure.
   {
     id: 'TA-39',
     title: mutcdTitle(39),
     seed: {
       objects: [
         roadFwy(),
-        sign('roadwork', SR, 150),
-        sign('onelane',  SR, 270),
-        sign('prepstop', SR, 390),
+        sign('roadwork',     SR, 150),
+        sign('twowaytraf',   SR, 270),
+        sign('donotenter',   SR, 390),
+        sign('keepright',    SR, 510),
+        sign('endwork',      SR, 600),
         taper('taper-1', CX + 25, TY, 65),
         zone('zone-1', CX, WY - 30, 150, 200),
-        device('sig-1', 'temp_signal', CX + 25, TY - 5),
-        device('sig-2', 'temp_signal', CX - 25, WY + 130),
+        device('barrier-1', 'barrier', CX, TY + 20),
       ],
     },
     assert: {
-      signs: ['roadwork', 'onelane', 'prepstop'],
-      devices: ['temp_signal'],
+      signs: ['roadwork', 'twowaytraf', 'donotenter', 'keepright', 'endwork'],
+      devices: ['barrier'],
       objectTypes: ['road', 'taper', 'zone'],
-      minDevices: { temp_signal: 2 },
     },
   },
 
   // ── TA-40: Median Crossover for an Entrance Ramp (Figure 6P-40) ──────────
-  // Entrance ramp affected by median crossover; ramp closed + detour signed.
+  // PDF Figure 6P-40: W20-1 (roadwork), W3-2 (yieldahead), W4-1L (mergeleft),
+  // R5-1 (donotenter), R1-2 (yield), R6-1L (oneway), W1-6L (reversecurve),
+  // R11-2 (roadclosed), W6-3 (twowaytraf). Barrier optional.
   {
     id: 'TA-40',
     title: mutcdTitle(40),
     seed: {
       objects: [
         roadFwy(),
-        sign('rampclosed', SR, 230),
-        sign('detour',     SR, 360),
+        sign('roadwork',     SR, 150),
+        sign('yieldahead',   SR, 270),
+        sign('mergeleft',    SR, 390),
+        sign('twowaytraf',   SR, 510),
+        sign('roadclosed',   SR, 600),
+        sign('reversecurve', SR, 700),
+        sign('oneway',       SR, 800),
+        sign('yield',        SR, 900),
+        sign('donotenter',   SR, 1000),
         zone('zone-1', CX + 130, WY - 30, 100, 80),
+        device('barrier-1', 'barrier', CX, TY + 20),
       ],
     },
     assert: {
-      signs: ['rampclosed', 'detour'],
+      signs: ['roadwork', 'yieldahead', 'mergeleft', 'twowaytraf', 'roadclosed', 'reversecurve', 'oneway', 'yield', 'donotenter'],
+      devices: ['barrier'],
       objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-41: Median Crossover for an Exit Ramp (Figure 6P-41) ─────────────
-  // Exit ramp affected by median crossover; exit closed + detour signed.
+  // PDF Figure 6P-41: W6-3 (twowaytraf), E5-1 (exitramp).
+  // R11-2 (exitclosed) and M4-8 (detour) do NOT appear in this figure.
   {
     id: 'TA-41',
     title: mutcdTitle(41),
     seed: {
       objects: [
         roadFwy(),
-        sign('exitclosed', SR, 230),
-        sign('detour',     SR, 360),
+        sign('twowaytraf', SR, 190),
+        sign('exitramp',   SR, 340),
         zone('zone-1', CX + 130, WY - 30, 100, 80),
       ],
     },
     assert: {
-      signs: ['exitclosed', 'detour'],
+      signs: ['twowaytraf', 'exitramp'],
       objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-42: Work in the Vicinity of an Exit Ramp (Figure 6P-42) ───────────
-  // Work near a freeway exit ramp; shoulder work + arrow board.
+  // PDF Figure 6P-42: E5-1 (exitramp), E5-2 (exitramp2), W4-2R (merge),
+  // W20-5R (rightlaneclosed), W20-1 (roadwork). W21-5a (shoulderwork) NOT in fig.
   {
     id: 'TA-42',
     title: mutcdTitle(42),
     seed: {
       objects: [
         roadFwy(),
-        sign('roadwork',     SR, 190),
-        sign('shoulderwork', SR, 340),
-        device('ab-1', 'arrow_board', CX + 120, TY),
+        sign('roadwork',        SR, 150),
+        sign('rightlaneclosed', SR, 270),
+        sign('merge',           SR, 390),
+        sign('exitramp',        SR, 510),
+        sign('exitramp2',       SR, 600),
+        taper('taper-1', CX + 50, TY, 65),
         zone('zone-1', CX + 130, WY - 30, 80, 80),
+        device('ab-1', 'arrow_board', CX + 50, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'shoulderwork'],
+      signs: ['roadwork', 'rightlaneclosed', 'merge', 'exitramp', 'exitramp2'],
       devices: ['arrow_board'],
-      objectTypes: ['road', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-43: Partial Exit Ramp Closure (MUTCD Figure 6P-43) ────────────────
-  // Exit ramp partially closed; traffic directed to remaining open portion
-  // or detoured to next exit.
+  // PDF Figure 6P-43: W20-1 (roadwork), G20-2 optional (endwork).
+  // W5-4 (road narrows) and W13-1P/W13-4P (plaques) not in catalog.
+  // exitclosed (R11-2) and detour (M4-8) do NOT appear in this figure.
   {
     id: 'TA-43',
     title: mutcdTitle(43),
     seed: {
       objects: [
         roadFwy(),
-        sign('exitclosed', SR, 230),
-        sign('detour',     SR, 360),
+        sign('roadwork', SR, 230),
+        sign('endwork',  SR, 430),
         taper('taper-1', CX + 120, TY, 65),
         zone('zone-1', CX + 130, WY - 30, 80, 80),
       ],
     },
     assert: {
-      signs: ['exitclosed', 'detour'],
+      signs: ['roadwork', 'endwork'],
       objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-44: Work in the Vicinity of an Entrance Ramp (Figure 6P-44) ────────
-  // Work area near freeway entrance ramp; shoulder work + arrow board.
+  // PDF Figure 6P-44 (merge-required variant): W20-1 (roadwork), W20-5R (rightlaneclosed),
+  // W4-2R (merge), G20-2 optional (endwork). shoulderwork (W21-5a) NOT in this figure.
   {
     id: 'TA-44',
     title: mutcdTitle(44),
     seed: {
       objects: [
         roadFwy(),
-        sign('roadwork',     SR, 190),
-        sign('shoulderwork', SR, 340),
-        device('ab-1', 'arrow_board', CX + 120, TY),
+        sign('roadwork',        SR, 150),
+        sign('rightlaneclosed', SR, 270),
+        sign('merge',           SR, 390),
+        sign('endwork',         SR, 530),
+        taper('taper-1', CX + 50, TY, 65),
         zone('zone-1', CX + 130, WY - 30, 80, 80),
+        device('ab-1', 'arrow_board', CX + 50, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'shoulderwork'],
+      signs: ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
       devices: ['arrow_board'],
-      objectTypes: ['road', 'zone'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-45: Temporary Reversible Lane Using Movable Barriers ──────────────
-  // Center lane direction reversed using movable barriers; signals control entry.
+  // PDF Figure 6P-45: W20-1 (roadwork), W20-5aL (leftlaneclosed), W4-2L (merge),
+  // G20-2 optional (endwork). centerlane (W9-3) and onelane (W20-4a) NOT in this figure.
   {
     id: 'TA-45',
     title: mutcdTitle(45),
     seed: {
       objects: [
         roadFwy(),
-        sign('roadwork',   SR, 150),
-        sign('centerlane', SR, 270),
-        sign('onelane',    SR, 390),
+        sign('roadwork',       SR, 150),
+        sign('leftlaneclosed', SR, 270),
+        sign('merge',          SR, 390),
+        sign('endwork',        SR, 530),
         taper('taper-1', CX, TY, 65),
         zone('zone-1', CX, WY - 30, 80, 200),
         device('barrier-1', 'barrier',     CX, TY + 20),
-        device('sig-1',     'temp_signal', CX, TY - 5),
+        device('ab-1',      'arrow_board', CX, TY - 10),
+        device('ab-2',      'arrow_board', CX - 25, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'centerlane', 'onelane'],
-      devices: ['barrier', 'temp_signal'],
+      signs: ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],
+      devices: ['barrier', 'arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
+      minDevices: { arrow_board: 2 },
     },
   },
 
   // ── TA-46: Work in the Vicinity of a Grade Crossing (Figure 6P-46) ────────
-  // Work zone near a railroad grade crossing. W10-1 (GRADE CROSS) warns drivers.
+  // PDF Figure 6P-46: W20-1 (roadwork), W20-4 (onelane), W20-7 (trafficcontrols),
+  // R8-8 (railroadxing), R15-1 (railcrossing), G20-2 optional (endwork).
+  // W10-1 (gradecrossing) does NOT appear in this figure.
   {
     id: 'TA-46',
     title: mutcdTitle(46),
     seed: {
       objects: [
         road2(),
-        sign('roadwork',      SR, 190),
-        sign('gradecrossing', SR, 340),
+        sign('roadwork',      SR, 150),
+        sign('onelane',       SR, 270),
+        sign('trafficcontrols', SR, 390),
+        sign('railroadxing',  SR, 510),
+        sign('railcrossing',  SR, 600),
+        sign('endwork',       SL, 150),
         zone('zone-1', WX, WY - 30, 100, 80),
+        device('flagger-1', 'flagger', WX, TY),
       ],
     },
     assert: {
-      signs: ['roadwork', 'gradecrossing'],
+      signs: ['roadwork', 'onelane', 'trafficcontrols', 'railroadxing', 'railcrossing', 'endwork'],
+      devices: ['flagger'],
       objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-47: Bicycle Lane Closure without a Detour (Figure 6P-47) ──────────
-  // Bike lane closed; no alternate route provided. R9-10a sign only.
+  // PDF Figure 6P-47: W20-1 (roadwork), R9-12 (bicyclelaneclosed), W20-5b (bikelaneclosedahead),
+  // R9-20 optional (yieldtobikes), G20-2 optional (endwork).
+  // R9-10a (bikelaneclosed) does NOT appear — figure uses R9-12 (BICYCLE LANE CLOSED).
   {
     id: 'TA-47',
     title: mutcdTitle(47),
     seed: {
       objects: [
         road4(),
-        sign('bikelaneclosed', SR, 280),
+        sign('roadwork',           SR, 150),
+        sign('bicyclelaneclosed',  SR, 270),
+        sign('bikelaneclosedahead', SR, 390),
+        sign('yieldtobikes',       SR, 510),
+        sign('endwork',            SR, 600),
+        taper('taper-1', CX + 40, TY, 35),
         zone('zone-1', CX + 100, WY - 30, 80, 120),
       ],
     },
     assert: {
-      signs: ['bikelaneclosed'],
-      objectTypes: ['road', 'zone'],
-      noDevices: true,
+      signs: ['roadwork', 'bicyclelaneclosed', 'bikelaneclosedahead', 'yieldtobikes', 'endwork'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-48: Bicycle Lane Closure with an On-Road Detour (Figure 6P-48) ─────
-  // Bike lane closed; cyclists detoured onto roadway. R9-10a + M4-8.
+  // PDF Figure 6P-48: W20-1 (roadwork), R9-12 (bicyclelaneclosed), W20-5b (bikelaneclosedahead),
+  // R9-20 optional (yieldtobikes). M4-8b/M4-9c are bike-detour signs not in catalog.
   {
     id: 'TA-48',
     title: mutcdTitle(48),
     seed: {
       objects: [
         road4(),
-        sign('bikelaneclosed', SR, 190),
-        sign('detour',         SR, 340),
+        sign('roadwork',            SR, 150),
+        sign('bicyclelaneclosed',   SR, 270),
+        sign('bikelaneclosedahead', SR, 390),
+        sign('yieldtobikes',        SR, 510),
+        taper('taper-1', CX + 40, TY, 35),
         zone('zone-1', CX + 100, WY - 30, 80, 120),
       ],
     },
     assert: {
-      signs: ['bikelaneclosed', 'detour'],
-      objectTypes: ['road', 'zone'],
+      signs: ['roadwork', 'bicyclelaneclosed', 'bikelaneclosedahead', 'yieldtobikes'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-49: Shared-Use Path Closure with a Diversion (Figure 6P-49) ────────
-  // Shared-use path closed; users diverted via alternate route. R9-7a + M4-11.
+  // PDF Figure 6P-49: W20-1b (pathworkahead), R11-2c (pathclosed).
+  // W24-1L/R and M4-10L/R are path-diversion signs not in catalog.
+  // sharedusepath (R9-7a) and diversionrte (M4-11) NOT in this figure.
   {
     id: 'TA-49',
     title: mutcdTitle(49),
     seed: {
       objects: [
         road2(),
-        sign('sharedusepath', SR, 190),
-        sign('diversionrte',  SR, 340),
+        sign('pathworkahead', SR, 190),
+        sign('pathclosed',    SR, 340),
         zone('zone-1', CX + 80, WY - 30, 100, 80),
       ],
     },
     assert: {
-      signs: ['sharedusepath', 'diversionrte'],
+      signs: ['pathworkahead', 'pathclosed'],
       objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-50: On-Road Detour for a Shared-Use Path (Figure 6P-50) ───────────
-  // Shared-use path closed; cyclists/pedestrians directed to share roadway.
+  // PDF Figure 6P-50: W20-1 (roadwork), W20-3a (roadworkpath), R11-2c (pathclosed),
+  // R9-20 optional (yieldtobikes). M4-9c/M6-3P are bike-detour signs not in catalog.
+  // sharedusepath (R9-7a) and detour (M4-8) NOT in this figure.
   {
     id: 'TA-50',
     title: mutcdTitle(50),
     seed: {
       objects: [
         road2(),
-        sign('sharedusepath', SR, 190),
-        sign('detour',        SR, 340),
+        sign('roadwork',     SR, 150),
+        sign('roadworkpath', SR, 270),
+        sign('pathclosed',   SR, 390),
+        sign('yieldtobikes', SR, 510),
         zone('zone-1', CX + 80, WY - 30, 100, 80),
       ],
     },
     assert: {
-      signs: ['sharedusepath', 'detour'],
+      signs: ['roadwork', 'roadworkpath', 'pathclosed', 'yieldtobikes'],
       objectTypes: ['road', 'zone'],
     },
   },
 
   // ── TA-51: Paved Shoulder Closure with a Bicycle Diversion (Figure 6P-51) ─
-  // Paved shoulder (used as bike facility) closed; cyclists diverted to temp path.
+  // PDF Figure 6P-51: W20-1 (roadwork), W21-5a (shoulderwork), W16-2aP optional (xxft),
+  // G20-2 optional (endwork). M4-9cL/R are bike-diversion signs not in catalog.
+  // bikelaneclosed (R9-10a) does NOT appear in this figure.
   {
     id: 'TA-51',
     title: mutcdTitle(51),
     seed: {
       objects: [
         road2(),
-        sign('shoulderwork',   SR, 190),
-        sign('bikelaneclosed', SR, 340),
+        sign('roadwork',     SR, 150),
+        sign('shoulderwork', SR, 270),
+        sign('xxft',         SR, 390),
+        sign('endwork',      SR, 510),
+        taper('taper-1', CX + 55, TY, 35),
         zone('zone-1', CX + 55, WY - 30, 100, 80),
       ],
     },
     assert: {
-      signs: ['shoulderwork', 'bikelaneclosed'],
-      objectTypes: ['road', 'zone'],
+      signs: ['roadwork', 'shoulderwork', 'xxft', 'endwork'],
+      objectTypes: ['road', 'taper', 'zone'],
     },
   },
 
   // ── TA-52: Short-Term Work in a Circular Intersection (Figure 6P-52) ───────
-  // Short-term or short-duration work in a roundabout; advance warning + detour.
+  // PDF Figure 6P-52: W20-1 (roadwork), W20-4 (onelane), W20-7 (trafficcontrols)
+  // on all approaches; flaggers at intersection. detour (M4-8) NOT in this figure.
   {
     id: 'TA-52',
     title: mutcdTitle(52),
     seed: {
       objects: [
         road4(),
-        sign('roadwork', SR, 190),
-        sign('detour',   SR, 340),
+        sign('roadwork',       SR, 150),
+        sign('onelane',        SR, 270),
+        sign('trafficcontrols', SR, 390),
         zone('zone-1', CX, WY - 30, 80, 80),
-        device('ab-1', 'arrow_board', CX, TY),
+        device('flagger-1', 'flagger', CX, TY),
       ],
     },
     assert: {
-      signs: ['roadwork', 'detour'],
-      devices: ['arrow_board'],
+      signs: ['roadwork', 'onelane', 'trafficcontrols'],
+      devices: ['flagger'],
       objectTypes: ['road', 'zone'],
     },
   },
@@ -1337,22 +1442,25 @@ export const TA_SCENARIOS: TAScenario[] = [
   },
 
   // ── TA-54: Inside Lane Closure on a Multi-Lane Circular Intersection ────────
-  // Inside lane of a multi-lane roundabout closed; W9-3 + taper + arrow board.
+  // PDF Figure 6P-54: W20-1 (roadwork), W20-5R (rightlaneclosed), W4-2R (merge),
+  // G20-2 optional (endwork). centerlane (W9-3) does NOT appear in this figure.
   {
     id: 'TA-54',
     title: mutcdTitle(54),
     seed: {
       objects: [
         road4(),
-        sign('roadwork',    SR, 190),
-        sign('centerlane',  SR, 340),
-        taper('taper-1', CX, TY, 35),
+        sign('roadwork',        SR, 150),
+        sign('rightlaneclosed', SR, 270),
+        sign('merge',           SR, 390),
+        sign('endwork',         SR, 530),
+        taper('taper-1', CX, TY, 35, 12, 1),
         zone('zone-1',   CX, WY - 30, 80, 80),
         device('ab-1', 'arrow_board', CX, TY - 10),
       ],
     },
     assert: {
-      signs: ['roadwork', 'centerlane'],
+      signs: ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
       devices: ['arrow_board'],
       objectTypes: ['road', 'taper', 'zone'],
     },

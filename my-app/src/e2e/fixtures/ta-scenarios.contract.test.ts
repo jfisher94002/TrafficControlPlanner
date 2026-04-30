@@ -31,6 +31,45 @@ const MUTCD_MIN_SIGN_IDS: Partial<Record<string, string[]>> = {
   'TA-54': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],     // W20-1, W20-5R, W4-2R, G20-2
 }
 
+const AUDITED_EXACT_SIGN_IDS: Partial<Record<string, string[]>> = {
+  'TA-3':  ['roadworknextmi', 'shoulderwork', 'endwork'],
+  'TA-4':  ['shoulderwork', 'roadwork', 'nextmiles'],
+  'TA-6':  ['roadwork', 'endwork'],
+  'TA-7':  ['roadwork', 'reversecurve', 'endwork'],
+  'TA-13': ['roadwork', 'prepstop', 'flaggerahead'],
+  'TA-14': ['roadwork', 'trafficcontrols'],
+  'TA-16': ['surveycrew', 'trafficcontrols'],
+  'TA-18': ['workers'],
+  'TA-21': ['roadwork', 'laneends', 'leftlaneclosed'],
+  'TA-22': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
+  'TA-23': ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],
+  'TA-24': ['roadwork', 'leftlaneclosed', 'merge', 'endwork', 'rightlaneclosed'],
+  'TA-25': ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],
+  'TA-27': ['roadwork', 'onelane', 'trafficcontrols', 'endwork'],
+  'TA-30': ['roadwork', 'leftlaneclosed', 'merge'],
+  'TA-31': ['roadwork', 'merge'],
+  'TA-32': ['roadwork', 'leftlaneclosed', 'rightlaneclosed', 'merge', 'endwork'],
+  'TA-35': ['leftlaneclosed'],
+  'TA-36': ['roadwork', 'endwork'],
+  'TA-37': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
+  'TA-38': ['roadwork', 'laneends', 'leftlaneclosed', 'merge', 'endwork'],
+  'TA-39': ['roadwork', 'twowaytraf', 'donotenter', 'keepright', 'endwork'],
+  'TA-40': ['roadwork', 'yieldahead', 'mergeleft', 'twowaytraf', 'roadclosed', 'reversecurve', 'oneway', 'yield', 'donotenter'],
+  'TA-41': ['twowaytraf', 'exitramp'],
+  'TA-42': ['roadwork', 'rightlaneclosed', 'merge', 'exitramp', 'exitramp2'],
+  'TA-43': ['roadwork', 'endwork'],
+  'TA-44': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
+  'TA-45': ['roadwork', 'leftlaneclosed', 'merge', 'endwork'],
+  'TA-46': ['roadwork', 'onelane', 'trafficcontrols', 'railroadxing', 'railcrossing', 'endwork'],
+  'TA-47': ['roadwork', 'bicyclelaneclosed', 'bikelaneclosedahead', 'yieldtobikes', 'endwork'],
+  'TA-48': ['roadwork', 'bicyclelaneclosed', 'bikelaneclosedahead', 'yieldtobikes'],
+  'TA-49': ['pathworkahead', 'pathclosed'],
+  'TA-50': ['roadwork', 'roadworkpath', 'pathclosed', 'yieldtobikes'],
+  'TA-51': ['roadwork', 'shoulderwork', 'xxft', 'endwork'],
+  'TA-52': ['roadwork', 'onelane', 'trafficcontrols'],
+  'TA-54': ['roadwork', 'rightlaneclosed', 'merge', 'endwork'],
+}
+
 describe('TA_SCENARIOS contract (55 × 6P/CA)', () => {
   it('MUTCD title index is 54 federal TAs (Table 6P-1)', () => {
     expect(MUTCD_6P1_TA_TITLES).toHaveLength(MUTCD_6P1_TA_TITLES_LEN)
@@ -78,6 +117,14 @@ describe('TA_SCENARIOS contract (55 × 6P/CA)', () => {
       for (const id of required) {
         expect(have.has(id), `${taId} missing required sign "${id}"`).toBe(true)
       }
+    })
+  }
+
+  for (const [taId, expected] of Object.entries(AUDITED_EXACT_SIGN_IDS) as [string, string[]][]) {
+    it(`${taId} seed keeps the exact audited sign ids`, () => {
+      const sc = TA_SCENARIOS.find((s) => s.id === taId)
+      expect(sc, `No scenario ${taId}`).toBeDefined()
+      expect(getSignIdsFromSeed(sc!.seed)).toEqual(expected)
     })
   }
 })

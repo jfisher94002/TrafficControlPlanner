@@ -13,6 +13,7 @@ import { SIGN_CATEGORIES } from '../features/tcp/tcpCatalog'
 // ─── Collect all signs from the catalog ──────────────────────────────────────
 
 const allSigns = Object.values(SIGN_CATEGORIES).flatMap((cat) => cat.signs)
+const signById = new Map(allSigns.map((sign) => [sign.id, sign]))
 
 // ─── ID uniqueness ────────────────────────────────────────────────────────────
 
@@ -28,8 +29,40 @@ describe('SIGN_CATEGORIES — ID uniqueness', () => {
     expect(dupes).toEqual([])
   })
 
-  it('has exactly 374 signs total', () => {
+  it('has exactly 386 signs total', () => {
     expect(allSigns).toHaveLength(386)
+  })
+})
+
+describe('SIGN_CATEGORIES — MUTCD sign audit coverage', () => {
+  it('includes the rail, bike, lane-closure, path, and exit signs with exact MUTCD metadata', () => {
+    const auditedSigns = [
+      ['regulatory', 'railroadxing', 'RR CROSSING', 'rect', '#fff', '#111', 'R8-8', '#111'],
+      ['regulatory', 'railcrossing', 'RAIL XING', 'rect', '#fff', '#111', 'R15-1', '#111'],
+      ['regulatory', 'yieldtobikes', 'YIELD TO BIKES', 'triangle', '#ef4444', '#fff', 'R9-20', undefined],
+      ['regulatory', 'bicyclelaneclosed', 'BICYCLE LN CLOSED', 'rect', '#ef4444', '#fff', 'R9-12', undefined],
+      ['temporary', 'rightlaneclosed', 'RIGHT LANE CLOSED', 'diamond', '#f97316', '#111', 'W20-5R', undefined],
+      ['temporary', 'leftlaneclosed', 'LEFT LANE CLOSED', 'diamond', '#f97316', '#111', 'W20-5L', undefined],
+      ['temporary', 'laneends', 'LANE ENDS MERGE', 'diamond', '#f97316', '#111', 'W12-1', undefined],
+      ['temporary', 'pathworkahead', 'PATH WORK AHEAD', 'diamond', '#f97316', '#111', 'W20-1b', undefined],
+      ['temporary', 'pathclosed', 'PATH CLOSED', 'rect', '#f97316', '#111', 'R11-2c', undefined],
+      ['temporary', 'bikelaneclosedahead', 'BIKE LN CLOSED AHD', 'diamond', '#f97316', '#111', 'W20-5b', undefined],
+      ['temporary', 'roadworkpath', 'ROAD WORK AHEAD', 'diamond', '#f97316', '#111', 'W20-3a', undefined],
+      ['guide', 'exitramp2', 'EXIT', 'rect', '#22c55e', '#fff', 'E5-2', undefined],
+    ] as const
+
+    for (const [category, id, label, shape, color, textColor, mutcd, border] of auditedSigns) {
+      expect(SIGN_CATEGORIES[category].signs.map((sign) => sign.id), `${id} category`).toContain(id)
+      expect(signById.get(id)).toMatchObject({
+        id,
+        label,
+        shape,
+        color,
+        textColor,
+        mutcd,
+        ...(border ? { border } : {}),
+      })
+    }
   })
 })
 

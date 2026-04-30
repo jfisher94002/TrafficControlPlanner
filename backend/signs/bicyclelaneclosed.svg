@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60" aria-label="BICYCLE LN CLOSED">
+  <rect x="3" y="3" width="114" height="54" rx="4" fill="#ef4444" stroke="#111" stroke-width="3"/>
+  <text x="60" y="28" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">BICYCLE LANE</text>
+  <text x="60" y="47" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff">CLOSED</text>
+</svg>
